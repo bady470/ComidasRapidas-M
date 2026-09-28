@@ -1,0 +1,18 @@
+# Filas base que toda empresa necesita. El aprovisionamiento después las ajusta con los datos de cada empresa.
+databaseChangeLog:
+  - changeSet:
+      id: empresa-005-datos-base
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO cliente.tbl_configuraciones (id, eslogan, titulo_portada, mensaje, franjas)
+              VALUES (1, 'Pide en línea y recibe en casa', 'Pide en línea, fácil y rápido',
+                      'Escoge tus productos, dinos dónde estás y paga como prefieras.',
+                      E'Mañana · 9 a 12\nTarde · 2 a 6');
+              INSERT INTO cliente.tbl_horarios (dia, es_activo, abre, cierra) VALUES
+                  (1, TRUE, '10:00', '22:00'), (2, TRUE, '10:00', '22:00'), (3, TRUE, '10:00', '22:00'),
+                  (4, TRUE, '10:00', '22:00'), (5, TRUE, '10:00', '23:00'), (6, TRUE, '10:00', '23:00'),
+                  (7, TRUE, '12:00', '21:00');
+      rollback:
+        - sql: { sql: DELETE FROM cliente.tbl_horarios; DELETE FROM cliente.tbl_configuraciones; }

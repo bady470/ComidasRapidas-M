@@ -1,11 +1,16 @@
-# Levanta la app completa (frontend + backend en un solo contenedor) y su base de datos.
+# Tres contenedores: base de datos, backend (API) y frontend (Angular + Nginx).
 # Arráncalo con:  docker compose up -d --build
+# Abre:           http://localhost:8080  (superadmin en http://localhost:8080/superadmin)
+#
+# PostgreSQL arranca con la base de control (db_leinei_control). El backend crea sola la plantilla
+# (db_leinei_plantilla) y, cada vez que el superadmin crea una empresa, su base db_cliente_<identificador>.
 services:
   db:
     image: postgres:17
     container_name: leinei-db
     environment:
-      POSTGRES_DB: leinei
+      POSTGRES_DB: db_leinei_control
+      # Usuario OWNER de la plataforma: crea bases y roles (en producción, uno con CREATEDB y CREATEROLE, no superusuario).
       POSTGRES_USER: leinei
       POSTGRES_PASSWORD: leinei
       TZ: America/Bogota
@@ -15,29 +20,47 @@ services:
       - leinei-datos:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U leinei -d leinei"]
+      test: ["CMD-SHELL", "pg_isready -U leinei -d db_leinei_control"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  app:
+  backend:
     build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: leinei-app
+      context: ./backend
+    image: leinei-backend
+    container_name: leinei-backend
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DB_URL: jdbc:postgresql://db:5432/leinei
-      DB_USER: leinei
-      DB_PASSWORD: leinei
-      # Mismo origen para frontend y API: no hace falta configurar CORS_ORIGINS.
-      ADMIN_USER: admin
-      ADMIN_NAME: Administrador
-      ADMIN_PASSWORD: cambia-esta-clave
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_OWNER_USER: leinei
+      DB_OWNER_PASSWORD: leinei
+      # Cifra las claves de la base de cada empresa. Cámbiala y guárdala: si se pierde, no se pueden abrir esas bases.
+      LEINEI_LLAVE_MAESTRA: cambia-esta-llave-maestra-por-una-larga
+      # Primer superadmin (solo se crea si no existe ninguno). Cambia la clave al entrar: /superadmin → Mi cuenta.
+      SUPERADMIN_USER: superadmin
+      SUPERADMIN_NAME: Superadministrador
+      SUPERADMIN_PASSWORD: cambia-esta-clave
+      # El navegador solo habla con el frontend (Nginx reenvía /api), así que no hace falta CORS_ORIGINS.
+    # Solo se publica para pruebas directas a la API (http://localhost:8081/api/...). Puedes quitarlo.
     ports:
-      - "8080:8080"
+      - "8081:8080"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    image: leinei-frontend
+    container_name: leinei-frontend
+    depends_on:
+      - backend
+    environment:
+      API_URL: http://backend:8080
+    ports:
+      - "8080:80"
     restart: unless-stopped
 
 volumes:

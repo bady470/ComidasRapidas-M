@@ -1,0 +1,102 @@
+# Esquema "cliente": personalización y configuración de la empresa (su tienda, sus administradores).
+databaseChangeLog:
+  - changeSet:
+      id: empresa-002-configuraciones
+      author: leinei
+      comment: Configuración de la tienda. Una sola fila. La marca (nombre, logo, colores) vive en la base de control.
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE cliente.tbl_configuraciones (
+                  id                      SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+                  uuid                    UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  eslogan                 VARCHAR(160) NOT NULL DEFAULT '',
+                  titulo_portada          VARCHAR(120) NOT NULL DEFAULT '',
+                  mensaje                 VARCHAR(400) NOT NULL DEFAULT '',
+                  whatsapp                VARCHAR(20)  NOT NULL DEFAULT '',
+                  direccion               VARCHAR(160) NOT NULL DEFAULT '',
+                  ciudad                  VARCHAR(80)  NOT NULL DEFAULT '',
+                  instagram               VARCHAR(60)  NOT NULL DEFAULT '',
+                  es_abierta              BOOLEAN      NOT NULL DEFAULT TRUE,
+                  modo_pedido             VARCHAR(12)  NOT NULL DEFAULT 'INMEDIATO' CHECK (modo_pedido IN ('INMEDIATO','PROGRAMADO')),
+                  tiempo_minimo           SMALLINT     NOT NULL DEFAULT 30,
+                  tiempo_maximo           SMALLINT     NOT NULL DEFAULT 45,
+                  dia_entrega             SMALLINT     NOT NULL DEFAULT 7 CHECK (dia_entrega BETWEEN 1 AND 7),
+                  cierre_dias_antes       SMALLINT     NOT NULL DEFAULT 1 CHECK (cierre_dias_antes BETWEEN 0 AND 6),
+                  cierre_hora             SMALLINT     NOT NULL DEFAULT 21 CHECK (cierre_hora BETWEEN 0 AND 23),
+                  franjas                 TEXT         NOT NULL DEFAULT '',
+                  pedido_minimo           INTEGER      NOT NULL DEFAULT 0,
+                  tiene_domicilio         BOOLEAN      NOT NULL DEFAULT TRUE,
+                  domicilio_valor         INTEGER      NOT NULL DEFAULT 0 CHECK (domicilio_valor >= 0),
+                  tiene_recogida          BOOLEAN      NOT NULL DEFAULT FALSE,
+                  tiene_efectivo          BOOLEAN      NOT NULL DEFAULT TRUE,
+                  costo_operativo_unidad  INTEGER      NOT NULL DEFAULT 0,
+                  actualizado_en          TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+      rollback:
+        - sql: { sql: DROP TABLE cliente.tbl_configuraciones; }
+
+  - changeSet:
+      id: empresa-002-horarios-zonas-cuentas
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              -- Horario de atención (modo inmediato). dia: 1 = lunes … 7 = domingo.
+              CREATE TABLE cliente.tbl_horarios (
+                  id        BIGSERIAL PRIMARY KEY,
+                  uuid      UUID     NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  dia       SMALLINT NOT NULL UNIQUE CHECK (dia BETWEEN 1 AND 7),
+                  es_activo BOOLEAN  NOT NULL DEFAULT TRUE,
+                  abre      TIME     NOT NULL DEFAULT '10:00',
+                  cierra    TIME     NOT NULL DEFAULT '22:00'
+              );
+              -- Zonas o barrios con su valor de domicilio.
+              CREATE TABLE cliente.tbl_zonas_envio (
+                  id        BIGSERIAL PRIMARY KEY,
+                  uuid      UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  nombre    VARCHAR(80) NOT NULL,
+                  valor     INTEGER     NOT NULL CHECK (valor >= 0),
+                  es_activa BOOLEAN     NOT NULL DEFAULT TRUE,
+                  orden     INTEGER     NOT NULL DEFAULT 0
+              );
+              -- Cuentas para transferir: Nequi, Daviplata, banco, llave Bre-B.
+              CREATE TABLE cliente.tbl_cuentas_pago (
+                  id        BIGSERIAL PRIMARY KEY,
+                  uuid      UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  entidad   VARCHAR(40) NOT NULL,
+                  titular   VARCHAR(80) NOT NULL,
+                  numero    VARCHAR(40) NOT NULL,
+                  es_activa BOOLEAN     NOT NULL DEFAULT TRUE,
+                  orden     INTEGER     NOT NULL DEFAULT 0
+              );
+      rollback:
+        - sql: { sql: DROP TABLE cliente.tbl_cuentas_pago; DROP TABLE cliente.tbl_zonas_envio; DROP TABLE cliente.tbl_horarios; }
+
+  - changeSet:
+      id: empresa-002-administradores
+      author: leinei
+      comment: Usuarios del portal de la empresa y sus sesiones (solo se guarda el hash del token).
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE cliente.tbl_administradores (
+                  id         BIGSERIAL PRIMARY KEY,
+                  uuid       UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  usuario    VARCHAR(40)  NOT NULL UNIQUE,
+                  nombre     VARCHAR(80)  NOT NULL,
+                  clave_hash VARCHAR(100) NOT NULL,
+                  es_activo  BOOLEAN      NOT NULL DEFAULT TRUE,
+                  creado_en  TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+              CREATE TABLE cliente.tbl_sesiones_admin (
+                  id               BIGSERIAL PRIMARY KEY,
+                  uuid             UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  token_hash       VARCHAR(64) NOT NULL UNIQUE,
+                  administrador_id BIGINT      NOT NULL REFERENCES cliente.tbl_administradores(id) ON DELETE CASCADE,
+                  creado_en        TIMESTAMPTZ NOT NULL DEFAULT now(),
+                  expira_en        TIMESTAMPTZ NOT NULL
+              );
+              CREATE INDEX idx_sesiones_admin_administrador_id ON cliente.tbl_sesiones_admin (administrador_id);
+      rollback:
+        - sql: { sql: DROP TABLE cliente.tbl_sesiones_admin; DROP TABLE cliente.tbl_administradores; }

@@ -2,6 +2,8 @@ package co.leinei.api.web;
 
 import co.leinei.api.config.TokenAuthFilter.AdminActual;
 import co.leinei.api.dominio.EstadoPedido;
+import co.leinei.api.empresa.EmpresaContexto;
+import co.leinei.api.empresa.Modulos;
 import co.leinei.api.servicio.PedidoService;
 import co.leinei.api.servicio.ReporteService;
 import co.leinei.api.web.dto.AdminDto;
@@ -15,7 +17,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping("/api/t/{empresa}/admin")
 public class AdminPedidoController {
 
     private final PedidoService pedidos;
@@ -38,6 +40,7 @@ public class AdminPedidoController {
     @ResponseStatus(HttpStatus.CREATED)
     public AdminDto.Pedido crearManual(@AuthenticationPrincipal AdminActual admin,
                                        @Valid @RequestBody AdminDto.PedidoManualRequest req) {
+        EmpresaContexto.exigirModulo(Modulos.PEDIDO_MANUAL, "Pedidos por WhatsApp");
         return pedidos.crearManual(req, admin.nombre());
     }
 
@@ -52,6 +55,7 @@ public class AdminPedidoController {
         return pedidos.cambiarPago(id, req.estadoPago());
     }
 
+    /** Días con pedidos: lo usa el filtro de la lista de pedidos, por eso no depende del módulo de reportes. */
     @GetMapping("/reportes/fechas")
     public List<LocalDate> fechas() {
         return reportes.fechas();
@@ -59,6 +63,7 @@ public class AdminPedidoController {
 
     @GetMapping("/reportes/produccion")
     public AdminDto.Produccion produccion(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+        EmpresaContexto.exigirModulo(Modulos.REPORTES, "Ventas y reportes");
         return reportes.produccion(fecha);
     }
 }

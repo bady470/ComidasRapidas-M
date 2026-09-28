@@ -1,0 +1,7 @@
+# Changelog de la BASE DE CONTROL (db_leinei_control): la base transversal de la plataforma.
+# Centraliza empresas, su marca, a qué base física apunta cada una, módulos, versión de esquema,
+# superadministradores y la cola de aprovisionamiento. Nunca guarda datos operativos de una empresa.
+databaseChangeLog:
+  - include: { file: 001-plataforma.yaml, relativeToChangelogFile: true }
+  - include: { file: 002-auditoria.yaml, relativeToChangelogFile: true }
+  - include: { file: 003-modulos.yaml, relativeToChangelogFile: true }

@@ -105,13 +105,23 @@ public class AuthService {
         return new AdminDto.Yo(a.getId(), a.getUsuario(), a.getNombre());
     }
 
+    /** El superadmin le asigna una clave nueva a un administrador de la empresa (y cierra sus sesiones). */
+    @Transactional
+    public void restablecerClave(String usuario, String nueva) {
+        AdminUsuario u = usuarios.findByUsuarioIgnoreCase(usuario.trim())
+                .orElseThrow(() -> ReglaNegocioException.noEncontrado("Esa empresa no tiene un administrador «" + usuario + "»."));
+        u.setClaveHash(encoder.encode(nueva));
+        u.setActivo(true);
+        sesiones.findAll().stream().filter(s -> s.getAdmin().getId().equals(u.getId())).forEach(sesiones::delete);
+    }
+
     @Transactional(readOnly = true)
     public java.util.List<AdminDto.Yo> listarAdmins() {
         return usuarios.findAll().stream().filter(AdminUsuario::isActivo)
                 .map(a -> new AdminDto.Yo(a.getId(), a.getUsuario(), a.getNombre())).toList();
     }
 
-    static String hash(String token) {
+    public static String hash(String token) {
         try {
             byte[] d = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(d);

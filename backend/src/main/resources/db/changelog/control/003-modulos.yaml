@@ -1,0 +1,18 @@
+# Catálogo inicial de módulos. "tienda" es la base: siempre activa para toda empresa.
+# Todas las empresas tienen físicamente las tablas de todos los módulos; activar uno es solo un permiso lógico.
+databaseChangeLog:
+  - changeSet:
+      id: control-003-modulos-iniciales
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO plataforma.tbl_modulos (codigo, nombre, descripcion, es_base, orden) VALUES
+                ('tienda',       'Tienda y pedidos',       'Catálogo, carrito, pedidos en línea, seguimiento y portal de pedidos.', TRUE, 1),
+                ('opciones',     'Productos personalizables', 'Tamaños, adiciones con precio e ingredientes para quitar.',          FALSE, 2),
+                ('promociones',  'Promociones',            'Combos, descuentos, precios especiales y domicilio gratis.',             FALSE, 3),
+                ('zonas',        'Zonas de domicilio',     'Valor de domicilio distinto por zona o barrio.',                         FALSE, 4),
+                ('reportes',     'Ventas y reportes',      'Qué preparar, ventas, ganancia estimada y pagos por cuenta.',            FALSE, 5),
+                ('pedido_manual','Pedidos por WhatsApp',   'Registrar desde el portal pedidos que llegan por WhatsApp o teléfono.',  FALSE, 6);
+      rollback:
+        - sql: { sql: DELETE FROM plataforma.tbl_modulos; }

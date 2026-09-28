@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject } from '@a
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Logo } from '../compartido/logo';
 import { Carrito } from '../core/carrito';
+import { EmpresaActual } from '../core/empresa';
 import { EstadoTienda } from '../core/estado-tienda';
 import { CelularPipe } from '../core/formato';
 
@@ -12,15 +13,15 @@ import { CelularPipe } from '../core/formato';
   template: `
     <header class="top">
       <div class="wrap">
-        <a class="brand" routerLink="/">
-          <app-logo [logoId]="tienda()?.logoId ?? null" [nombre]="tienda()?.nombre ?? ''" />
+        <a class="brand" [routerLink]="emp.url()">
+          <app-logo [logoUrl]="tienda()?.logoUrl" [nombre]="tienda()?.nombre ?? ''" />
           <b>{{ tienda()?.nombre }}</b>
         </a>
         <nav class="nav" aria-label="Secciones">
-          <a routerLink="/" routerLinkActive="activo" [routerLinkActiveOptions]="{ exact: true }">Menú</a>
-          <a routerLink="/seguimiento" routerLinkActive="activo">Mi pedido</a>
+          <a [routerLink]="emp.url()" routerLinkActive="activo" [routerLinkActiveOptions]="{ exact: true }">Menú</a>
+          <a [routerLink]="emp.url('/seguimiento')" routerLinkActive="activo">Mi pedido</a>
         </nav>
-        <a class="pillbtn escritorio" routerLink="/carrito">Carrito <span class="pill num">{{ carrito.totalUnidades() }}</span></a>
+        <a class="pillbtn escritorio" [routerLink]="emp.url('/carrito')">Carrito <span class="pill num">{{ carrito.totalUnidades() }}</span></a>
       </div>
     </header>
 
@@ -44,9 +45,10 @@ import { CelularPipe } from '../core/formato';
 export class TiendaLayout implements OnInit {
   protected estado = inject(EstadoTienda);
   protected carrito = inject(Carrito);
+  protected emp = inject(EmpresaActual);
   protected tienda = computed(() => this.estado.catalogo()?.tienda ?? null);
 
   ngOnInit(): void {
-    if (!this.estado.catalogo()) this.estado.cargar();
+    this.estado.asegurar();
   }
 }

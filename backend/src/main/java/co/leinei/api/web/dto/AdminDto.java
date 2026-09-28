@@ -130,7 +130,8 @@ public final class AdminDto {
             @Size(max = 160) String eslogan,
             @Size(max = 120) String tituloPortada,
             @Size(max = 400) String mensaje,
-            Long logoId,
+            /** Solo lectura: el logo se cambia con POST /marca/logo. */
+            String logoUrl,
             @NotBlank @Pattern(regexp = "#[0-9A-Fa-f]{6}", message = "Color principal inválido") String colorPrimario,
             @NotBlank @Pattern(regexp = "#[0-9A-Fa-f]{6}", message = "Color secundario inválido") String colorSecundario,
             // Contacto

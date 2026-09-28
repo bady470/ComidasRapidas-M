@@ -6,14 +6,14 @@ import {
   AdminUsuario, Catalogo, CategoriaAdmin, ConfigAdmin, Cotizacion, CrearPedido, EstadoPago, EstadoPedido, ItemPedido,
   PedidoAdmin, PedidoCreado, PedidoManual, Produccion, ProductoAdmin, ProductoForm, PromocionAdmin, PromocionForm,
   Seguimiento, Sesion, TipoEntrega,
+  ActualizarEmpresa, CrearEmpresa, EmpresaDetalle, EmpresaResumen, ModuloPlataforma, ResumenPlataforma, Superadmin,
 } from './modelos';
 
-const API = environment.apiUrl;
+import { apiEmpresa } from './empresa';
 
-/** Dirección pública de una imagen subida (logo o foto de producto). */
-export function urlImagen(id: number | null | undefined): string | null {
-  return id ? `${API}/public/archivos/${id}` : null;
-}
+export { urlImagen } from './empresa';
+
+const API = environment.apiUrl;
 
 /** Saca el mensaje que manda la API ({detail}) o uno genérico si no hay conexión. */
 export function mensajeError(e: unknown): string {
@@ -30,24 +30,25 @@ export class TiendaApi {
   private http = inject(HttpClient);
 
   catalogo(): Observable<Catalogo> {
-    return this.http.get<Catalogo>(`${API}/public/catalogo`);
+    return this.http.get<Catalogo>(`${apiEmpresa()}/public/catalogo`);
   }
   cotizar(items: ItemPedido[], tipoEntrega: TipoEntrega | null, zonaId: number | null): Observable<Cotizacion> {
-    return this.http.post<Cotizacion>(`${API}/public/cotizar`, { items, tipoEntrega, zonaId });
+    return this.http.post<Cotizacion>(`${apiEmpresa()}/public/cotizar`, { items, tipoEntrega, zonaId });
   }
   crearPedido(p: CrearPedido): Observable<PedidoCreado> {
-    return this.http.post<PedidoCreado>(`${API}/public/pedidos`, p);
+    return this.http.post<PedidoCreado>(`${apiEmpresa()}/public/pedidos`, p);
   }
   seguimiento(codigo: string, celular: string): Observable<Seguimiento> {
     const params = new HttpParams().set('celular', celular);
-    return this.http.get<Seguimiento>(`${API}/public/pedidos/${encodeURIComponent(codigo)}`, { params });
+    return this.http.get<Seguimiento>(`${apiEmpresa()}/public/pedidos/${encodeURIComponent(codigo)}`, { params });
   }
 }
 
 @Injectable({ providedIn: 'root' })
 export class AdminApi {
   private http = inject(HttpClient);
-  private base = `${API}/admin`;
+  /** Siempre la empresa actual: /api/t/{empresa}/admin */
+  private get base(): string { return `${apiEmpresa()}/admin`; }
 
   // ---- Sesión y administradores
   login(usuario: string, clave: string): Observable<Sesion> {
@@ -71,6 +72,16 @@ export class AdminApi {
     const datos = new FormData();
     datos.append('archivo', archivo);
     return this.http.post<{ id: number }>(`${this.base}/archivos`, datos);
+  }
+
+  // ---- Logo del negocio (se guarda en la plataforma, no en la base de la empresa)
+  subirLogo(archivo: File): Observable<ConfigAdmin> {
+    const datos = new FormData();
+    datos.append('archivo', archivo);
+    return this.http.post<ConfigAdmin>(`${this.base}/marca/logo`, datos);
+  }
+  quitarLogo(): Observable<ConfigAdmin> {
+    return this.http.delete<ConfigAdmin>(`${this.base}/marca/logo`);
   }
 
   // ---- Pedidos
@@ -147,5 +158,72 @@ export class AdminApi {
   }
   guardarConfig(c: ConfigAdmin): Observable<ConfigAdmin> {
     return this.http.put<ConfigAdmin>(`${this.base}/config`, c);
+  }
+}
+
+/** API del superadmin: empresas de la plataforma. */
+@Injectable({ providedIn: 'root' })
+export class PlataformaApi {
+  private http = inject(HttpClient);
+  private base = `${API}/plataforma`;
+
+  // ---- Sesión
+  login(usuario: string, clave: string): Observable<Sesion> {
+    return this.http.post<Sesion>(`${this.base}/auth/login`, { usuario, clave });
+  }
+  logout(): Observable<void> {
+    return this.http.post<void>(`${this.base}/auth/logout`, {});
+  }
+  cambiarClave(actual: string, nueva: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/auth/clave`, { actual, nueva });
+  }
+  superadmins(): Observable<Superadmin[]> {
+    return this.http.get<Superadmin[]>(`${this.base}/auth/superadmins`);
+  }
+  crearSuperadmin(usuario: string, nombre: string, clave: string): Observable<Superadmin> {
+    return this.http.post<Superadmin>(`${this.base}/auth/superadmins`, { usuario, nombre, clave });
+  }
+
+  // ---- Empresas
+  modulos(): Observable<ModuloPlataforma[]> {
+    return this.http.get<ModuloPlataforma[]>(`${this.base}/modulos`);
+  }
+  resumen(): Observable<ResumenPlataforma> {
+    return this.http.get<ResumenPlataforma>(`${this.base}/resumen`);
+  }
+  empresas(): Observable<EmpresaResumen[]> {
+    return this.http.get<EmpresaResumen[]>(`${this.base}/empresas`);
+  }
+  empresa(uuid: string): Observable<EmpresaDetalle> {
+    return this.http.get<EmpresaDetalle>(`${this.base}/empresas/${uuid}`);
+  }
+  crearEmpresa(e: CrearEmpresa): Observable<EmpresaDetalle> {
+    return this.http.post<EmpresaDetalle>(`${this.base}/empresas`, e);
+  }
+  actualizarEmpresa(uuid: string, e: ActualizarEmpresa): Observable<EmpresaDetalle> {
+    return this.http.put<EmpresaDetalle>(`${this.base}/empresas/${uuid}`, e);
+  }
+  subirLogo(uuid: string, archivo: File): Observable<EmpresaDetalle> {
+    const datos = new FormData();
+    datos.append('archivo', archivo);
+    return this.http.post<EmpresaDetalle>(`${this.base}/empresas/${uuid}/logo`, datos);
+  }
+  quitarLogo(uuid: string): Observable<EmpresaDetalle> {
+    return this.http.delete<EmpresaDetalle>(`${this.base}/empresas/${uuid}/logo`);
+  }
+  guardarModulos(uuid: string, modulos: string[]): Observable<EmpresaDetalle> {
+    return this.http.put<EmpresaDetalle>(`${this.base}/empresas/${uuid}/modulos`, { modulos });
+  }
+  suspender(uuid: string): Observable<EmpresaDetalle> {
+    return this.http.post<EmpresaDetalle>(`${this.base}/empresas/${uuid}/suspender`, {});
+  }
+  activar(uuid: string): Observable<EmpresaDetalle> {
+    return this.http.post<EmpresaDetalle>(`${this.base}/empresas/${uuid}/activar`, {});
+  }
+  reintentar(uuid: string): Observable<EmpresaDetalle> {
+    return this.http.post<EmpresaDetalle>(`${this.base}/empresas/${uuid}/reintentar`, {});
+  }
+  claveAdmin(uuid: string, usuario: string, nueva: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/empresas/${uuid}/clave-admin`, { usuario, nueva });
   }
 }

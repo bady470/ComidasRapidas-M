@@ -42,7 +42,7 @@ public class ArchivoService {
         return new Imagen(a.getDatos(), a.getTipoContenido());
     }
 
-    static String tipoDe(byte[] b) {
+    public static String tipoDe(byte[] b) {
         if (empieza(b, 0x89, 'P', 'N', 'G')) return "image/png";
         if (empieza(b, 0xFF, 0xD8, 0xFF)) return "image/jpeg";
         if (b.length > 12 && empieza(b, 'R', 'I', 'F', 'F')

@@ -5,12 +5,15 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "pedido_evento")
+@Table(schema = "producto", name = "tbl_pedidos_eventos")
 public class PedidoEvento {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    /** Identificador para exponer hacia afuera (el id interno solo sirve para índices). */
+    @Column(updatable = false)
+    private java.util.UUID uuid = java.util.UUID.randomUUID();
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "pedido_id")
@@ -20,8 +23,10 @@ public class PedidoEvento {
     private EstadoPedido estado;
     private String nota = "";
     private String autor = "";
+    @Column(name = "creado_en")
     private Instant creado = Instant.now();
 
+    public java.util.UUID getUuid() { return uuid; }
     public Long getId() { return id; }
     public Pedido getPedido() { return pedido; }
     void setPedido(Pedido v) { pedido = v; }

@@ -1,5 +1,6 @@
 package co.leinei.api.config;
 
+import co.leinei.api.plataforma.servicio.SuperadminAuthService;
 import co.leinei.api.servicio.AuthService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,7 +29,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain cadena(HttpSecurity http, AuthService auth) throws Exception {
+    public SecurityFilterChain cadena(HttpSecurity http, AuthService auth, SuperadminAuthService superadmins) throws Exception {
         http
             .csrf(c -> c.disable())               // API sin cookies: el token va en un encabezado
             .cors(Customizer.withDefaults())
@@ -38,19 +39,26 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/api/public/**").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/admin/auth/login").permitAll()
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                // Tienda de cada empresa: pública.
+                .requestMatchers("/api/t/*/public/**").permitAll()
+                // Portal de cada empresa: su administrador (token validado en la base de ESA empresa).
+                .requestMatchers(HttpMethod.POST, "/api/t/*/admin/auth/login").permitAll()
+                .requestMatchers("/api/t/*/admin/**").hasRole("ADMIN")
+                // Plataforma: solo el superadmin, salvo el logo y la búsqueda por dominio.
+                .requestMatchers("/api/plataforma/publico/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/plataforma/auth/login").permitAll()
+                .requestMatchers("/api/plataforma/**").hasRole("SUPERADMIN")
+                .requestMatchers("/api/**").denyAll()
                 .requestMatchers("/error").permitAll()
                 // Frontend Angular servido desde el mismo jar (archivos estáticos y rutas del SPA).
                 .requestMatchers(HttpMethod.GET, "/**").permitAll()
                 .anyRequest().denyAll())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint((req, res, ex) -> escribir(res, HttpStatus.UNAUTHORIZED,
-                        "Tu sesión terminó. Vuelve a entrar al panel."))
+                        "Tu sesión terminó. Vuelve a entrar."))
                 .accessDeniedHandler((req, res, ex) -> escribir(res, HttpStatus.FORBIDDEN,
                         "No tienes permiso para esta acción.")))
-            .addFilterBefore(new TokenAuthFilter(auth), UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(new TokenAuthFilter(auth, superadmins), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 

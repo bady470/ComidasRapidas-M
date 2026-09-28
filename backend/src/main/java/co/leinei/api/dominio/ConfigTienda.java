@@ -5,39 +5,39 @@ import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
-/** Configuración de la tienda: marca, contacto, forma de pedir, entrega y pagos. Hay una sola fila. */
+/**
+ * Configuración de la tienda de una empresa (una sola fila en su base).
+ * La marca (nombre comercial, logo, colores, dominio) vive en la base de control: ver EmpresaActual.
+ */
 @Entity
-@Table(name = "config_tienda")
+@Table(schema = "cliente", name = "tbl_configuraciones")
 public class ConfigTienda {
 
     @Id
     private Short id = 1;
-    // Marca
-    private String nombre;
+    @Column(updatable = false)
+    private UUID uuid = UUID.randomUUID();
+    // Textos de la portada
     private String eslogan = "";
     @Column(name = "titulo_portada")
     private String tituloPortada = "";
     private String mensaje = "";
-    @Column(name = "logo_id")
-    private Long logoId;
-    @Column(name = "color_primario")
-    private String colorPrimario;
-    @Column(name = "color_secundario")
-    private String colorSecundario;
     // Contacto
     private String whatsapp = "";
     private String direccion = "";
     private String ciudad = "";
     private String instagram = "";
     // Pedidos
+    @Column(name = "es_abierta")
     private boolean abierto = true;
     @Enumerated(EnumType.STRING)
     @Column(name = "modo_pedido")
     private ModoPedido modoPedido = ModoPedido.INMEDIATO;
-    @Column(name = "tiempo_min")
+    @Column(name = "tiempo_minimo")
     private short tiempoMin;
-    @Column(name = "tiempo_max")
+    @Column(name = "tiempo_maximo")
     private short tiempoMax;
     @Column(name = "dia_entrega")
     private short diaEntrega;
@@ -49,16 +49,18 @@ public class ConfigTienda {
     @Column(name = "pedido_minimo")
     private int pedidoMinimo;
     // Entrega
-    @Column(name = "domicilio_activo")
+    @Column(name = "tiene_domicilio")
     private boolean domicilioActivo;
     @Column(name = "domicilio_valor")
     private int domicilioValor;
-    @Column(name = "recoger_activo")
+    @Column(name = "tiene_recogida")
     private boolean recogerActivo;
     // Pagos y reportes
+    @Column(name = "tiene_efectivo")
     private boolean efectivo;
     @Column(name = "costo_operativo_unidad")
     private int costoOperativoUnidad;
+    @Column(name = "actualizado_en")
     private Instant actualizado;
 
     @PreUpdate
@@ -71,20 +73,13 @@ public class ConfigTienda {
     }
 
     public Short getId() { return id; }
-    public String getNombre() { return nombre; }
-    public void setNombre(String v) { nombre = v; }
+    public UUID getUuid() { return uuid; }
     public String getEslogan() { return eslogan; }
     public void setEslogan(String v) { eslogan = v; }
     public String getTituloPortada() { return tituloPortada; }
     public void setTituloPortada(String v) { tituloPortada = v; }
     public String getMensaje() { return mensaje; }
     public void setMensaje(String v) { mensaje = v; }
-    public Long getLogoId() { return logoId; }
-    public void setLogoId(Long v) { logoId = v; }
-    public String getColorPrimario() { return colorPrimario; }
-    public void setColorPrimario(String v) { colorPrimario = v; }
-    public String getColorSecundario() { return colorSecundario; }
-    public void setColorSecundario(String v) { colorSecundario = v; }
     public String getWhatsapp() { return whatsapp; }
     public void setWhatsapp(String v) { whatsapp = v; }
     public String getDireccion() { return direccion; }

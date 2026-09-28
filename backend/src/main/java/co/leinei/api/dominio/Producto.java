@@ -7,12 +7,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "producto")
+@Table(schema = "producto", name = "tbl_productos")
 public class Producto {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    /** Identificador para exponer hacia afuera (el id interno solo sirve para índices). */
+    @Column(updatable = false)
+    private java.util.UUID uuid = java.util.UUID.randomUUID();
     private String slug;
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "categoria_id")
@@ -22,12 +25,15 @@ public class Producto {
     private int precio;
     /** Costo por unidad. Solo lo ve el administrador. */
     private int costo;
-    @Column(name = "imagen_id")
+    @Column(name = "archivo_id")
     private Long imagenId;
     private String etiqueta = "";
+    @Column(name = "es_disponible")
     private boolean disponible = true;
     private int orden;
+    @Column(name = "creado_en")
     private Instant creado = Instant.now();
+    @Column(name = "actualizado_en")
     private Instant actualizado = Instant.now();
 
     @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -42,6 +48,7 @@ public class Producto {
         grupos.add(g);
     }
 
+    public java.util.UUID getUuid() { return uuid; }
     public Long getId() { return id; }
     public void setId(Long v) { id = v; }
     public String getSlug() { return slug; }

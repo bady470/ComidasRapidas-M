@@ -1,0 +1,9 @@
+# Changelog de la base de cada EMPRESA (db_cliente_<identificador>) y de la plantilla (db_leinei_plantilla).
+# Regla: todas las bases de empresa tienen exactamente la misma estructura. Los changesets nunca se editan
+# después de aplicados; los cambios nuevos van en un archivo nuevo al final de esta lista.
+databaseChangeLog:
+  - include: { file: 001-esquemas-y-auditoria.yaml, relativeToChangelogFile: true }
+  - include: { file: 002-cliente.yaml, relativeToChangelogFile: true }
+  - include: { file: 003-producto.yaml, relativeToChangelogFile: true }
+  - include: { file: 004-triggers-auditoria.yaml, relativeToChangelogFile: true }
+  - include: { file: 005-datos-base.yaml, relativeToChangelogFile: true }

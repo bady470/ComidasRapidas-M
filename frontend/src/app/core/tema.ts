@@ -1,5 +1,8 @@
 import { Injectable } from '@angular/core';
-import { urlImagen } from './api';
+import { urlServidor } from './empresa';
+
+/** Ícono original de index.html, para volver a él fuera de una tienda. */
+const ICONO_ORIGINAL = document.querySelector<HTMLLinkElement>('link[rel="icon"]')?.href ?? '';
 
 /**
  * Aplica la marca del negocio a toda la app: colores, título de la pestaña, ícono y color de la barra del celular.
@@ -7,7 +10,7 @@ import { urlImagen } from './api';
  */
 @Injectable({ providedIn: 'root' })
 export class Tema {
-  aplicar(marca: { nombre: string; eslogan?: string; colorPrimario: string; colorSecundario: string; logoId: number | null }): void {
+  aplicar(marca: { nombre: string; eslogan?: string; colorPrimario: string; colorSecundario: string; logoUrl: string | null }): void {
     const raiz = document.documentElement.style;
     raiz.setProperty('--brand', marca.colorPrimario);
     raiz.setProperty('--on-brand', textoSobre(marca.colorPrimario));
@@ -17,9 +20,17 @@ export class Tema {
     meta('theme-color', marca.colorSecundario);
     if (marca.eslogan) meta('description', `${marca.nombre}: ${marca.eslogan}`);
 
-    const icono = urlImagen(marca.logoId);
+    const icono = urlServidor(marca.logoUrl);
     const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-    if (link && icono) { link.href = icono; link.type = ''; }
+    if (link) { link.href = icono ?? ICONO_ORIGINAL; link.type = ''; }
+  }
+
+  /** Quita la marca de la empresa (páginas de la plataforma). */
+  restablecer(): void {
+    const raiz = document.documentElement.style;
+    for (const v of ['--brand', '--on-brand', '--brand-2', '--on-brand-2']) raiz.removeProperty(v);
+    const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (link && ICONO_ORIGINAL) link.href = ICONO_ORIGINAL;
   }
 }
 

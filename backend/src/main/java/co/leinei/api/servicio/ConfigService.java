@@ -1,6 +1,10 @@
 package co.leinei.api.servicio;
 
 import co.leinei.api.dominio.*;
+import co.leinei.api.empresa.EmpresaActual;
+import co.leinei.api.empresa.EmpresaContexto;
+import co.leinei.api.empresa.Modulos;
+import co.leinei.api.plataforma.servicio.MarcaService;
 import co.leinei.api.repositorio.*;
 import co.leinei.api.web.dto.AdminDto;
 import co.leinei.api.web.dto.PublicoDto;
@@ -22,17 +26,17 @@ public class ConfigService {
     private final HorarioRepositorio horarioRepo;
     private final ZonaEnvioRepositorio zonaRepo;
     private final CuentaPagoRepositorio cuentaRepo;
-    private final ArchivoRepositorio archivoRepo;
+    private final MarcaService marca;
     private final DisponibilidadService disponibilidad;
 
     public ConfigService(ConfigTiendaRepositorio configRepo, HorarioRepositorio horarioRepo, ZonaEnvioRepositorio zonaRepo,
-                         CuentaPagoRepositorio cuentaRepo, ArchivoRepositorio archivoRepo,
+                         CuentaPagoRepositorio cuentaRepo, MarcaService marca,
                          DisponibilidadService disponibilidad) {
         this.configRepo = configRepo;
         this.horarioRepo = horarioRepo;
         this.zonaRepo = zonaRepo;
         this.cuentaRepo = cuentaRepo;
-        this.archivoRepo = archivoRepo;
+        this.marca = marca;
         this.disponibilidad = disponibilidad;
     }
 
@@ -46,7 +50,7 @@ public class ConfigService {
 
     @Transactional(readOnly = true)
     public List<Horario> horarios() {
-        return horarioRepo.findAll(org.springframework.data.domain.Sort.by("dia"));
+        return horarioRepo.findAllByOrderByDiaAsc();
     }
 
     @Transactional(readOnly = true)
@@ -54,8 +58,10 @@ public class ConfigService {
         return disponibilidad.calcular(tienda(), horarios());
     }
 
+    /** Zonas con valor propio; sin el módulo de zonas se cobra el valor único de domicilio. */
     @Transactional(readOnly = true)
     public List<ZonaEnvio> zonasActivas() {
+        if (!EmpresaContexto.tieneModulo(Modulos.ZONAS)) return List.of();
         return zonaRepo.findByActivaTrueOrderByOrdenAscIdAsc();
     }
 
@@ -78,12 +84,13 @@ public class ConfigService {
         List<PublicoDto.HorarioDia> hs = horarios.stream()
                 .map(h -> new PublicoDto.HorarioDia(h.getDia(), h.isActivo(), h.getAbre().format(HH_MM), h.getCierra().format(HH_MM)))
                 .toList();
-        return new PublicoDto.Tienda(c.getNombre(), c.getEslogan(), c.getTituloPortada(), c.getMensaje(), c.getLogoId(),
-                c.getColorPrimario(), c.getColorSecundario(), c.getWhatsapp(), c.getDireccion(), c.getCiudad(),
+        EmpresaActual e = EmpresaContexto.requerida();
+        return new PublicoDto.Tienda(e.identificador(), e.nombreComercial(), c.getEslogan(), c.getTituloPortada(), c.getMensaje(),
+                e.logoUrl(), e.colorPrimario(), e.colorSecundario(), c.getWhatsapp(), c.getDireccion(), c.getCiudad(),
                 c.getInstagram(), c.isAbierto(), c.getModoPedido(), d.recibePedidos(), d.enHorario(), d.fechaServicio(),
                 d.cierre(), d.proximaApertura(), c.getTiempoMin(), c.getTiempoMax(), c.listaFranjas(),
                 c.getPedidoMinimo(), hs, c.isDomicilioActivo(), c.getDomicilioValor(), zonas, c.isRecogerActivo(),
-                c.isEfectivo(), cuentas);
+                c.isEfectivo(), cuentas, e.modulos().stream().sorted().toList());
     }
 
     @Transactional(readOnly = true)
@@ -97,8 +104,9 @@ public class ConfigService {
         List<AdminDto.Cuenta> cuentas = cuentaRepo.findAllByOrderByOrdenAscIdAsc().stream()
                 .map(n -> new AdminDto.Cuenta(n.getId(), n.getEntidad(), n.getTitular(), n.getNumero(), n.isActiva()))
                 .toList();
-        return new AdminDto.Config(c.getNombre(), c.getEslogan(), c.getTituloPortada(), c.getMensaje(), c.getLogoId(),
-                c.getColorPrimario(), c.getColorSecundario(), c.getWhatsapp(), c.getDireccion(), c.getCiudad(),
+        EmpresaActual e = EmpresaContexto.requerida();
+        return new AdminDto.Config(e.nombreComercial(), c.getEslogan(), c.getTituloPortada(), c.getMensaje(), e.logoUrl(),
+                e.colorPrimario(), e.colorSecundario(), c.getWhatsapp(), c.getDireccion(), c.getCiudad(),
                 c.getInstagram(), c.isAbierto(), c.getModoPedido(), c.getTiempoMin(), c.getTiempoMax(),
                 c.getDiaEntrega(), c.getCierreDiasAntes(), c.getCierreHora(), c.listaFranjas(), c.getPedidoMinimo(),
                 horarios, c.isDomicilioActivo(), c.getDomicilioValor(), zonas, c.isRecogerActivo(), c.isEfectivo(),
@@ -123,21 +131,17 @@ public class ConfigService {
         if (r.recogerActivo() && blanco(r.direccion())) {
             throw ReglaNegocioException.invalido("Escribe la dirección del local para que los clientes puedan recoger.");
         }
-        if (r.logoId() != null && !archivoRepo.existsById(r.logoId())) {
-            throw ReglaNegocioException.invalido("El logo ya no existe. Súbelo de nuevo.");
-        }
         Set<Integer> dias = new HashSet<>();
         if (r.horarios() != null) r.horarios().forEach(h -> dias.add(h.dia()));
         if (dias.size() != 7) throw ReglaNegocioException.invalido("El horario necesita los 7 días de la semana.");
 
+        // La marca vive en la base de control: se guarda allá.
+        marca.actualizarDesdeEmpresa(EmpresaContexto.requerida(), r.nombre().trim(), r.colorPrimario(), r.colorSecundario());
+
         ConfigTienda c = tienda();
-        c.setNombre(r.nombre().trim());
         c.setEslogan(limpio(r.eslogan()));
         c.setTituloPortada(limpio(r.tituloPortada()));
         c.setMensaje(limpio(r.mensaje()));
-        c.setLogoId(r.logoId());
-        c.setColorPrimario(r.colorPrimario().toUpperCase(Locale.ROOT));
-        c.setColorSecundario(r.colorSecundario().toUpperCase(Locale.ROOT));
         c.setWhatsapp(limpio(r.whatsapp()));
         c.setDireccion(limpio(r.direccion()));
         c.setCiudad(limpio(r.ciudad()));
@@ -159,7 +163,7 @@ public class ConfigService {
         c.setCostoOperativoUnidad(r.costoOperativoUnidad());
 
         for (AdminDto.Horario h : r.horarios()) {
-            Horario e = horarioRepo.findById((short) h.dia())
+            Horario e = horarioRepo.findByDia((short) h.dia())
                     .orElseGet(() -> new Horario(h.dia(), true, LocalTime.of(10, 0), LocalTime.of(22, 0)));
             e.setActivo(h.activo());
             e.setAbre(hora(h.abre()));
@@ -167,7 +171,7 @@ public class ConfigService {
             horarioRepo.save(e);
         }
 
-        reemplazar(zonas, AdminDto.Zona::id, zonaRepo, ZonaEnvio::new, ZonaEnvio::getId, (z, req, orden) -> {
+        if (EmpresaContexto.tieneModulo(Modulos.ZONAS)) reemplazar(zonas, AdminDto.Zona::id, zonaRepo, ZonaEnvio::new, ZonaEnvio::getId, (z, req, orden) -> {
             z.setNombre(req.nombre().trim());
             z.setValor(req.valor());
             z.setActiva(req.activa());

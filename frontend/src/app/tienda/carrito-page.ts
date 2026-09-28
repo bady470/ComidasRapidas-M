@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { TiendaApi, mensajeError } from '../core/api';
 import { Avisos } from '../core/avisos';
 import { Carrito, claveLinea } from '../core/carrito';
+import { claveLocal, EmpresaActual } from '../core/empresa';
 import { EstadoTienda } from '../core/estado-tienda';
 import { CelularPipe, DiaLargoPipe, DineroPipe, copiar, cuando, diaLargo, dinero, linkWhatsapp } from '../core/formato';
 import { Cotizacion, MetodoPago, PedidoCreado, TipoEntrega } from '../core/modelos';
@@ -13,7 +14,7 @@ interface DatosCliente {
   nombre: string; celular: string; barrio: string; direccion: string; referencia: string;
 }
 
-const CLAVE_CLIENTE = 'tienda_cliente';
+const CLAVE_CLIENTE = () => claveLocal('cliente');
 
 @Component({
   selector: 'app-carrito',
@@ -52,12 +53,12 @@ const CLAVE_CLIENTE = 'tienda_cliente';
             <a class="wa" [href]="linkWa()" target="_blank" rel="noopener">Enviar pedido por WhatsApp</a>
             <p class="muted" style="text-align:center">Si el botón no abre WhatsApp, escríbenos al <b class="num">{{ p.whatsappTienda | celular }}</b>.</p>
           }
-          <a class="ghost" [routerLink]="['/pedido', p.codigo]">Ver por dónde va mi pedido</a>
+          <a class="ghost" [routerLink]="emp.url('/pedido/' + p.codigo)">Ver por dónde va mi pedido</a>
         </section>
       } @else if (!carrito.totalUnidades()) {
         <section class="centro">
           <div class="empty">Tu carrito está vacío.</div>
-          <a class="primary" routerLink="/">Ver el menú</a>
+          <a class="primary" [routerLink]="emp.url()">Ver el menú</a>
         </section>
       } @else {
         @if (tienda(); as t) {
@@ -175,7 +176,7 @@ const CLAVE_CLIENTE = 'tienda_cliente';
             <button class="primary" type="button" (click)="pedir()" [disabled]="enviando() || !cotizacion() || !tienda()?.recibePedidos || !!faltaMinimo()">
               {{ enviando() ? 'Enviando pedido…' : 'Hacer pedido' + (cotizacion() ? ' · ' + precio(cotizacion()!.total) : '') }}
             </button>
-            <a class="linkbtn" routerLink="/">Seguir viendo el menú</a>
+            <a class="linkbtn" [routerLink]="emp.url()">Seguir viendo el menú</a>
           </aside>
         </div>
       }
@@ -187,6 +188,7 @@ export class CarritoPage {
   private estado = inject(EstadoTienda);
   private avisos = inject(Avisos);
   protected carrito = inject(Carrito);
+  protected emp = inject(EmpresaActual);
 
   protected tienda = computed(() => this.estado.catalogo()?.tienda ?? null);
   protected cotizacion = signal<Cotizacion | null>(null);
@@ -285,7 +287,7 @@ export class CarritoPage {
       notas: this.notas.trim(),
     }).subscribe({
       next: (p) => {
-        try { localStorage.setItem(CLAVE_CLIENTE, JSON.stringify({ ...d, celular: cel })); } catch { /* nada */ }
+        try { localStorage.setItem(CLAVE_CLIENTE(), JSON.stringify({ ...d, celular: cel })); } catch { /* nada */ }
         guardarPedidoReciente(p.codigo, cel);
         this.ultimoMensaje = this.mensaje(p, cot);
         this.creado.set(p);
@@ -316,6 +318,6 @@ export class CarritoPage {
 
 function leerCliente(): DatosCliente {
   const vacio: DatosCliente = { nombre: '', celular: '', barrio: '', direccion: '', referencia: '' };
-  try { return { ...vacio, ...(JSON.parse(localStorage.getItem(CLAVE_CLIENTE) ?? '{}') as Partial<DatosCliente>) }; }
+  try { return { ...vacio, ...(JSON.parse(localStorage.getItem(CLAVE_CLIENTE()) ?? '{}') as Partial<DatosCliente>) }; }
   catch { return vacio; }
 }

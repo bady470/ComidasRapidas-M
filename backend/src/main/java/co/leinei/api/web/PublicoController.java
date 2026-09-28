@@ -16,7 +16,7 @@ import java.time.Duration;
 
 /** Endpoints abiertos para los clientes de la tienda. */
 @RestController
-@RequestMapping("/api/public")
+@RequestMapping("/api/t/{empresa}/public")
 public class PublicoController {
 
     private final CatalogoService catalogo;
