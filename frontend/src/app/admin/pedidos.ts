@@ -6,7 +6,7 @@ import { Avisos } from '../core/avisos';
 import { claveLinea } from '../core/carrito';
 import { EstadoTienda } from '../core/estado-tienda';
 import { CelularPipe, DiaCortoPipe, DineroPipe, HoraPipe, dinero, linkWhatsapp } from '../core/formato';
-import { ACCION_HACIA, EstadoPedido, MetodoPago, NOMBRE_ESTADO, PedidoAdmin, Producto, TipoEntrega } from '../core/modelos';
+import { ACCION_HACIA, EstadoPedido, MODULOS, MetodoPago, NOMBRE_ESTADO, PedidoAdmin, Producto, TipoEntrega } from '../core/modelos';
 
 type Filtro = 'ACTIVOS' | 'TODOS' | EstadoPedido;
 
@@ -23,7 +23,9 @@ interface LineaManual { clave: string; producto: Producto; opcionIds: number[]; 
         @for (f of fechas(); track f) { <option [value]="f">{{ f | diaCorto }}</option> }
       </select>
       <input type="search" placeholder="Buscar nombre, celular, código o barrio" [ngModel]="busqueda()" (ngModelChange)="busqueda.set($event)">
-      <button class="btn main" (click)="manualAbierto.set(!manualAbierto())">+ Pedido por WhatsApp o teléfono</button>
+      @if (estadoTienda.tieneModulo(M.pedidoManual)) {
+        <button class="btn main" (click)="manualAbierto.set(!manualAbierto())">+ Pedido por WhatsApp o teléfono</button>
+      }
     </div>
     <div class="toolbar">
       <div class="seg">
@@ -166,7 +168,8 @@ interface LineaManual { clave: string; producto: Producto; opcionIds: number[]; 
 })
 export class PedidosPage {
   private api = inject(AdminApi);
-  private estadoTienda = inject(EstadoTienda);
+  protected estadoTienda = inject(EstadoTienda);
+  protected readonly M = MODULOS;
   private avisos = inject(Avisos);
 
   protected segmentos: { k: Filtro; t: string }[] = [

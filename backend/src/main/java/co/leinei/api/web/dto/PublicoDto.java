@@ -21,8 +21,8 @@ public final class PublicoDto {
     public record HorarioDia(int dia, boolean activo, String abre, String cierra) {}
 
     public record Tienda(
-            // Marca
-            String nombre, String eslogan, String tituloPortada, String mensaje, Long logoId,
+            // Marca (sale de la base de control)
+            String identificador, String nombre, String eslogan, String tituloPortada, String mensaje, String logoUrl,
             String colorPrimario, String colorSecundario,
             // Contacto
             String whatsapp, String direccion, String ciudad, String instagram,
@@ -32,7 +32,9 @@ public final class PublicoDto {
             int tiempoMin, int tiempoMax, List<String> franjas, int pedidoMinimo, List<HorarioDia> horarios,
             // Entrega y pagos
             boolean domicilioActivo, int domicilioValor, List<Zona> zonas, boolean recogerActivo,
-            boolean efectivo, List<Cuenta> cuentas) {}
+            boolean efectivo, List<Cuenta> cuentas,
+            // Módulos activos del plan de la empresa
+            List<String> modulos) {}
 
     public record Categoria(Long id, String nombre) {}
 

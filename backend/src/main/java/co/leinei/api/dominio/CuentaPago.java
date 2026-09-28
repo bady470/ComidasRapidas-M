@@ -4,18 +4,23 @@ import jakarta.persistence.*;
 
 /** Cuenta a la que el cliente transfiere: Nequi, Daviplata, Bancolombia, una llave Bre-B… */
 @Entity
-@Table(name = "cuenta_pago")
+@Table(schema = "cliente", name = "tbl_cuentas_pago")
 public class CuentaPago {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    /** Identificador para exponer hacia afuera (el id interno solo sirve para índices). */
+    @Column(updatable = false)
+    private java.util.UUID uuid = java.util.UUID.randomUUID();
     private String entidad;
     private String titular;
     private String numero;
+    @Column(name = "es_activa")
     private boolean activa = true;
     private int orden;
 
+    public java.util.UUID getUuid() { return uuid; }
     public Long getId() { return id; }
     public String getEntidad() { return entidad; }
     public void setEntidad(String v) { entidad = v; }

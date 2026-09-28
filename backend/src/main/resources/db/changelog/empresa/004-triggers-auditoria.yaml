@@ -1,0 +1,38 @@
+# Triggers de auditoría en las tablas críticas: todo INSERT, UPDATE y DELETE queda en plataforma.tbl_auditoria.
+# No se auditan tbl_archivos (datos binarios grandes) ni tbl_sesiones_admin (se renuevan en cada ingreso).
+databaseChangeLog:
+  - changeSet:
+      id: empresa-004-triggers-auditoria
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              CREATE TRIGGER trg_auditar_configuraciones AFTER INSERT OR UPDATE OR DELETE ON cliente.tbl_configuraciones FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_horarios AFTER INSERT OR UPDATE OR DELETE ON cliente.tbl_horarios FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_zonas_envio AFTER INSERT OR UPDATE OR DELETE ON cliente.tbl_zonas_envio FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_cuentas_pago AFTER INSERT OR UPDATE OR DELETE ON cliente.tbl_cuentas_pago FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_administradores AFTER INSERT OR UPDATE OR DELETE ON cliente.tbl_administradores FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_categorias AFTER INSERT OR UPDATE OR DELETE ON producto.tbl_categorias FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_productos AFTER INSERT OR UPDATE OR DELETE ON producto.tbl_productos FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_grupos_opciones AFTER INSERT OR UPDATE OR DELETE ON producto.tbl_grupos_opciones FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_opciones AFTER INSERT OR UPDATE OR DELETE ON producto.tbl_opciones FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_promociones AFTER INSERT OR UPDATE OR DELETE ON producto.tbl_promociones FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_promociones_productos AFTER INSERT OR UPDATE OR DELETE ON producto.tbl_promociones_productos FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_pedidos AFTER INSERT OR UPDATE OR DELETE ON producto.tbl_pedidos FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_pedidos_items AFTER INSERT OR UPDATE OR DELETE ON producto.tbl_pedidos_items FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+      rollback:
+        - sql:
+            sql: |
+              DROP TRIGGER trg_auditar_pedidos_items ON producto.tbl_pedidos_items;
+              DROP TRIGGER trg_auditar_pedidos ON producto.tbl_pedidos;
+              DROP TRIGGER trg_auditar_promociones_productos ON producto.tbl_promociones_productos;
+              DROP TRIGGER trg_auditar_promociones ON producto.tbl_promociones;
+              DROP TRIGGER trg_auditar_opciones ON producto.tbl_opciones;
+              DROP TRIGGER trg_auditar_grupos_opciones ON producto.tbl_grupos_opciones;
+              DROP TRIGGER trg_auditar_productos ON producto.tbl_productos;
+              DROP TRIGGER trg_auditar_categorias ON producto.tbl_categorias;
+              DROP TRIGGER trg_auditar_administradores ON cliente.tbl_administradores;
+              DROP TRIGGER trg_auditar_cuentas_pago ON cliente.tbl_cuentas_pago;
+              DROP TRIGGER trg_auditar_zonas_envio ON cliente.tbl_zonas_envio;
+              DROP TRIGGER trg_auditar_horarios ON cliente.tbl_horarios;
+              DROP TRIGGER trg_auditar_configuraciones ON cliente.tbl_configuraciones;

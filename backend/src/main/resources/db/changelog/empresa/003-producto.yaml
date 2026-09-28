@@ -1,0 +1,176 @@
+# Esquema "producto": núcleo operativo (catálogo, promociones y pedidos).
+databaseChangeLog:
+  - changeSet:
+      id: empresa-003-catalogo
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              -- Fotos de productos (se guardan en la base para no depender de un disco).
+              CREATE TABLE producto.tbl_archivos (
+                  id              BIGSERIAL PRIMARY KEY,
+                  uuid            UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  tipo_contenido  VARCHAR(40) NOT NULL,
+                  datos           BYTEA       NOT NULL,
+                  tamano          INTEGER     NOT NULL,
+                  creado_en       TIMESTAMPTZ NOT NULL DEFAULT now()
+              );
+              CREATE TABLE producto.tbl_categorias (
+                  id        BIGSERIAL PRIMARY KEY,
+                  uuid      UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  nombre    VARCHAR(60) NOT NULL,
+                  es_activa BOOLEAN     NOT NULL DEFAULT TRUE,
+                  orden     INTEGER     NOT NULL DEFAULT 0
+              );
+              CREATE TABLE producto.tbl_productos (
+                  id             BIGSERIAL PRIMARY KEY,
+                  uuid           UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  slug           VARCHAR(60)  NOT NULL UNIQUE,
+                  categoria_id   BIGINT REFERENCES producto.tbl_categorias(id) ON DELETE SET NULL,
+                  archivo_id     BIGINT REFERENCES producto.tbl_archivos(id) ON DELETE SET NULL,
+                  nombre         VARCHAR(80)  NOT NULL,
+                  descripcion    VARCHAR(400) NOT NULL DEFAULT '',
+                  precio         INTEGER      NOT NULL CHECK (precio > 0),
+                  costo          INTEGER      NOT NULL DEFAULT 0 CHECK (costo >= 0),
+                  etiqueta       VARCHAR(40)  NOT NULL DEFAULT '',
+                  es_disponible  BOOLEAN      NOT NULL DEFAULT TRUE,
+                  orden          INTEGER      NOT NULL DEFAULT 0,
+                  creado_en      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+                  actualizado_en TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+              CREATE INDEX idx_productos_categoria_id ON producto.tbl_productos (categoria_id);
+              CREATE INDEX idx_productos_archivo_id ON producto.tbl_productos (archivo_id);
+
+              -- Grupos de opciones de un producto ("Tamaño", "Adiciones") y sus opciones.
+              CREATE TABLE producto.tbl_grupos_opciones (
+                  id          BIGSERIAL PRIMARY KEY,
+                  uuid        UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  producto_id BIGINT      NOT NULL REFERENCES producto.tbl_productos(id) ON DELETE CASCADE,
+                  nombre      VARCHAR(60) NOT NULL,
+                  minimo      SMALLINT    NOT NULL DEFAULT 0 CHECK (minimo >= 0),
+                  maximo      SMALLINT    NOT NULL DEFAULT 1 CHECK (maximo >= 1),
+                  orden       INTEGER     NOT NULL DEFAULT 0,
+                  CHECK (minimo <= maximo)
+              );
+              CREATE INDEX idx_grupos_opciones_producto_id ON producto.tbl_grupos_opciones (producto_id);
+              CREATE TABLE producto.tbl_opciones (
+                  id              BIGSERIAL PRIMARY KEY,
+                  uuid            UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  grupo_opcion_id BIGINT      NOT NULL REFERENCES producto.tbl_grupos_opciones(id) ON DELETE CASCADE,
+                  nombre          VARCHAR(60) NOT NULL,
+                  precio_extra    INTEGER     NOT NULL DEFAULT 0 CHECK (precio_extra >= 0),
+                  es_disponible   BOOLEAN     NOT NULL DEFAULT TRUE,
+                  orden           INTEGER     NOT NULL DEFAULT 0
+              );
+              CREATE INDEX idx_opciones_grupo_opcion_id ON producto.tbl_opciones (grupo_opcion_id);
+      rollback:
+        - sql:
+            sql: |
+              DROP TABLE producto.tbl_opciones; DROP TABLE producto.tbl_grupos_opciones; DROP TABLE producto.tbl_productos;
+              DROP TABLE producto.tbl_categorias; DROP TABLE producto.tbl_archivos;
+
+  - changeSet:
+      id: empresa-003-promociones
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE producto.tbl_promociones (
+                  id               BIGSERIAL PRIMARY KEY,
+                  uuid             UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  nombre           VARCHAR(80)  NOT NULL,
+                  descripcion      VARCHAR(300) NOT NULL DEFAULT '',
+                  tipo             VARCHAR(20)  NOT NULL CHECK (tipo IN ('COMBO','PORCENTAJE','PRECIO_ESPECIAL','ENVIO_GRATIS')),
+                  cantidad         INTEGER,
+                  precio           INTEGER,
+                  porcentaje       INTEGER CHECK (porcentaje IS NULL OR porcentaje BETWEEN 1 AND 90),
+                  minimo           INTEGER      NOT NULL DEFAULT 0,
+                  producto_id      BIGINT REFERENCES producto.tbl_productos(id) ON DELETE CASCADE,
+                  es_activa        BOOLEAN      NOT NULL DEFAULT TRUE,
+                  es_destacada     BOOLEAN      NOT NULL DEFAULT TRUE,
+                  vigente_desde_en DATE,
+                  vigente_hasta_en DATE,
+                  creado_en        TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+              CREATE INDEX idx_promociones_producto_id ON producto.tbl_promociones (producto_id);
+              -- Pivote N:N: productos a los que aplica un combo o un porcentaje. Sin filas = todos.
+              CREATE TABLE producto.tbl_promociones_productos (
+                  id           BIGSERIAL PRIMARY KEY,
+                  uuid         UUID   NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  promocion_id BIGINT NOT NULL REFERENCES producto.tbl_promociones(id) ON DELETE CASCADE,
+                  producto_id  BIGINT NOT NULL REFERENCES producto.tbl_productos(id) ON DELETE CASCADE,
+                  UNIQUE (promocion_id, producto_id)
+              );
+              CREATE INDEX idx_promociones_productos_promocion_id ON producto.tbl_promociones_productos (promocion_id);
+              CREATE INDEX idx_promociones_productos_producto_id ON producto.tbl_promociones_productos (producto_id);
+      rollback:
+        - sql: { sql: DROP TABLE producto.tbl_promociones_productos; DROP TABLE producto.tbl_promociones; }
+
+  - changeSet:
+      id: empresa-003-pedidos
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE producto.tbl_pedidos (
+                  id                  BIGSERIAL PRIMARY KEY,
+                  uuid                UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  codigo              VARCHAR(12)  NOT NULL UNIQUE,
+                  creado_en           TIMESTAMPTZ  NOT NULL DEFAULT now(),
+                  actualizado_en      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+                  -- Día de servicio: día de entrega (programado) o día del turno (inmediato).
+                  entrega_en          DATE         NOT NULL,
+                  franja              VARCHAR(60)  NOT NULL DEFAULT '',
+                  tipo_entrega        VARCHAR(10)  NOT NULL CHECK (tipo_entrega IN ('DOMICILIO','RECOGER')),
+                  zona                VARCHAR(80)  NOT NULL DEFAULT '',
+                  cliente_nombre      VARCHAR(80)  NOT NULL,
+                  cliente_celular     VARCHAR(10)  NOT NULL DEFAULT '',
+                  barrio              VARCHAR(80)  NOT NULL DEFAULT '',
+                  direccion           VARCHAR(160) NOT NULL DEFAULT '',
+                  referencia          VARCHAR(160) NOT NULL DEFAULT '',
+                  notas               VARCHAR(300) NOT NULL DEFAULT '',
+                  subtotal            INTEGER      NOT NULL,
+                  descuento           INTEGER      NOT NULL DEFAULT 0,
+                  promocion_aplicada  VARCHAR(80)  NOT NULL DEFAULT '',
+                  domicilio           INTEGER      NOT NULL DEFAULT 0,
+                  total               INTEGER      NOT NULL,
+                  costo_total         INTEGER      NOT NULL DEFAULT 0,
+                  metodo_pago         VARCHAR(10)  NOT NULL CHECK (metodo_pago IN ('CUENTA','EFECTIVO')),
+                  cuenta_entidad      VARCHAR(40)  NOT NULL DEFAULT '',
+                  cuenta_titular      VARCHAR(80)  NOT NULL DEFAULT '',
+                  cuenta_numero       VARCHAR(40)  NOT NULL DEFAULT '',
+                  estado_pago         VARCHAR(10)  NOT NULL DEFAULT 'PENDIENTE' CHECK (estado_pago IN ('PENDIENTE','RECIBIDO')),
+                  estado              VARCHAR(12)  NOT NULL DEFAULT 'NUEVO'
+                                      CHECK (estado IN ('NUEVO','CONFIRMADO','PREPARANDO','EN_CAMINO','LISTO','ENTREGADO','CANCELADO')),
+                  origen              VARCHAR(10)  NOT NULL DEFAULT 'WEB' CHECK (origen IN ('WEB','WHATSAPP'))
+              );
+              CREATE INDEX idx_pedidos_entrega_en ON producto.tbl_pedidos (entrega_en);
+              CREATE INDEX idx_pedidos_estado ON producto.tbl_pedidos (estado);
+
+              CREATE TABLE producto.tbl_pedidos_items (
+                  id               BIGSERIAL PRIMARY KEY,
+                  uuid             UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  pedido_id        BIGINT       NOT NULL REFERENCES producto.tbl_pedidos(id) ON DELETE CASCADE,
+                  producto_id      BIGINT       REFERENCES producto.tbl_productos(id) ON DELETE SET NULL,
+                  nombre           VARCHAR(80)  NOT NULL,
+                  detalle          VARCHAR(400) NOT NULL DEFAULT '',
+                  precio_unitario  INTEGER      NOT NULL,
+                  costo_unitario   INTEGER      NOT NULL DEFAULT 0,
+                  cantidad         INTEGER      NOT NULL CHECK (cantidad > 0)
+              );
+              CREATE INDEX idx_pedidos_items_pedido_id ON producto.tbl_pedidos_items (pedido_id);
+              CREATE INDEX idx_pedidos_items_producto_id ON producto.tbl_pedidos_items (producto_id);
+
+              -- Historial de estados: es lo que ve el cliente en el seguimiento.
+              CREATE TABLE producto.tbl_pedidos_eventos (
+                  id         BIGSERIAL PRIMARY KEY,
+                  uuid       UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  pedido_id  BIGINT       NOT NULL REFERENCES producto.tbl_pedidos(id) ON DELETE CASCADE,
+                  estado     VARCHAR(12)  NOT NULL,
+                  nota       VARCHAR(200) NOT NULL DEFAULT '',
+                  autor      VARCHAR(80)  NOT NULL DEFAULT '',
+                  creado_en  TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+              CREATE INDEX idx_pedidos_eventos_pedido_id ON producto.tbl_pedidos_eventos (pedido_id);
+      rollback:
+        - sql: { sql: DROP TABLE producto.tbl_pedidos_eventos; DROP TABLE producto.tbl_pedidos_items; DROP TABLE producto.tbl_pedidos; }

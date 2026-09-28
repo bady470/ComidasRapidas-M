@@ -9,12 +9,15 @@ import java.util.Objects;
 import java.util.Set;
 
 @Entity
-@Table(name = "promocion")
+@Table(schema = "producto", name = "tbl_promociones")
 public class Promocion {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    /** Identificador para exponer hacia afuera (el id interno solo sirve para índices). */
+    @Column(updatable = false)
+    private java.util.UUID uuid = java.util.UUID.randomUUID();
     private String nombre;
     private String descripcion = "";
     @Enumerated(EnumType.STRING)
@@ -31,15 +34,20 @@ public class Promocion {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "producto_id")
     private Producto producto;
+    @Column(name = "es_activa")
     private boolean activa = true;
+    @Column(name = "es_destacada")
     private boolean destacada = true;
+    @Column(name = "vigente_desde_en")
     private LocalDate desde;
+    @Column(name = "vigente_hasta_en")
     private LocalDate hasta;
+    @Column(name = "creado_en")
     private Instant creado = Instant.now();
 
     /** COMBO y PORCENTAJE: postres incluidos. Vacío = todos. */
     @ManyToMany(fetch = FetchType.EAGER)
-    @JoinTable(name = "promocion_producto",
+    @JoinTable(schema = "producto", name = "tbl_promociones_productos",
             joinColumns = @JoinColumn(name = "promocion_id"),
             inverseJoinColumns = @JoinColumn(name = "producto_id"))
     private Set<Producto> productos = new HashSet<>();
@@ -55,6 +63,7 @@ public class Promocion {
         return productos.isEmpty() || productos.stream().anyMatch(p -> Objects.equals(p.getId(), productoId));
     }
 
+    public java.util.UUID getUuid() { return uuid; }
     public Long getId() { return id; }
     public void setId(Long v) { id = v; }
     public String getNombre() { return nombre; }

@@ -11,7 +11,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/admin/auth")
+@RequestMapping("/api/t/{empresa}/admin/auth")
 public class AdminAuthController {
 
     private final AuthService auth;

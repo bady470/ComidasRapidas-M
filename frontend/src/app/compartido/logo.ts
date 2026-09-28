@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { urlImagen } from '../core/api';
+import { urlServidor } from '../core/empresa';
 import { iniciales } from '../core/formato';
 
 /** Logo del negocio o, si no ha subido uno, sus iniciales. */
@@ -12,8 +12,9 @@ import { iniciales } from '../core/formato';
   `,
 })
 export class Logo {
-  readonly logoId = input<number | null>(null);
+  /** Dirección del logo tal como la entrega la API ("/api/…"), o null. */
+  readonly logoUrl = input<string | null | undefined>(null);
   readonly nombre = input('');
-  protected url = computed(() => urlImagen(this.logoId()));
+  protected url = computed(() => urlServidor(this.logoUrl()));
   protected letras = computed(() => iniciales(this.nombre()));
 }

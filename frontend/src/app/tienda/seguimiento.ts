@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, injec
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TiendaApi, mensajeError } from '../core/api';
+import { EmpresaActual } from '../core/empresa';
 import { DiaLargoPipe, DineroPipe, HoraPipe } from '../core/formato';
 import { EstadoPedido, NOMBRE_ESTADO, Seguimiento } from '../core/modelos';
 import { guardarPedidoReciente, pedidosRecientes } from './recientes';
@@ -100,7 +101,7 @@ const PASOS: Record<string, { titulo: string; detalle: string }> = {
             @if (error()) { <p class="err" role="alert">{{ error() }}</p> }
             <button class="primary" type="submit" [disabled]="cargando()">{{ cargando() ? 'Buscando…' : 'Ver mi pedido' }}</button>
           </form>
-          <a class="linkbtn" routerLink="/">Volver al menú</a>
+          <a class="linkbtn" [routerLink]="emp.url()">Volver al menú</a>
         }
       </section>
     </main>
@@ -109,6 +110,7 @@ const PASOS: Record<string, { titulo: string; detalle: string }> = {
 export class SeguimientoPage implements OnInit {
   private api = inject(TiendaApi);
   private router = inject(Router);
+  protected emp = inject(EmpresaActual);
 
   /** Viene de la ruta /pedido/:codigo */
   readonly codigo = input<string>('');
@@ -170,7 +172,7 @@ export class SeguimientoPage implements OnInit {
         guardarPedidoReciente(s.codigo, cel);
         this.pedido.set(s);
         this.cargando.set(false);
-        if (this.codigo() !== s.codigo) this.router.navigate(['/pedido', s.codigo], { replaceUrl: true });
+        if (this.codigo() !== s.codigo) this.router.navigateByUrl(this.emp.url('/pedido/' + encodeURIComponent(s.codigo)), { replaceUrl: true });
       },
       error: (e) => { this.error.set(mensajeError(e)); this.cargando.set(false); },
     });
@@ -179,6 +181,6 @@ export class SeguimientoPage implements OnInit {
   protected otro(): void {
     this.pedido.set(null);
     this.recientes = pedidosRecientes();
-    this.router.navigate(['/seguimiento']);
+    this.router.navigateByUrl(this.emp.url('/seguimiento'));
   }
 }

@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DisponibilidadServiceTest {
 
     private static final ZoneId BOGOTA = ZoneId.of("America/Bogota");
-    private static final LeineiProperties PROPS = new LeineiProperties("America/Bogota", "", null, 12);
+    private static final LeineiProperties PROPS = new LeineiProperties("America/Bogota", "", 12, null, null);
 
     private DisponibilidadService en(LocalDateTime hora) {
         return new DisponibilidadService(Clock.fixed(hora.atZone(BOGOTA).toInstant(), BOGOTA), PROPS);

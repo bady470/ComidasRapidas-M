@@ -4,6 +4,7 @@ import { Foto } from '../compartido/foto';
 import { SelectorProducto, Seleccion } from '../compartido/selector-producto';
 import { Avisos } from '../core/avisos';
 import { Carrito } from '../core/carrito';
+import { EmpresaActual } from '../core/empresa';
 import { EstadoTienda } from '../core/estado-tienda';
 import { DiaLargoPipe, DineroPipe, cuando, etiquetaPromo } from '../core/formato';
 import { Producto, Promocion } from '../core/modelos';
@@ -123,7 +124,7 @@ interface Seccion { id: string; nombre: string; productos: Producto[]; }
 
     @if (carrito.totalUnidades()) {
       <div class="cartbar">
-        <a routerLink="/carrito"><span>Ver carrito · {{ carrito.totalUnidades() }} {{ carrito.totalUnidades() === 1 ? 'producto' : 'productos' }}</span><span>Pedir</span></a>
+        <a [routerLink]="emp.url('/carrito')"><span>Ver carrito · {{ carrito.totalUnidades() }} {{ carrito.totalUnidades() === 1 ? 'producto' : 'productos' }}</span><span>Pedir</span></a>
       </div>
     }
   `,
@@ -131,6 +132,7 @@ interface Seccion { id: string; nombre: string; productos: Producto[]; }
 export class CatalogoPage {
   protected estado = inject(EstadoTienda);
   protected carrito = inject(Carrito);
+  protected emp = inject(EmpresaActual);
   private avisos = inject(Avisos);
 
   protected abierto = signal<Producto | null>(null);

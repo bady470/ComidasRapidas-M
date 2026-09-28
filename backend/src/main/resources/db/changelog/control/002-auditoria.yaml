@@ -1,0 +1,77 @@
+# Auditoría de la base de control: mismo mecanismo que en las bases de empresa.
+databaseChangeLog:
+  - changeSet:
+      id: control-002-auditoria
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE plataforma.tbl_auditoria (
+                  id              BIGSERIAL PRIMARY KEY,
+                  uuid            UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  esquema         VARCHAR(63) NOT NULL,
+                  tabla           VARCHAR(63) NOT NULL,
+                  operacion       VARCHAR(8)  NOT NULL,
+                  registro_id     VARCHAR(64),
+                  dato_anterior   JSONB,
+                  dato_nuevo      JSONB,
+                  usuario_bd      VARCHAR(63) NOT NULL DEFAULT current_user,
+                  usuario_app     VARCHAR(120),
+                  ocurrido_en     TIMESTAMPTZ NOT NULL DEFAULT now()
+              );
+              CREATE INDEX idx_auditoria_tabla ON plataforma.tbl_auditoria (esquema, tabla, ocurrido_en);
+        - sql:
+            splitStatements: false
+            sql: |
+              CREATE OR REPLACE FUNCTION plataforma.fn_auditar() RETURNS trigger
+              LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, plataforma AS $$
+              DECLARE
+                  v_nuevo JSONB;
+                  v_viejo JSONB;
+              BEGIN
+                  -- Nunca se copian al rastro las claves cifradas ni el logo binario.
+                  IF TG_OP IN ('INSERT', 'UPDATE') THEN
+                      v_nuevo := to_jsonb(NEW) - 'clave_owner_cifrada' - 'clave_app_cifrada' - 'clave_lectura_cifrada' - 'clave_hash' - 'logo_datos';
+                  END IF;
+                  IF TG_OP IN ('UPDATE', 'DELETE') THEN
+                      v_viejo := to_jsonb(OLD) - 'clave_owner_cifrada' - 'clave_app_cifrada' - 'clave_lectura_cifrada' - 'clave_hash' - 'logo_datos';
+                  END IF;
+                  INSERT INTO plataforma.tbl_auditoria (esquema, tabla, operacion, registro_id, dato_anterior, dato_nuevo, usuario_bd, usuario_app)
+                  VALUES (TG_TABLE_SCHEMA, TG_TABLE_NAME, TG_OP, COALESCE(v_nuevo, v_viejo) ->> 'id', v_viejo, v_nuevo,
+                          session_user, NULLIF(current_setting('leinei.usuario', true), ''));
+                  RETURN NULL;
+              END;
+              $$;
+        - sql:
+            splitStatements: false
+            sql: |
+              CREATE OR REPLACE FUNCTION plataforma.fn_auditoria_inmutable() RETURNS trigger
+              LANGUAGE plpgsql AS $$
+              BEGIN
+                  RAISE EXCEPTION 'La auditoría no se puede modificar ni borrar (%)', TG_OP;
+              END;
+              $$;
+        - sql:
+            sql: |
+              CREATE TRIGGER trg_auditoria_inmutable BEFORE UPDATE OR DELETE ON plataforma.tbl_auditoria
+                  FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditoria_inmutable();
+              CREATE TRIGGER trg_auditoria_sin_truncate BEFORE TRUNCATE ON plataforma.tbl_auditoria
+                  FOR EACH STATEMENT EXECUTE FUNCTION plataforma.fn_auditoria_inmutable();
+              CREATE TRIGGER trg_auditar_empresas AFTER INSERT OR UPDATE OR DELETE ON plataforma.tbl_empresas FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_empresas_marca AFTER INSERT OR UPDATE OR DELETE ON plataforma.tbl_empresas_marca FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_empresa_conexiones AFTER INSERT OR UPDATE OR DELETE ON plataforma.tbl_empresa_conexiones FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_empresa_modulos AFTER INSERT OR UPDATE OR DELETE ON plataforma.tbl_empresa_modulos FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_superadmins AFTER INSERT OR UPDATE OR DELETE ON plataforma.tbl_superadmins FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+      rollback:
+        - sql:
+            sql: |
+              DROP TRIGGER trg_auditar_superadmins ON plataforma.tbl_superadmins;
+              DROP TRIGGER trg_auditar_empresa_modulos ON plataforma.tbl_empresa_modulos;
+              DROP TRIGGER trg_auditar_empresa_conexiones ON plataforma.tbl_empresa_conexiones;
+              DROP TRIGGER trg_auditar_empresas_marca ON plataforma.tbl_empresas_marca;
+              DROP TRIGGER trg_auditar_empresas ON plataforma.tbl_empresas;
+              DROP TRIGGER trg_auditoria_sin_truncate ON plataforma.tbl_auditoria;
+              DROP TRIGGER trg_auditoria_inmutable ON plataforma.tbl_auditoria;
+              DROP FUNCTION plataforma.fn_auditoria_inmutable();
+              DROP FUNCTION plataforma.fn_auditar();
+              DROP TABLE plataforma.tbl_auditoria;

@@ -223,7 +223,9 @@ public class PedidoService {
     private List<Opcion> opcionesValidas(Producto p, List<Long> ids, boolean soloDisponibles) {
         Set<Long> pedidas = new LinkedHashSet<>(ids);
         List<Opcion> escogidas = new ArrayList<>();
-        for (GrupoOpcion g : p.getGrupos()) {
+        List<GrupoOpcion> grupos = co.leinei.api.empresa.EmpresaContexto.tieneModulo(co.leinei.api.empresa.Modulos.OPCIONES)
+                ? p.getGrupos() : List.of();
+        for (GrupoOpcion g : grupos) {
             List<Opcion> delGrupo = g.getOpciones().stream().filter(o -> pedidas.contains(o.getId())).toList();
             if (delGrupo.size() < g.getMinimo()) {
                 throw ReglaNegocioException.invalido("En " + p.getNombre() + " escoge " + (g.getMinimo() == 1 ? "una opción" : g.getMinimo() + " opciones")

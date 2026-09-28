@@ -1,6 +1,8 @@
 package co.leinei.api.servicio;
 
 import co.leinei.api.dominio.*;
+import co.leinei.api.empresa.EmpresaContexto;
+import co.leinei.api.empresa.Modulos;
 import co.leinei.api.repositorio.*;
 import co.leinei.api.web.dto.AdminDto;
 import co.leinei.api.web.dto.PublicoDto;
@@ -39,7 +41,7 @@ public class CatalogoService {
     @Transactional(readOnly = true)
     public PublicoDto.Catalogo catalogoPublico() {
         PublicoDto.Tienda tienda = configService.tiendaPublica();
-        List<Promocion> vigentes = promocionRepo.findByActivaTrue().stream()
+        List<Promocion> vigentes = promocionesActivas().stream()
                 .filter(p -> p.vigentePara(tienda.fechaServicio())).toList();
 
         List<Categoria> categorias = categoriaRepo.findAllByOrderByOrdenAscIdAsc().stream().filter(Categoria::isActiva).toList();
@@ -68,6 +70,7 @@ public class CatalogoService {
     }
 
     private static List<PublicoDto.Grupo> gruposPublicos(Producto p) {
+        if (!EmpresaContexto.tieneModulo(Modulos.OPCIONES)) return List.of();
         return p.getGrupos().stream()
                 .map(g -> new PublicoDto.Grupo(g.getId(), g.getNombre(), g.getMinimo(), g.getMaximo(),
                         g.getOpciones().stream()
@@ -79,6 +82,7 @@ public class CatalogoService {
     /** Todas las promociones activas; el cálculo filtra por fecha. */
     @Transactional(readOnly = true)
     public List<Promocion> promocionesActivas() {
+        if (!EmpresaContexto.tieneModulo(Modulos.PROMOCIONES)) return List.of();
         return promocionRepo.findByActivaTrue();
     }
 
@@ -181,7 +185,12 @@ public class CatalogoService {
         p.setEtiqueta(Objects.requireNonNullElse(r.etiqueta(), "").trim());
         p.setDisponible(r.disponible());
         p.setOrden(r.orden());
-        aplicarGrupos(p, r.grupos() == null ? List.of() : r.grupos());
+        List<AdminDto.Grupo> grupos = r.grupos() == null ? List.of() : r.grupos();
+        if (!grupos.isEmpty() && !EmpresaContexto.tieneModulo(Modulos.OPCIONES)) {
+            throw new ReglaNegocioException(org.springframework.http.HttpStatus.FORBIDDEN,
+                    "Tu plan no incluye «Productos personalizables». Quita las opciones o pide que te activen el módulo.");
+        }
+        aplicarGrupos(p, grupos);
     }
 
     /** Actualiza los grupos y opciones conservando sus ids, para no dañar carritos abiertos. */

@@ -1,16 +1,15 @@
 import { Injectable, computed, signal } from '@angular/core';
+import { claveLocal } from './empresa';
 import { ItemPedido, Producto } from './modelos';
 
 /** Una línea del carrito: el mismo producto con opciones distintas son líneas distintas. */
 export interface LineaCarrito { clave: string; productoId: number; opcionIds: number[]; cantidad: number; }
 
-const CLAVE = 'tienda_carrito_v2';
-
 export function claveLinea(productoId: number, opcionIds: number[]): string {
   return productoId + ':' + [...opcionIds].sort((a, b) => a - b).join(',');
 }
 
-/** Carrito del cliente. Se guarda en el navegador. */
+/** Carrito del cliente. Se guarda en el navegador, uno por empresa. */
 @Injectable({ providedIn: 'root' })
 export class Carrito {
   readonly lineas = signal<LineaCarrito[]>(leer());
@@ -57,19 +56,24 @@ export class Carrito {
     if (lista.length !== this.lineas().length) this.guardar(lista);
   }
 
+  /** Lee el carrito de la empresa actual (al entrar a otra tienda). */
+  recargar(): void {
+    this.lineas.set(leer());
+  }
+
   vaciar(): void {
     this.guardar([]);
   }
 
   private guardar(v: LineaCarrito[]): void {
     this.lineas.set(v);
-    try { localStorage.setItem(CLAVE, JSON.stringify(v)); } catch { /* sin almacenamiento */ }
+    try { localStorage.setItem(claveLocal('carrito'), JSON.stringify(v)); } catch { /* sin almacenamiento */ }
   }
 }
 
 function leer(): LineaCarrito[] {
   try {
-    const v = JSON.parse(localStorage.getItem(CLAVE) ?? '[]') as LineaCarrito[];
+    const v = JSON.parse(localStorage.getItem(claveLocal('carrito')) ?? '[]') as LineaCarrito[];
     return Array.isArray(v) ? v : [];
   } catch { return []; }
 }

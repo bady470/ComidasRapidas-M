@@ -8,16 +8,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "pedido")
+@Table(schema = "producto", name = "tbl_pedidos")
 public class Pedido {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    /** Identificador para exponer hacia afuera (el id interno solo sirve para índices). */
+    @Column(updatable = false)
+    private java.util.UUID uuid = java.util.UUID.randomUUID();
     private String codigo;
+    @Column(name = "creado_en")
     private Instant creado = Instant.now();
+    @Column(name = "actualizado_en")
     private Instant actualizado = Instant.now();
-    @Column(name = "fecha_entrega")
+    @Column(name = "entrega_en")
     private LocalDate fechaEntrega;
     private String franja = "";
     @Enumerated(EnumType.STRING)
@@ -86,6 +91,7 @@ public class Pedido {
         return items.stream().mapToInt(PedidoItem::getCantidad).sum();
     }
 
+    public java.util.UUID getUuid() { return uuid; }
     public Long getId() { return id; }
     public String getCodigo() { return codigo; }
     public void setCodigo(String v) { codigo = v; }

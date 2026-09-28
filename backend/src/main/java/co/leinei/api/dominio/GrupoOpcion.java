@@ -10,12 +10,15 @@ import java.util.List;
  * Ejemplos: "Tamaño" (mínimo 1, máximo 1), "Adiciones" (mínimo 0, máximo 5), "Sin…" (mínimo 0, máximo 4).
  */
 @Entity
-@Table(name = "grupo_opcion")
+@Table(schema = "producto", name = "tbl_grupos_opciones")
 public class GrupoOpcion {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    /** Identificador para exponer hacia afuera (el id interno solo sirve para índices). */
+    @Column(updatable = false)
+    private java.util.UUID uuid = java.util.UUID.randomUUID();
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "producto_id")
     private Producto producto;
@@ -33,6 +36,7 @@ public class GrupoOpcion {
         opciones.add(o);
     }
 
+    public java.util.UUID getUuid() { return uuid; }
     public Long getId() { return id; }
     public void setId(Long v) { id = v; }
     public Producto getProducto() { return producto; }

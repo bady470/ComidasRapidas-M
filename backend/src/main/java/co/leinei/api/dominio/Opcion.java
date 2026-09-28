@@ -3,21 +3,26 @@ package co.leinei.api.dominio;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "opcion")
+@Table(schema = "producto", name = "tbl_opciones")
 public class Opcion {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    /** Identificador para exponer hacia afuera (el id interno solo sirve para índices). */
+    @Column(updatable = false)
+    private java.util.UUID uuid = java.util.UUID.randomUUID();
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "grupo_id")
+    @JoinColumn(name = "grupo_opcion_id")
     private GrupoOpcion grupo;
     private String nombre;
     @Column(name = "precio_extra")
     private int precioExtra;
+    @Column(name = "es_disponible")
     private boolean disponible = true;
     private int orden;
 
+    public java.util.UUID getUuid() { return uuid; }
     public Long getId() { return id; }
     public void setId(Long v) { id = v; }
     public GrupoOpcion getGrupo() { return grupo; }

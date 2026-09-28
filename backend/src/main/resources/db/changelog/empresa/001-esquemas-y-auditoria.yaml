@@ -1,0 +1,100 @@
+databaseChangeLog:
+  - changeSet:
+      id: empresa-001-esquemas
+      author: leinei
+      comment: Esquemas propios; no se usa public.
+      changes:
+        - sql:
+            sql: |
+              CREATE SCHEMA IF NOT EXISTS plataforma;
+              CREATE SCHEMA IF NOT EXISTS cliente;
+              CREATE SCHEMA IF NOT EXISTS producto;
+              REVOKE ALL ON SCHEMA public FROM PUBLIC;
+      rollback:
+        - sql:
+            sql: DROP SCHEMA IF EXISTS producto CASCADE; DROP SCHEMA IF EXISTS cliente CASCADE;
+
+  - changeSet:
+      id: empresa-001-auditoria-tabla
+      author: leinei
+      comment: Rastro de cambios de datos. Solo se inserta; nadie puede editarlo ni borrarlo.
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE plataforma.tbl_auditoria (
+                  id              BIGSERIAL PRIMARY KEY,
+                  uuid            UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  esquema         VARCHAR(63) NOT NULL,
+                  tabla           VARCHAR(63) NOT NULL,
+                  operacion       VARCHAR(8)  NOT NULL,
+                  registro_id     VARCHAR(64),
+                  dato_anterior   JSONB,
+                  dato_nuevo      JSONB,
+                  usuario_bd      VARCHAR(63) NOT NULL DEFAULT current_user,
+                  usuario_app     VARCHAR(120),
+                  ocurrido_en     TIMESTAMPTZ NOT NULL DEFAULT now()
+              );
+              CREATE INDEX idx_auditoria_tabla ON plataforma.tbl_auditoria (esquema, tabla, ocurrido_en);
+      rollback:
+        - sql:
+            sql: DROP TABLE plataforma.tbl_auditoria;
+
+  - changeSet:
+      id: empresa-001-fn-auditar
+      author: leinei
+      comment: >
+        Función de los triggers de auditoría. SECURITY DEFINER para que el rol app escriba el rastro
+        sin tener permiso directo sobre la tabla.
+      changes:
+        - sql:
+            splitStatements: false
+            sql: |
+              CREATE OR REPLACE FUNCTION plataforma.fn_auditar() RETURNS trigger
+              LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, plataforma AS $$
+              DECLARE
+                  v_id TEXT;
+              BEGIN
+                  IF TG_OP = 'DELETE' THEN
+                      v_id := (to_jsonb(OLD) ->> 'id');
+                  ELSE
+                      v_id := (to_jsonb(NEW) ->> 'id');
+                  END IF;
+                  INSERT INTO plataforma.tbl_auditoria (esquema, tabla, operacion, registro_id, dato_anterior, dato_nuevo, usuario_bd, usuario_app)
+                  VALUES (TG_TABLE_SCHEMA, TG_TABLE_NAME, TG_OP, v_id,
+                          CASE WHEN TG_OP IN ('UPDATE', 'DELETE') THEN to_jsonb(OLD) END,
+                          CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN to_jsonb(NEW) END,
+                          session_user,
+                          NULLIF(current_setting('leinei.usuario', true), ''));
+                  RETURN NULL;
+              END;
+              $$;
+      rollback:
+        - sql:
+            sql: DROP FUNCTION plataforma.fn_auditar();
+
+  - changeSet:
+      id: empresa-001-auditoria-inmutable
+      author: leinei
+      comment: Bloquea UPDATE, DELETE y TRUNCATE sobre la auditoría, incluso para el rol owner de la empresa.
+      changes:
+        - sql:
+            splitStatements: false
+            sql: |
+              CREATE OR REPLACE FUNCTION plataforma.fn_auditoria_inmutable() RETURNS trigger
+              LANGUAGE plpgsql AS $$
+              BEGIN
+                  RAISE EXCEPTION 'La auditoría no se puede modificar ni borrar (%)', TG_OP;
+              END;
+              $$;
+        - sql:
+            sql: |
+              CREATE TRIGGER trg_auditoria_inmutable BEFORE UPDATE OR DELETE ON plataforma.tbl_auditoria
+                  FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditoria_inmutable();
+              CREATE TRIGGER trg_auditoria_sin_truncate BEFORE TRUNCATE ON plataforma.tbl_auditoria
+                  FOR EACH STATEMENT EXECUTE FUNCTION plataforma.fn_auditoria_inmutable();
+      rollback:
+        - sql:
+            sql: |
+              DROP TRIGGER trg_auditoria_sin_truncate ON plataforma.tbl_auditoria;
+              DROP TRIGGER trg_auditoria_inmutable ON plataforma.tbl_auditoria;
+              DROP FUNCTION plataforma.fn_auditoria_inmutable();

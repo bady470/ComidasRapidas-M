@@ -301,3 +301,21 @@ footer.site { border-top: 1px solid var(--line); padding-block: 18px 90px; color
 .subir .vista img { width: 100%; height: 100%; object-fit: cover; }
 .pitem .mini { width: 56px; height: 56px; border-radius: 12px; overflow: hidden; flex: none; }
 .sec-titulo { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); font-weight: 800; margin-top: 6px; }
+
+/* ---------- Plataforma (superadmin) ---------- */
+.st-activa { background: var(--ok-soft); color: var(--ok); }
+.st-pendiente_aprovisionamiento, .st-aprovisionando { background: var(--info-soft); color: var(--info); }
+.st-suspendida { background: var(--warn-soft); color: var(--warn); }
+.st-error_aprovisionamiento { background: var(--bad-soft); color: var(--bad); }
+.empresa-fila { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.empresa-fila .muestra { width: 12px; height: 28px; border-radius: 6px; flex: none; }
+.registro { background: var(--surface-2); border-radius: var(--r); padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; white-space: pre-wrap; max-height: 320px; overflow: auto; margin: 0; }
+.modulos { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.modulos label { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: start; padding: 10px; border: 1px solid var(--line); border-radius: var(--r); cursor: pointer; }
+.modulos label input { margin-top: 3px; }
+.modulos label .muted { grid-column: 2; font-size: 13px; }
+.datos { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 14px; margin: 0; }
+.datos dt { color: var(--ink-3); font-weight: 600; }
+.datos dd { margin: 0; overflow-wrap: anywhere; }
+.inicio { min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; }
+.inicio .panel { max-width: 460px; width: 100%; }

@@ -4,14 +4,13 @@ import { Logo } from '../compartido/logo';
 import { AdminApi, mensajeError } from '../core/api';
 import { Avisos } from '../core/avisos';
 import { EstadoTienda } from '../core/estado-tienda';
-import { AdminUsuario, ConfigAdmin, DIAS } from '../core/modelos';
+import { AdminUsuario, ConfigAdmin, DIAS, MODULOS } from '../core/modelos';
 import { textoSobre } from '../core/tema';
-import { SubirImagen } from './subir-imagen';
 
 /** Todo lo que cambia de un negocio a otro: marca, contacto, forma de pedir, entregas y pagos. */
 @Component({
   selector: 'app-config',
-  imports: [FormsModule, SubirImagen, Logo],
+  imports: [FormsModule, Logo],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (config(); as c) {
@@ -22,7 +21,15 @@ import { SubirImagen } from './subir-imagen';
             <h3>Marca</h3>
             <div class="field"><label for="cNombre">Nombre del negocio</label><input id="cNombre" name="cNombre" [(ngModel)]="c.nombre"></div>
             <div class="field"><span class="flabel">Logo</span>
-              <app-subir-imagen [imagenId]="c.logoId" (cambio)="c.logoId = $event; refrescar()" ayuda="Cuadrado, idealmente de 512 × 512." /></div>
+              <div class="subir">
+                <app-logo [logoUrl]="c.logoUrl" [nombre]="c.nombre" style="width:64px;height:64px;border-radius:14px" />
+                <div class="stack" style="gap:6px">
+                  <label class="btn" style="cursor:pointer">{{ subiendoLogo() ? 'Subiendo…' : c.logoUrl ? 'Cambiar logo' : 'Subir logo' }}
+                    <input type="file" accept="image/png,image/jpeg,image/webp" hidden (change)="subirLogo($event)" [disabled]="subiendoLogo()"></label>
+                  @if (c.logoUrl) { <button class="linkbtn" type="button" (click)="quitarLogo()">Quitar logo</button> }
+                  <span class="hint">Cuadrado, idealmente de 512 × 512. Se aplica de inmediato.</span>
+                </div>
+              </div></div>
             <div class="row2">
               <div class="field"><label for="cColor1">Color principal</label>
                 <div class="row"><input id="cColor1" name="cColor1" type="color" [(ngModel)]="c.colorPrimario" (ngModelChange)="refrescar()" style="width:52px;height:40px;padding:2px">
@@ -34,7 +41,7 @@ import { SubirImagen } from './subir-imagen';
                 <span class="hint">Barra del carrito, promociones y logo sin imagen.</span></div>
             </div>
             <div class="muestra-marca" [style.--m1]="muestra().c1" [style.--m1-on]="muestra().t1" [style.--m2]="muestra().c2" [style.--m2-on]="muestra().t2">
-              <div class="barra"><app-logo [logoId]="c.logoId" [nombre]="c.nombre" style="width:30px;height:30px" /> {{ c.nombre || 'Tu negocio' }}</div>
+              <div class="barra"><app-logo [logoUrl]="c.logoUrl" [nombre]="c.nombre" style="width:30px;height:30px" /> {{ c.nombre || 'Tu negocio' }}</div>
               <div class="cuerpo-m"><span class="boton-m">Agregar</span><span class="muted">Así se verá tu tienda</span></div>
             </div>
             <div class="field"><label for="cTitulo">Título de la portada</label><input id="cTitulo" name="cTitulo" [(ngModel)]="c.tituloPortada" placeholder="Ej: Las mejores hamburguesas del barrio"></div>
@@ -131,6 +138,7 @@ import { SubirImagen } from './subir-imagen';
             @if (c.domicilioActivo) {
               <div class="field"><label for="cDomV">Valor del domicilio</label><input id="cDomV" name="cDomV" type="number" min="0" step="500" [(ngModel)]="c.domicilioValor">
                 <span class="hint">Se cobra cuando no tienes zonas. Con zonas, cada una tiene su valor.</span></div>
+              @if (estado.tieneModulo(M.zonas)) {
               <span class="flabel">Zonas o barrios <span class="hint">(opcional)</span></span>
               @for (z of c.zonas; track $index; let i = $index) {
                 <div class="fila-zona">
@@ -141,6 +149,7 @@ import { SubirImagen } from './subir-imagen';
                 </div>
               }
               <div><button class="btn" type="button" (click)="c.zonas.push({ id: null, nombre: '', valor: c.domicilioValor, activa: true })">+ Zona</button></div>
+              }
             }
             <label class="check"><input type="checkbox" name="cRec" [(ngModel)]="c.recogerActivo"> El cliente puede recoger en el local</label>
             @if (c.recogerActivo && !c.direccion) { <span class="err">Escribe la dirección del local en «Contacto».</span> }
@@ -188,7 +197,9 @@ import { SubirImagen } from './subir-imagen';
 export class ConfigPage {
   private api = inject(AdminApi);
   private avisos = inject(Avisos);
-  private estado = inject(EstadoTienda);
+  protected estado = inject(EstadoTienda);
+  protected readonly M = MODULOS;
+  protected subiendoLogo = signal(false);
 
   protected dias = DIAS;
   protected config = signal<ConfigAdmin | null>(null);
@@ -258,6 +269,35 @@ export class ConfigPage {
       },
       error: (e) => { this.error.set(mensajeError(e)); this.guardando.set(false); },
     });
+  }
+
+  protected subirLogo(ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    const archivo = input.files?.[0];
+    input.value = '';
+    if (!archivo) return;
+    if (archivo.size > 2 * 1024 * 1024) { this.error.set('El logo debe pesar menos de 2 MB.'); return; }
+    this.subiendoLogo.set(true);
+    this.api.subirLogo(archivo).subscribe({
+      next: (r) => this.logoCambiado(r.logoUrl, 'Logo actualizado'),
+      error: (e) => { this.error.set(mensajeError(e)); this.subiendoLogo.set(false); },
+    });
+  }
+
+  protected quitarLogo(): void {
+    this.api.quitarLogo().subscribe({
+      next: (r) => this.logoCambiado(r.logoUrl, 'Logo quitado'),
+      error: (e) => this.error.set(mensajeError(e)),
+    });
+  }
+
+  /** Solo cambia el logo: lo demás que el administrador esté editando se conserva. */
+  private logoCambiado(logoUrl: string | null, aviso: string): void {
+    this.config.update((c) => c && { ...c, logoUrl });
+    this.subiendoLogo.set(false);
+    this.error.set('');
+    this.avisos.mostrar(aviso);
+    this.estado.cargar();
   }
 
   protected crearAdmin(form: NgForm): void {

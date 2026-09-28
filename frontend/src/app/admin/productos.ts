@@ -6,7 +6,7 @@ import { AdminApi, mensajeError } from '../core/api';
 import { Avisos } from '../core/avisos';
 import { EstadoTienda } from '../core/estado-tienda';
 import { DineroPipe, dinero } from '../core/formato';
-import { CategoriaAdmin, GrupoAdmin, ProductoAdmin, ProductoForm } from '../core/modelos';
+import { CategoriaAdmin, GrupoAdmin, MODULOS, ProductoAdmin, ProductoForm } from '../core/modelos';
 
 const PLANTILLAS: { nombre: string; grupo: () => GrupoAdmin }[] = [
   { nombre: 'Tamaño', grupo: () => ({ id: null, nombre: 'Tamaño', minimo: 1, maximo: 1, opciones: [
@@ -66,6 +66,7 @@ const PLANTILLAS: { nombre: string; grupo: () => GrupoAdmin }[] = [
         </div>
         <label class="check"><input type="checkbox" name="pDisp" [(ngModel)]="e.form.disponible"> Disponible para pedir</label>
 
+        @if (estado.tieneModulo(M.opciones)) {
         <span class="sec-titulo">Opciones del producto</span>
         <p class="muted">Tamaños, adiciones con precio, salsas o ingredientes para quitar. Déjalo vacío si el producto no tiene opciones.</p>
         @for (g of e.form.grupos; track $index; let gi = $index) {
@@ -99,6 +100,7 @@ const PLANTILLAS: { nombre: string; grupo: () => GrupoAdmin }[] = [
           <span class="muted">o usa una plantilla:</span>
           @for (t of plantillas; track t.nombre) { <button class="btn" type="button" (click)="agregarGrupo(t.grupo())">{{ t.nombre }}</button> }
         </div>
+        }
 
         @if (errorForm()) { <p class="err">{{ errorForm() }}</p> }
         <div class="row"><button class="btn main" type="submit" [disabled]="guardando()">{{ guardando() ? 'Guardando…' : 'Guardar producto' }}</button>
@@ -136,7 +138,8 @@ const PLANTILLAS: { nombre: string; grupo: () => GrupoAdmin }[] = [
 export class ProductosPage {
   private api = inject(AdminApi);
   private avisos = inject(Avisos);
-  private estado = inject(EstadoTienda);
+  protected estado = inject(EstadoTienda);
+  protected readonly M = MODULOS;
 
   protected plantillas = PLANTILLAS;
   protected productos = signal<ProductoAdmin[]>([]);

@@ -3,12 +3,15 @@ package co.leinei.api.dominio;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "pedido_item")
+@Table(schema = "producto", name = "tbl_pedidos_items")
 public class PedidoItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    /** Identificador para exponer hacia afuera (el id interno solo sirve para índices). */
+    @Column(updatable = false)
+    private java.util.UUID uuid = java.util.UUID.randomUUID();
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "pedido_id")
@@ -26,6 +29,7 @@ public class PedidoItem {
     private int costoUnitario;
     private int cantidad;
 
+    public java.util.UUID getUuid() { return uuid; }
     public Long getId() { return id; }
     public Pedido getPedido() { return pedido; }
     void setPedido(Pedido v) { pedido = v; }

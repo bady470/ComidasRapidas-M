@@ -3,17 +3,22 @@ package co.leinei.api.dominio;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "zona_envio")
+@Table(schema = "cliente", name = "tbl_zonas_envio")
 public class ZonaEnvio {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    /** Identificador para exponer hacia afuera (el id interno solo sirve para índices). */
+    @Column(updatable = false)
+    private java.util.UUID uuid = java.util.UUID.randomUUID();
     private String nombre;
     private int valor;
+    @Column(name = "es_activa")
     private boolean activa = true;
     private int orden;
 
+    public java.util.UUID getUuid() { return uuid; }
     public Long getId() { return id; }
     public String getNombre() { return nombre; }
     public void setNombre(String v) { nombre = v; }

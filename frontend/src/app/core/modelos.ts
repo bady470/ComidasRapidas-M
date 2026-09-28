@@ -26,6 +26,16 @@ export const ACCION_HACIA: Partial<Record<EstadoPedido, string>> = {
   ENTREGADO: 'Marcar entregado',
 };
 
+/** Módulos que el superadmin activa por empresa (coinciden con plataforma.tbl_modulos). */
+export const MODULOS = {
+  tienda: 'tienda',
+  opciones: 'opciones',
+  promociones: 'promociones',
+  zonas: 'zonas',
+  reportes: 'reportes',
+  pedidoManual: 'pedido_manual',
+} as const;
+
 export const DIAS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 // ---------- Público ----------
@@ -34,7 +44,8 @@ export interface Zona { id: number; nombre: string; valor: number; }
 export interface HorarioDia { dia: number; activo: boolean; abre: string; cierra: string; }
 
 export interface Tienda {
-  nombre: string; eslogan: string; tituloPortada: string; mensaje: string; logoId: number | null;
+  identificador: string;
+  nombre: string; eslogan: string; tituloPortada: string; mensaje: string; logoUrl: string | null;
   colorPrimario: string; colorSecundario: string;
   whatsapp: string; direccion: string; ciudad: string; instagram: string;
   abierto: boolean; modoPedido: ModoPedido; recibePedidos: boolean; enHorario: boolean;
@@ -42,6 +53,8 @@ export interface Tienda {
   tiempoMin: number; tiempoMax: number; franjas: string[]; pedidoMinimo: number; horarios: HorarioDia[];
   domicilioActivo: boolean; domicilioValor: number; zonas: Zona[]; recogerActivo: boolean;
   efectivo: boolean; cuentas: Cuenta[];
+  /** Módulos del plan de la empresa (ver MODULOS). */
+  modulos: string[];
 }
 
 export interface Categoria { id: number; nombre: string; }
@@ -139,7 +152,8 @@ export interface CuentaAdmin { id: number | null; entidad: string; titular: stri
 export interface ZonaAdmin { id: number | null; nombre: string; valor: number; activa: boolean; }
 
 export interface ConfigAdmin {
-  nombre: string; eslogan: string; tituloPortada: string; mensaje: string; logoId: number | null;
+  /** Solo lectura: el logo se cambia con subirLogo/quitarLogo. */
+  nombre: string; eslogan: string; tituloPortada: string; mensaje: string; logoUrl: string | null;
   colorPrimario: string; colorSecundario: string;
   whatsapp: string; direccion: string; ciudad: string; instagram: string;
   abierto: boolean; modoPedido: ModoPedido; tiempoMin: number; tiempoMax: number;
@@ -156,4 +170,49 @@ export interface Produccion {
   productos: { nombre: string; unidades: number; ventas: number; costo: number; ganancia: number }[];
   detalle: { nombre: string; detalle: string; unidades: number }[];
   pagos: { cuenta: string; pedidos: number; total: number; recibido: number }[];
+}
+
+// ---------- Plataforma (superadmin) ----------
+export type EstadoEmpresa = 'pendiente_aprovisionamiento' | 'aprovisionando' | 'activa' | 'suspendida' | 'error_aprovisionamiento';
+
+export const NOMBRE_ESTADO_EMPRESA: Record<EstadoEmpresa, string> = {
+  pendiente_aprovisionamiento: 'En cola',
+  aprovisionando: 'Preparando',
+  activa: 'Activa',
+  suspendida: 'Suspendida',
+  error_aprovisionamiento: 'Error al preparar',
+};
+
+export interface Superadmin { uuid: string; usuario: string; nombre: string; }
+export interface ModuloPlataforma { codigo: string; nombre: string; descripcion: string; esBase: boolean; }
+export interface ResumenPlataforma { total: number; activas: number; suspendidas: number; enPreparacion: number; conError: number; }
+
+export interface EmpresaResumen {
+  uuid: string; identificador: string; nombreComercial: string; razonSocial: string; estado: EstadoEmpresa;
+  plan: string | null; colorPrimario: string; colorSecundario: string; logoUrl: string | null;
+  dominioPropio: string | null; modulos: string[]; creadoEn: string;
+}
+
+export interface EmpresaDetalle {
+  uuid: string; identificador: string; razonSocial: string; nit: string | null;
+  responsableNombre: string; responsableCorreo: string | null; responsableCelular: string | null;
+  plan: string | null; estado: EstadoEmpresa; notas: string | null; creadoEn: string;
+  nombreComercial: string; colorPrimario: string; colorSecundario: string; logoUrl: string | null;
+  dominioPropio: string | null; modulos: string[];
+  conexion: { host: string; puerto: number; nombreBase: string; usuarioOwner: string; usuarioApp: string; usuarioLectura: string } | null;
+  versiones: { ultimaMigracionAplicada: string; aplicadaEn: string }[];
+  aprovisionamiento: { estado: string; intentos: number; pasoActual: string | null; registro: string | null; actualizadoEn: string } | null;
+}
+
+export interface ActualizarEmpresa {
+  razonSocial: string; nit: string; responsableNombre: string; responsableCorreo: string; responsableCelular: string;
+  plan: string; notas: string; nombreComercial: string; colorPrimario: string; colorSecundario: string; dominioPropio: string;
+}
+
+export interface CrearEmpresa extends ActualizarEmpresa {
+  identificador: string;
+  modoPedido: ModoPedido; whatsapp: string; ciudad: string; direccion: string;
+  tieneDomicilio: boolean; tieneRecogida: boolean; domicilioValor: number;
+  modulos: string[];
+  adminNombre: string; adminUsuario: string; adminClave: string;
 }

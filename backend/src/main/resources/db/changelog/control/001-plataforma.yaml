@@ -1,0 +1,178 @@
+databaseChangeLog:
+  - changeSet:
+      id: control-001-esquema
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              CREATE SCHEMA IF NOT EXISTS plataforma;
+              REVOKE ALL ON SCHEMA public FROM PUBLIC;
+      rollback:
+        - sql: { sql: SELECT 1; }
+
+  - changeSet:
+      id: control-001-empresas
+      author: leinei
+      comment: Catálogo maestro de empresas y su identidad de marca blanca.
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE plataforma.tbl_empresas (
+                  id                  BIGSERIAL PRIMARY KEY,
+                  uuid                UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  -- Identificador corto y público: va en la URL (/la-parrilla) y en el nombre de su base.
+                  identificador       VARCHAR(30)  NOT NULL UNIQUE CHECK (identificador ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+                  razon_social        VARCHAR(160) NOT NULL,
+                  nit                 VARCHAR(20)  NOT NULL DEFAULT '',
+                  responsable_nombre  VARCHAR(80)  NOT NULL,
+                  responsable_correo  VARCHAR(120) NOT NULL DEFAULT '',
+                  responsable_celular VARCHAR(20)  NOT NULL DEFAULT '',
+                  plan                VARCHAR(30)  NOT NULL DEFAULT 'basico',
+                  estado              VARCHAR(30)  NOT NULL DEFAULT 'pendiente_aprovisionamiento'
+                                      CHECK (estado IN ('pendiente_aprovisionamiento','aprovisionando','activa','suspendida','error_aprovisionamiento')),
+                  notas               VARCHAR(400) NOT NULL DEFAULT '',
+                  creado_en           TIMESTAMPTZ  NOT NULL DEFAULT now(),
+                  actualizado_en      TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+              CREATE INDEX idx_empresas_estado ON plataforma.tbl_empresas (estado);
+
+              CREATE TABLE plataforma.tbl_empresas_marca (
+                  id                BIGSERIAL PRIMARY KEY,
+                  uuid              UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  empresa_id        BIGINT      NOT NULL UNIQUE REFERENCES plataforma.tbl_empresas(id) ON DELETE CASCADE,
+                  nombre_comercial  VARCHAR(80) NOT NULL,
+                  color_primario    VARCHAR(7)  NOT NULL DEFAULT '#E9A23B' CHECK (color_primario ~ '^#[0-9A-Fa-f]{6}$'),
+                  color_secundario  VARCHAR(7)  NOT NULL DEFAULT '#3A2620' CHECK (color_secundario ~ '^#[0-9A-Fa-f]{6}$'),
+                  logo_tipo         VARCHAR(40),
+                  logo_datos        BYTEA,
+                  logo_version      INTEGER     NOT NULL DEFAULT 0,
+                  dominio_propio    VARCHAR(120) UNIQUE,
+                  actualizado_en    TIMESTAMPTZ NOT NULL DEFAULT now()
+              );
+              CREATE INDEX idx_empresas_marca_empresa_id ON plataforma.tbl_empresas_marca (empresa_id);
+      rollback:
+        - sql: { sql: DROP TABLE plataforma.tbl_empresas_marca; DROP TABLE plataforma.tbl_empresas; }
+
+  - changeSet:
+      id: control-001-conexiones-versiones
+      author: leinei
+      comment: >
+        A qué base física apunta cada empresa y con qué credenciales (cifradas con la llave maestra de la
+        plataforma), y qué migración tiene aplicada cada base.
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE plataforma.tbl_empresa_conexiones (
+                  id                     BIGSERIAL PRIMARY KEY,
+                  uuid                   UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  empresa_id             BIGINT       NOT NULL UNIQUE REFERENCES plataforma.tbl_empresas(id) ON DELETE CASCADE,
+                  host                   VARCHAR(120) NOT NULL,
+                  puerto                 INTEGER      NOT NULL DEFAULT 5432,
+                  nombre_base            VARCHAR(63)  NOT NULL UNIQUE,
+                  usuario_owner          VARCHAR(63)  NOT NULL,
+                  clave_owner_cifrada    TEXT         NOT NULL,
+                  usuario_app            VARCHAR(63)  NOT NULL,
+                  clave_app_cifrada      TEXT         NOT NULL,
+                  usuario_lectura        VARCHAR(63)  NOT NULL,
+                  clave_lectura_cifrada  TEXT         NOT NULL,
+                  creado_en              TIMESTAMPTZ  NOT NULL DEFAULT now(),
+                  actualizado_en         TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+              CREATE INDEX idx_empresa_conexiones_empresa_id ON plataforma.tbl_empresa_conexiones (empresa_id);
+
+              CREATE TABLE plataforma.tbl_empresa_esquema_version (
+                  id                        BIGSERIAL PRIMARY KEY,
+                  uuid                      UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  empresa_id                BIGINT       NOT NULL REFERENCES plataforma.tbl_empresas(id) ON DELETE CASCADE,
+                  ultima_migracion_aplicada VARCHAR(150) NOT NULL,
+                  aplicada_en               TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+              CREATE INDEX idx_empresa_esquema_version_empresa_id ON plataforma.tbl_empresa_esquema_version (empresa_id);
+      rollback:
+        - sql: { sql: DROP TABLE plataforma.tbl_empresa_esquema_version; DROP TABLE plataforma.tbl_empresa_conexiones; }
+
+  - changeSet:
+      id: control-001-modulos
+      author: leinei
+      comment: Catálogo de módulos de la plataforma y cuáles tiene activos cada empresa (pivote N:N).
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE plataforma.tbl_modulos (
+                  id          BIGSERIAL PRIMARY KEY,
+                  uuid        UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  codigo      VARCHAR(40)  NOT NULL UNIQUE,
+                  nombre      VARCHAR(80)  NOT NULL,
+                  descripcion VARCHAR(300) NOT NULL DEFAULT '',
+                  es_base     BOOLEAN      NOT NULL DEFAULT FALSE,
+                  orden       INTEGER      NOT NULL DEFAULT 0
+              );
+              CREATE TABLE plataforma.tbl_empresa_modulos (
+                  id           BIGSERIAL PRIMARY KEY,
+                  uuid         UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  empresa_id   BIGINT      NOT NULL REFERENCES plataforma.tbl_empresas(id) ON DELETE CASCADE,
+                  modulo_id    BIGINT      NOT NULL REFERENCES plataforma.tbl_modulos(id) ON DELETE CASCADE,
+                  es_activo    BOOLEAN     NOT NULL DEFAULT TRUE,
+                  activado_en  TIMESTAMPTZ NOT NULL DEFAULT now(),
+                  UNIQUE (empresa_id, modulo_id)
+              );
+              CREATE INDEX idx_empresa_modulos_empresa_id ON plataforma.tbl_empresa_modulos (empresa_id);
+              CREATE INDEX idx_empresa_modulos_modulo_id ON plataforma.tbl_empresa_modulos (modulo_id);
+      rollback:
+        - sql: { sql: DROP TABLE plataforma.tbl_empresa_modulos; DROP TABLE plataforma.tbl_modulos; }
+
+  - changeSet:
+      id: control-001-aprovisionamientos
+      author: leinei
+      comment: >
+        Cola de aprovisionamiento. La aplicación solo inserta aquí (no crea bases); el proceso de
+        aprovisionamiento, con credenciales owner propias, la procesa y deja su registro paso a paso.
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE plataforma.tbl_aprovisionamientos (
+                  id              BIGSERIAL PRIMARY KEY,
+                  uuid            UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  empresa_id      BIGINT      NOT NULL REFERENCES plataforma.tbl_empresas(id) ON DELETE CASCADE,
+                  estado          VARCHAR(20) NOT NULL DEFAULT 'pendiente'
+                                  CHECK (estado IN ('pendiente','en_proceso','completado','fallido')),
+                  intentos        INTEGER     NOT NULL DEFAULT 0,
+                  paso_actual     VARCHAR(80) NOT NULL DEFAULT '',
+                  registro        TEXT        NOT NULL DEFAULT '',
+                  -- Datos para la semilla: administrador inicial (clave ya en BCrypt), tienda y módulos.
+                  datos_iniciales JSONB       NOT NULL DEFAULT '{}'::jsonb,
+                  creado_en       TIMESTAMPTZ NOT NULL DEFAULT now(),
+                  actualizado_en  TIMESTAMPTZ NOT NULL DEFAULT now()
+              );
+              CREATE INDEX idx_aprovisionamientos_empresa_id ON plataforma.tbl_aprovisionamientos (empresa_id);
+              CREATE INDEX idx_aprovisionamientos_estado ON plataforma.tbl_aprovisionamientos (estado);
+      rollback:
+        - sql: { sql: DROP TABLE plataforma.tbl_aprovisionamientos; }
+
+  - changeSet:
+      id: control-001-superadmins
+      author: leinei
+      comment: Dueños de la plataforma y sus sesiones (solo se guarda el hash del token).
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE plataforma.tbl_superadmins (
+                  id         BIGSERIAL PRIMARY KEY,
+                  uuid       UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  usuario    VARCHAR(40)  NOT NULL UNIQUE,
+                  nombre     VARCHAR(80)  NOT NULL,
+                  clave_hash VARCHAR(100) NOT NULL,
+                  es_activo  BOOLEAN      NOT NULL DEFAULT TRUE,
+                  creado_en  TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+              CREATE TABLE plataforma.tbl_superadmin_sesiones (
+                  id            BIGSERIAL PRIMARY KEY,
+                  uuid          UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  token_hash    VARCHAR(64) NOT NULL UNIQUE,
+                  superadmin_id BIGINT      NOT NULL REFERENCES plataforma.tbl_superadmins(id) ON DELETE CASCADE,
+                  creado_en     TIMESTAMPTZ NOT NULL DEFAULT now(),
+                  expira_en     TIMESTAMPTZ NOT NULL
+              );
+              CREATE INDEX idx_superadmin_sesiones_superadmin_id ON plataforma.tbl_superadmin_sesiones (superadmin_id);
+      rollback:
+        - sql: { sql: DROP TABLE plataforma.tbl_superadmin_sesiones; DROP TABLE plataforma.tbl_superadmins; }

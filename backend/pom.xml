@@ -15,7 +15,7 @@
   <artifactId>leinei-api</artifactId>
   <version>1.0.0</version>
   <name>leinei-api</name>
-  <description>API de pedidos de Leinei, postres fríos en vaso</description>
+  <description>Plataforma Leinei: tiendas en línea de marca blanca, una base de datos por empresa</description>
 
   <properties>
     <java.version>21</java.version>
@@ -38,13 +38,11 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-security</artifactId>
     </dependency>
+    <!-- Migraciones: Liquibase (YAML). Se corre desde la plataforma sobre la base de control,
+         la plantilla y cada base de empresa; por eso no se usa la autoconfiguración de Spring. -->
     <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-flyway</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.flywaydb</groupId>
-      <artifactId>flyway-database-postgresql</artifactId>
+      <groupId>org.liquibase</groupId>
+      <artifactId>liquibase-core</artifactId>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>

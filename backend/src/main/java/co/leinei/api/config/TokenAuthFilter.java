@@ -1,6 +1,8 @@
 package co.leinei.api.config;
 
 import co.leinei.api.dominio.AdminUsuario;
+import co.leinei.api.empresa.EmpresaContexto;
+import co.leinei.api.plataforma.servicio.SuperadminAuthService;
 import co.leinei.api.servicio.AuthService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -13,14 +15,24 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.regex.Pattern;
 
-/** Lee el encabezado "Authorization: Bearer <token>" y, si la sesión es válida, marca la petición como ADMIN. */
+/**
+ * Lee "Authorization: Bearer <token>" y reconoce dos tipos de usuario:
+ * - Administrador de una empresa (/api/t/{empresa}/admin/**): el token se busca en la base de ESA empresa,
+ *   así que un token de una empresa no sirve en otra.
+ * - Superadmin (/api/plataforma/**): el token se busca en la base de control.
+ */
 public class TokenAuthFilter extends OncePerRequestFilter {
 
-    private final AuthService auth;
+    private static final Pattern ADMIN_EMPRESA = Pattern.compile("^/api/t/[^/]+/admin/.*");
 
-    public TokenAuthFilter(AuthService auth) {
+    private final AuthService auth;
+    private final SuperadminAuthService superadmins;
+
+    public TokenAuthFilter(AuthService auth, SuperadminAuthService superadmins) {
         this.auth = auth;
+        this.superadmins = superadmins;
     }
 
     public record AdminActual(Long id, String usuario, String nombre) {}
@@ -30,19 +42,28 @@ public class TokenAuthFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String token = extraerToken(req);
         if (token != null) {
-            auth.validar(token).ifPresent((AdminUsuario u) -> {
-                var principal = new AdminActual(u.getId(), u.getUsuario(), u.getNombre());
-                var autenticacion = new UsernamePasswordAuthenticationToken(principal, token,
-                        List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
-                SecurityContextHolder.getContext().setAuthentication(autenticacion);
-            });
+            String ruta = req.getRequestURI();
+            if (ADMIN_EMPRESA.matcher(ruta).matches() && EmpresaContexto.actual().isPresent()) {
+                auth.validar(token).ifPresent((AdminUsuario u) -> {
+                    EmpresaContexto.usuario(u.getUsuario());
+                    autenticar(new AdminActual(u.getId(), u.getUsuario(), u.getNombre()), token, "ROLE_ADMIN");
+                });
+            } else if (ruta.startsWith("/api/plataforma/")) {
+                superadmins.validar(token).ifPresent(s -> autenticar(s, token, "ROLE_SUPERADMIN"));
+            }
         }
         chain.doFilter(req, res);
     }
 
+    private static void autenticar(Object principal, String token, String rol) {
+        var autenticacion = new UsernamePasswordAuthenticationToken(principal, token, List.of(new SimpleGrantedAuthority(rol)));
+        SecurityContextHolder.getContext().setAuthentication(autenticacion);
+    }
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest req) {
-        return !req.getRequestURI().startsWith("/api/admin/");
+        String ruta = req.getRequestURI();
+        return !(ruta.startsWith("/api/t/") || ruta.startsWith("/api/plataforma/"));
     }
 
     public static String extraerToken(HttpServletRequest req) {

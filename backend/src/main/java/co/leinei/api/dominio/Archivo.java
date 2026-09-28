@@ -6,19 +6,24 @@ import java.time.Instant;
 
 /** Imagen subida desde el panel (logo o foto de producto). */
 @Entity
-@Table(name = "archivo")
+@Table(schema = "producto", name = "tbl_archivos")
 public class Archivo {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    /** Identificador para exponer hacia afuera (el id interno solo sirve para índices). */
+    @Column(updatable = false)
+    private java.util.UUID uuid = java.util.UUID.randomUUID();
     @Column(name = "tipo_contenido")
     private String tipoContenido;
     @Basic(fetch = FetchType.LAZY)
     private byte[] datos;
     private int tamano;
+    @Column(name = "creado_en")
     private Instant creado = Instant.now();
 
+    public java.util.UUID getUuid() { return uuid; }
     public Long getId() { return id; }
     public String getTipoContenido() { return tipoContenido; }
     public void setTipoContenido(String v) { tipoContenido = v; }

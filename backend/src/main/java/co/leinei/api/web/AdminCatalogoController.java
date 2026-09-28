@@ -1,5 +1,9 @@
 package co.leinei.api.web;
 
+import co.leinei.api.empresa.EmpresaActual;
+import co.leinei.api.empresa.EmpresaContexto;
+import co.leinei.api.empresa.Modulos;
+import co.leinei.api.plataforma.servicio.MarcaService;
 import co.leinei.api.servicio.ArchivoService;
 import co.leinei.api.servicio.CatalogoService;
 import co.leinei.api.servicio.ConfigService;
@@ -14,17 +18,34 @@ import java.io.IOException;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping("/api/t/{empresa}/admin")
 public class AdminCatalogoController {
 
     private final CatalogoService catalogo;
     private final ConfigService config;
     private final ArchivoService archivos;
+    private final MarcaService marca;
 
-    public AdminCatalogoController(CatalogoService catalogo, ConfigService config, ArchivoService archivos) {
+    public AdminCatalogoController(CatalogoService catalogo, ConfigService config, ArchivoService archivos, MarcaService marca) {
         this.catalogo = catalogo;
         this.config = config;
         this.archivos = archivos;
+        this.marca = marca;
+    }
+
+    // ---- Logo de la empresa (se guarda en la base de control, con la marca)
+    @PostMapping(value = "/marca/logo", consumes = "multipart/form-data")
+    public AdminDto.Config subirLogo(@RequestParam("archivo") MultipartFile archivo) throws IOException {
+        EmpresaActual e = EmpresaContexto.requerida();
+        marca.guardarLogo(e.id(), e.identificador(), archivo.getBytes());
+        return config.verAdmin();
+    }
+
+    @DeleteMapping("/marca/logo")
+    public AdminDto.Config quitarLogo() {
+        EmpresaActual e = EmpresaContexto.requerida();
+        marca.quitarLogo(e.id(), e.identificador());
+        return config.verAdmin();
     }
 
     // ---- Imágenes (logo y fotos)
@@ -91,17 +112,20 @@ public class AdminCatalogoController {
     // ---- Promociones
     @GetMapping("/promociones")
     public List<AdminDto.Promocion> promociones() {
+        exigirPromociones();
         return catalogo.listarPromociones();
     }
 
     @PostMapping("/promociones")
     @ResponseStatus(HttpStatus.CREATED)
     public AdminDto.Promocion crearPromocion(@Valid @RequestBody AdminDto.PromocionRequest req) {
+        exigirPromociones();
         return catalogo.crearPromocion(req);
     }
 
     @PutMapping("/promociones/{id}")
     public AdminDto.Promocion actualizarPromocion(@PathVariable Long id, @Valid @RequestBody AdminDto.PromocionRequest req) {
+        exigirPromociones();
         return catalogo.actualizarPromocion(id, req);
     }
 
@@ -125,5 +149,9 @@ public class AdminCatalogoController {
     @PutMapping("/config")
     public AdminDto.Config guardarConfig(@Valid @RequestBody AdminDto.Config req) {
         return config.actualizar(req);
+    }
+
+    private static void exigirPromociones() {
+        EmpresaContexto.exigirModulo(Modulos.PROMOCIONES, "Promociones");
     }
 }
