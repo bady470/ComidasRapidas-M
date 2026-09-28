@@ -1,0 +1,18 @@
+# Base de datos PostgreSQL para desarrollo. Arráncala con:  docker compose up -d
+services:
+  db:
+    image: postgres:17
+    container_name: leinei-db
+    environment:
+      POSTGRES_DB: leinei
+      POSTGRES_USER: leinei
+      POSTGRES_PASSWORD: leinei
+      TZ: America/Bogota
+    ports:
+      - "5432:5432"
+    volumes:
+      - leinei-datos:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  leinei-datos:
