@@ -1,7 +1,8 @@
-# Levanta la plataforma completa (frontend + backend en un solo contenedor) y PostgreSQL.
+# Tres contenedores: base de datos, backend (API) y frontend (Angular + Nginx).
 # Arráncalo con:  docker compose up -d --build
+# Abre:           http://localhost:8080  (superadmin en http://localhost:8080/superadmin)
 #
-# PostgreSQL arranca con la base de control (db_leinei_control). La app crea sola la plantilla
+# PostgreSQL arranca con la base de control (db_leinei_control). El backend crea sola la plantilla
 # (db_leinei_plantilla) y, cada vez que el superadmin crea una empresa, su base db_cliente_<identificador>.
 services:
   db:
@@ -24,11 +25,11 @@ services:
       timeout: 5s
       retries: 10
 
-  app:
+  backend:
     build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: leinei-app
+      context: ./backend
+    image: leinei-backend
+    container_name: leinei-backend
     depends_on:
       db:
         condition: service_healthy
@@ -43,9 +44,23 @@ services:
       SUPERADMIN_USER: superadmin
       SUPERADMIN_NAME: Superadministrador
       SUPERADMIN_PASSWORD: cambia-esta-clave
-      # Mismo origen para frontend y API: no hace falta configurar CORS_ORIGINS.
+      # El navegador solo habla con el frontend (Nginx reenvía /api), así que no hace falta CORS_ORIGINS.
+    # Solo se publica para pruebas directas a la API (http://localhost:8081/api/...). Puedes quitarlo.
     ports:
-      - "8080:8080"
+      - "8081:8080"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    image: leinei-frontend
+    container_name: leinei-frontend
+    depends_on:
+      - backend
+    environment:
+      API_URL: http://backend:8080
+    ports:
+      - "8080:80"
     restart: unless-stopped
 
 volumes:

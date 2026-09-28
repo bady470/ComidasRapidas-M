@@ -2,5 +2,5 @@ target/
 .idea/
 *.iml
 .vscode/
-# generado en el build de Docker al copiar el dist de Angular
+# (ya no se usa: el frontend va en su propia imagen)
 src/main/resources/static/

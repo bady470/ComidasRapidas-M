@@ -1,4 +1,7 @@
-# Imagen para desplegar la API (Render, Railway, un VPS...).
+# Imagen del backend (API Spring Boot). El frontend va en su propia imagen (frontend/Dockerfile).
+# Build: docker build -t leinei-backend ./backend
+# Run:   docker run -p 8080:8080 -e DB_HOST=... -e DB_OWNER_USER=... -e DB_OWNER_PASSWORD=... -e LEINEI_LLAVE_MAESTRA=... leinei-backend
+
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
 COPY pom.xml .

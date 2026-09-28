@@ -12,11 +12,10 @@ La plataforma arranca **sin empresas**: la primera se crea desde `/superadmin �
 
 ```
 leinei-marca-blanca/
-├── docker-compose.yml   ← PostgreSQL + la app en un contenedor
-├── Dockerfile           ← Construye frontend y backend en una sola imagen
+├── docker-compose.yml   ← Tres contenedores: db, backend y frontend
 ├── ejemplos/            ← Datos de ejemplo para cargar en la base de una empresa
-├── backend/             ← Java 21 + Spring Boot 4.1.1 + Liquibase + PostgreSQL
-└── frontend/            ← Angular 22: tienda, portal de la empresa y superadmin
+├── backend/             ← Java 21 + Spring Boot 4.1.1 + Liquibase + PostgreSQL (Dockerfile propio)
+└── frontend/            ← Angular 22 servido por Nginx: tienda, portal y superadmin (Dockerfile propio)
 ```
 
 ---
@@ -154,10 +153,23 @@ Los errores llegan como `{ "status": 400, "detail": "Mensaje para mostrar" }` y 
 
 ## 3. Correrlo en tu computador
 
-### Con Docker (todo junto)
+### Con Docker (tres contenedores)
 
 ```bash
 docker compose up -d --build
+```
+
+| Contenedor | Imagen | Puerto en tu equipo | Qué hace |
+|---|---|---|---|
+| `leinei-db` | `postgres:17` | 5432 | Base de control, plantilla y una base por empresa |
+| `leinei-backend` | `leinei-backend` (`backend/Dockerfile`) | 8081 (solo para pruebas) | API Spring Boot |
+| `leinei-frontend` | `leinei-frontend` (`frontend/Dockerfile`) | **8080** | Nginx: sirve Angular y reenvía `/api/**` al backend |
+
+El navegador solo habla con el frontend: Nginx pasa `/api/**` al contenedor del backend (variable `API_URL`, por defecto `http://backend:8080`). Así todo queda en el mismo origen y no hace falta CORS. Cada imagen se puede construir y desplegar por separado:
+
+```bash
+docker build -t leinei-backend ./backend
+docker build -t leinei-frontend ./frontend
 ```
 
 Abre `http://localhost:8080/superadmin` y entra con **superadmin** / **cambia-esta-clave** (cámbiala en *Mi cuenta*). Crea la primera empresa; en unos segundos queda activa y puedes abrir su tienda (`/identificador`) y su portal (`/identificador/admin`) con el administrador que definiste.
