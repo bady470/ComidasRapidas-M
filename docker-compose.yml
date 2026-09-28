@@ -1,4 +1,5 @@
-# Base de datos PostgreSQL para desarrollo. Arráncala con:  docker compose up -d
+# Levanta la app completa (frontend + backend en un solo contenedor) y su base de datos.
+# Arráncalo con:  docker compose up -d --build
 services:
   db:
     image: postgres:17
@@ -12,6 +13,31 @@ services:
       - "5432:5432"
     volumes:
       - leinei-datos:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leinei -d leinei"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: leinei-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/leinei
+      DB_USER: leinei
+      DB_PASSWORD: leinei
+      # Mismo origen para frontend y API: no hace falta configurar CORS_ORIGINS.
+      ADMIN_USER: admin
+      ADMIN_NAME: Administrador
+      ADMIN_PASSWORD: cambia-esta-clave
+    ports:
+      - "8080:8080"
     restart: unless-stopped
 
 volumes:

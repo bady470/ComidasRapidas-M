@@ -1,4 +1,4 @@
-// Producción: la dirección pública de la API de ESTE negocio. Cámbiala en cada instalación.
+// Producción: la API se sirve del mismo contenedor/origen que el frontend.
 export const environment = {
-  apiUrl: 'https://api.minegocio.com/api',
+  apiUrl: '/api',
 };

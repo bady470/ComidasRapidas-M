@@ -2,3 +2,5 @@ target/
 .idea/
 *.iml
 .vscode/
+# generado en el build de Docker al copiar el dist de Angular
+src/main/resources/static/
