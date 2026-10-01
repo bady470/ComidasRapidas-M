@@ -94,5 +94,9 @@ public final class PublicoDto {
                               List<ItemSeguimiento> items, int subtotal, int descuento, String promocion,
                               int domicilio, int total, MetodoPago metodoPago, String cuentaEntidad,
                               String cuentaTitular, String cuentaNumero, List<Evento> eventos, Instant creado,
-                              String direccionTienda) {}
+                              String direccionTienda,
+                              // Pago por transferencia: si ya adjuntó comprobante y cuándo.
+                              boolean tieneComprobante, Instant pagoReportado,
+                              // Quién lleva el pedido (solo nombre y celular del domiciliario).
+                              String domiciliarioNombre, String domiciliarioCelular) {}
 }

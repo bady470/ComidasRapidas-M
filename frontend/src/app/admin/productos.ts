@@ -108,30 +108,40 @@ const PLANTILLAS: { nombre: string; grupo: () => GrupoAdmin }[] = [
       </form>
     }
 
-    <div class="plist">
-      @for (p of visibles(); track p.id) {
-        <div class="pitem">
-          <div class="mini"><app-foto [imagenId]="p.imagenId" [nombre]="p.nombre" /></div>
-          <div>
-            <b>{{ p.nombre }}</b> @if (!p.disponible) { <span class="chip">Agotado</span> }
-            <div class="meta num">{{ nombreCategoria(p.categoriaId) }} · {{ p.precio | dinero }} · {{ margen(p) }}</div>
-            @if (p.grupos.length) { <div class="meta">Opciones: {{ resumenGrupos(p) }}</div> }
-          </div>
-          <div class="acts">
-            <button class="btn" (click)="disponible(p)">{{ p.disponible ? 'Marcar agotado' : 'Marcar disponible' }}</button>
-            <button class="btn" (click)="editar(p)">Editar</button>
-            <button class="btn" (click)="duplicar(p)">Duplicar</button>
-            @if (confirmar() === p.id) {
-              <button class="btn sure" (click)="eliminar(p)">Sí, eliminar</button>
-              <button class="btn" (click)="confirmar.set(null)">No</button>
-            } @else {
-              <button class="btn bad" (click)="confirmar.set(p.id)">Eliminar</button>
-            }
-          </div>
-        </div>
-      } @empty {
-        <div class="empty">No hay productos aquí. Crea el primero con «Nuevo producto».</div>
-      }
+    <div class="panel tablewrap tabla-datos" style="padding:0">
+      <table>
+        <thead>
+          <tr><th style="width:64px"></th><th>Producto</th><th>Categoría</th><th class="r">Precio</th><th class="r">Costo</th><th>Opciones</th><th>Estado</th><th class="r">Acciones</th></tr>
+        </thead>
+        <tbody>
+          @for (p of visibles(); track p.id) {
+            <tr [class.apagada]="!p.disponible">
+              <td><div class="mini"><app-foto [imagenId]="p.imagenId" [nombre]="p.nombre" /></div></td>
+              <td><b>{{ p.nombre }}</b>@if (p.etiqueta) { <span class="chip hot" style="margin-left:6px">{{ p.etiqueta }}</span> }</td>
+              <td class="muted">{{ nombreCategoria(p.categoriaId) }}</td>
+              <td class="r num"><b>{{ p.precio | dinero }}</b></td>
+              <td class="r num"><span>{{ p.costo | dinero }}</span><div class="muted">{{ margen(p) }}</div></td>
+              <td class="muted" style="max-width:220px">{{ p.grupos.length ? resumenGrupos(p) : '—' }}</td>
+              <td><span class="st" [class.pay-RECIBIDO]="p.disponible" [class.pay-PENDIENTE]="!p.disponible">{{ p.disponible ? 'Disponible' : 'Agotado' }}</span></td>
+              <td class="r">
+                <div class="acciones-fila">
+                  <button class="btn" (click)="editar(p)">Editar</button>
+                  <button class="btn" (click)="disponible(p)">{{ p.disponible ? 'Agotar' : 'Activar' }}</button>
+                  <button class="btn" (click)="duplicar(p)">Duplicar</button>
+                  @if (confirmar() === p.id) {
+                    <button class="btn sure" (click)="eliminar(p)">Confirmar</button>
+                    <button class="btn" (click)="confirmar.set(null)">No</button>
+                  } @else {
+                    <button class="btn bad" (click)="confirmar.set(p.id)">Eliminar</button>
+                  }
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="8" class="vacio">No hay productos aquí. Crea el primero con «Nuevo producto».</td></tr>
+          }
+        </tbody>
+      </table>
     </div>
   `,
 })

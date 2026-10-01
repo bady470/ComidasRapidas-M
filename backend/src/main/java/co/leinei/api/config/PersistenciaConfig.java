@@ -76,12 +76,16 @@ public class PersistenciaConfig {
         return new DataSourceTransactionManager(ds);
     }
 
-    /** DataSource de las entidades JPA: enruta a la base de la empresa de la petición. */
+    /**
+     * DataSource de las entidades JPA: enruta a la base de la empresa de la petición.
+     * Recibe el DataSource de control (no el bean JdbcClient): Spring Boot hace que los beans JdbcClient
+     * esperen a los inicializadores de bases, y eso formaba un ciclo con este DataSource.
+     */
     @Bean(destroyMethod = "cerrarTodo")
     @Primary
-    public EnrutadorDataSource dataSource(@Qualifier("controlJdbc") JdbcClient control, CifradoClaves cifrado,
+    public EnrutadorDataSource dataSource(@Qualifier("controlDataSource") DataSource control, CifradoClaves cifrado,
                                           ServidorPostgres servidor, LeineiProperties props) {
-        return new EnrutadorDataSource(control, cifrado, servidor, props.plataforma().poolPorEmpresa());
+        return new EnrutadorDataSource(JdbcClient.create(control), cifrado, servidor, props.plataforma().poolPorEmpresa());
     }
 
     @Bean

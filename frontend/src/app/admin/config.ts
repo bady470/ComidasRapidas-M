@@ -217,8 +217,8 @@ export class ConfigPage {
   protected muestra = computed(() => {
     this.version();
     const c = this.config();
-    const c1 = valido(c?.colorPrimario) ? c!.colorPrimario : '#E9A23B';
-    const c2 = valido(c?.colorSecundario) ? c!.colorSecundario : '#3A2620';
+    const c1 = valido(c?.colorPrimario) ? c!.colorPrimario : '#1D4ED8';
+    const c2 = valido(c?.colorSecundario) ? c!.colorSecundario : '#0F172A';
     return { c1, c2, t1: textoSobre(c1), t2: textoSobre(c2) };
   });
 

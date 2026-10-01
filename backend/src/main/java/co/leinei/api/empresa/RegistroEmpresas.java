@@ -60,7 +60,7 @@ public class RegistroEmpresas {
                                m.color_secundario, m.logo_version, (m.logo_datos IS NOT NULL) AS tiene_logo, m.dominio_propio
                         FROM plataforma.tbl_empresas e
                         JOIN plataforma.tbl_empresas_marca m ON m.empresa_id = e.id
-                        WHERE """ + condicion)
+                        WHERE\s""" + condicion) // \s: Java quita el espacio final de los bloques de texto
                 .param(valor)
                 .query((rs, n) -> new EmpresaActual(rs.getLong("id"), rs.getObject("uuid", UUID.class),
                         rs.getString("identificador"), rs.getString("estado"), rs.getString("nombre_comercial"),

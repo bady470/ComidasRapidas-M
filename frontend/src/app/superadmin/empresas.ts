@@ -2,27 +2,30 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signa
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Logo } from '../compartido/logo';
+import { Animar, Contar } from '../core/animar';
 import { PlataformaApi, mensajeError } from '../core/api';
-import { HoraPipe } from '../core/formato';
-import { EmpresaResumen, EstadoEmpresa, NOMBRE_ESTADO_EMPRESA, ResumenPlataforma } from '../core/modelos';
+import { enVivoPlataforma } from './en-vivo';
+import { DineroPipe, HoraPipe } from '../core/formato';
+import { EmpresaResumen, Plan, EstadoEmpresa, NOMBRE_ESTADO_EMPRESA, ResumenPlataforma } from '../core/modelos';
 
 /** Todas las empresas de la plataforma con su estado. */
 @Component({
   selector: 'app-empresas',
-  imports: [FormsModule, RouterLink, Logo, HoraPipe],
+  imports: [FormsModule, RouterLink, Logo, HoraPipe, DineroPipe, Animar, Contar],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (resumen(); as r) {
-      <div class="kpis">
-        <div class="kpi"><span class="muted">Empresas</span><div class="v">{{ r.total }}</div></div>
-        <div class="kpi"><span class="muted">Activas</span><div class="v ok">{{ r.activas }}</div></div>
-        <div class="kpi"><span class="muted">Preparando</span><div class="v">{{ r.enPreparacion }}</div></div>
-        <div class="kpi"><span class="muted">Suspendidas</span><div class="v">{{ r.suspendidas }}</div></div>
-        <div class="kpi"><span class="muted">Con error</span><div class="v">{{ r.conError }}</div></div>
+      <div class="kpis" animar="hijos">
+        <div class="kpi"><span class="muted">Empresas</span><div class="v"><span [contar]="r.total"></span></div></div>
+        <div class="kpi"><span class="muted">Activas</span><div class="v ok"><span [contar]="r.activas"></span></div></div>
+        <div class="kpi"><span class="muted">Preparando</span><div class="v"><span [contar]="r.enPreparacion"></span></div></div>
+        <div class="kpi"><span class="muted">Suspendidas</span><div class="v"><span [contar]="r.suspendidas"></span></div></div>
+        <div class="kpi"><span class="muted">Con error</span><div class="v"><span [contar]="r.conError"></span></div></div>
       </div>
     }
 
     <div class="toolbar">
+      <span class="en-vivo" [class.off]="!vivo.enVivo()">{{ vivo.enVivo() ? 'En vivo' : 'Reconectando' }}</span>
       <input type="search" placeholder="Buscar por nombre, identificador, razón social o dominio" [ngModel]="busqueda()" (ngModelChange)="busqueda.set($event)">
       <a class="btn main" routerLink="/superadmin/empresas/nueva">+ Nueva empresa</a>
     </div>
@@ -38,7 +41,7 @@ import { EmpresaResumen, EstadoEmpresa, NOMBRE_ESTADO_EMPRESA, ResumenPlataforma
     } @else if (empresas().length) {
       <div class="panel tablewrap" style="padding:0">
         <table>
-          <thead><tr><th>Empresa</th><th>Estado</th><th>Dirección</th><th>Módulos</th><th>Creada</th><th></th></tr></thead>
+          <thead><tr><th>Empresa</th><th>Estado</th><th>Dirección</th><th>Plan</th><th>Creada</th><th></th></tr></thead>
           <tbody>
             @for (e of filtradas(); track e.uuid) {
               <tr>
@@ -53,7 +56,7 @@ import { EmpresaResumen, EstadoEmpresa, NOMBRE_ESTADO_EMPRESA, ResumenPlataforma
                   <div class="num">/{{ e.identificador }}</div>
                   @if (e.dominioPropio) { <div class="muted">{{ e.dominioPropio }}</div> }
                 </td>
-                <td class="muted" style="font-size:13px">{{ e.modulos.length }}</td>
+                <td style="font-size:13px"><b>{{ nombrePlan(e.plan) }}</b><div class="muted">{{ e.precioPlan | dinero }}/{{ e.cicloFacturacion === 'ANUAL' ? 'año' : 'mes' }}</div></td>
                 <td class="muted" style="font-size:13px">{{ e.creadoEn | hora }}</td>
                 <td class="r" style="white-space:nowrap">
                   @if (e.estado === 'activa') {
@@ -80,6 +83,7 @@ export class EmpresasPage {
   protected cargado = signal(false);
   protected error = signal('');
   protected busqueda = signal('');
+  protected vivo: { enVivo: () => boolean };
 
   protected filtradas = computed(() => {
     const q = this.busqueda().trim().toLowerCase();
@@ -88,12 +92,20 @@ export class EmpresasPage {
       [e.nombreComercial, e.identificador, e.razonSocial, e.dominioPropio ?? ''].some((t) => t.toLowerCase().includes(q)));
   });
 
+  protected planes = signal<Plan[]>([]);
+  protected nombrePlan(codigo: string | null): string {
+    return this.planes().find((p) => p.codigo === codigo)?.nombre ?? codigo ?? '';
+  }
+
   constructor() {
+    this.api.planes().subscribe((l) => this.planes.set(l));
     this.cargar();
-    // Mientras haya empresas preparándose, se refresca solo.
+    // En vivo: la lista cambia sola cuando se crea una empresa, avanza su preparación o cambia su estado.
+    this.vivo = enVivoPlataforma(() => this.cargar());
+    // Respaldo lento por si la conexión en vivo no está disponible.
     const t = setInterval(() => {
       if (this.empresas().some((e) => e.estado === 'pendiente_aprovisionamiento' || e.estado === 'aprovisionando')) this.cargar();
-    }, 4000);
+    }, 15_000);
     inject(DestroyRef).onDestroy(() => clearInterval(t));
   }
 

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
+import { Acceso } from '../compartido/acceso';
 import { PlataformaApi, mensajeError } from '../core/api';
 import { EmpresaActual } from '../core/empresa';
 import { SesionSuperadmin } from '../core/sesion';
@@ -8,21 +8,15 @@ import { Tema } from '../core/tema';
 
 @Component({
   selector: 'app-super-login',
-  imports: [FormsModule],
+  imports: [RouterLink, Acceso],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <main class="inicio">
-      <form class="panel login" (ngSubmit)="entrar()">
-        <h1 style="font-size:28px">Superadmin</h1>
-        <p class="muted" style="font-size:14px">Administra las empresas de la plataforma: crea tiendas, activa módulos y revisa su estado.</p>
-        <div class="field"><label for="usuario">Usuario</label>
-          <input id="usuario" name="usuario" autocomplete="username" [(ngModel)]="usuario"></div>
-        <div class="field"><label for="clave">Clave</label>
-          <input id="clave" name="clave" type="password" autocomplete="current-password" [(ngModel)]="clave"></div>
-        @if (error()) { <p class="err" role="alert">{{ error() }}</p> }
-        <button class="primary" type="submit" [disabled]="cargando()">{{ cargando() ? 'Entrando…' : 'Entrar' }}</button>
-      </form>
-    </main>
+    <app-acceso marca="Leinei" titulo="Superadministración" subtitulo="Entra con tu usuario de superadministrador."
+      lema="Administra todas las empresas de la plataforma desde un solo lugar."
+      [beneficios]="['Crea tiendas y portales en minutos', 'Planes, módulos y precios por empresa', 'Productos precargados y correo de bienvenida']"
+      [error]="error()" [cargando]="cargando()" [(usuario)]="usuario" [(clave)]="clave" (enviar)="entrar()">
+      <a class="linkbtn" routerLink="/">← Volver al inicio</a>
+    </app-acceso>
   `,
 })
 export class SuperLoginPage {
@@ -30,8 +24,8 @@ export class SuperLoginPage {
   private sesion = inject(SesionSuperadmin);
   private router = inject(Router);
 
-  protected usuario = '';
-  protected clave = '';
+  protected usuario = signal('');
+  protected clave = signal('');
   protected cargando = signal(false);
   protected error = signal('');
 
@@ -43,10 +37,10 @@ export class SuperLoginPage {
   }
 
   protected entrar(): void {
-    if (!this.usuario.trim() || !this.clave) { this.error.set('Escribe tu usuario y tu clave.'); return; }
+    if (!this.usuario().trim() || !this.clave()) { this.error.set('Escribe tu usuario y tu clave.'); return; }
     this.cargando.set(true);
     this.error.set('');
-    this.api.login(this.usuario.trim(), this.clave).subscribe({
+    this.api.login(this.usuario().trim(), this.clave()).subscribe({
       next: (s) => { this.sesion.iniciar(s); this.router.navigateByUrl('/superadmin'); },
       error: (e) => { this.error.set(mensajeError(e)); this.cargando.set(false); },
     });

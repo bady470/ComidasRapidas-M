@@ -7,3 +7,5 @@ databaseChangeLog:
   - include: { file: 003-producto.yaml, relativeToChangelogFile: true }
   - include: { file: 004-triggers-auditoria.yaml, relativeToChangelogFile: true }
   - include: { file: 005-datos-base.yaml, relativeToChangelogFile: true }
+  - include: { file: 006-pagos-domiciliarios-notificaciones.yaml, relativeToChangelogFile: true }
+  - include: { file: 007-categorias-tipicas.yaml, relativeToChangelogFile: true }

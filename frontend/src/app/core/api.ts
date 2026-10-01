@@ -6,7 +6,7 @@ import {
   AdminUsuario, Catalogo, CategoriaAdmin, ConfigAdmin, Cotizacion, CrearPedido, EstadoPago, EstadoPedido, ItemPedido,
   PedidoAdmin, PedidoCreado, PedidoManual, Produccion, ProductoAdmin, ProductoForm, PromocionAdmin, PromocionForm,
   Seguimiento, Sesion, TipoEntrega,
-  ActualizarEmpresa, CrearEmpresa, EmpresaDetalle, EmpresaResumen, ModuloPlataforma, ResumenPlataforma, Superadmin,
+  Avisos, Domiciliario, ActualizarEmpresa, CrearEmpresa, EmpresaDetalle, EmpresaResumen, ModuloPlataforma, ResumenPlataforma, Superadmin, Biblioteca, ResultadoBiblioteca, Plan, EmpresaCreada, ConfigCorreo, ConfigCorreoForm, ResultadoPrueba,
 } from './modelos';
 
 import { apiEmpresa } from './empresa';
@@ -19,6 +19,9 @@ const API = environment.apiUrl;
 export function mensajeError(e: unknown): string {
   if (e instanceof HttpErrorResponse) {
     if (e.status === 0) return 'No hay conexión con el servidor. Revisa tu internet e intenta de nuevo.';
+    if (e.status === 502 || e.status === 503 || e.status === 504) {
+      return 'El servidor no está disponible en este momento (la API no responde). Intenta de nuevo en un momento.';
+    }
     const detalle = (e.error as { detail?: string } | null)?.detail;
     if (detalle) return detalle;
   }
@@ -37,6 +40,13 @@ export class TiendaApi {
   }
   crearPedido(p: CrearPedido): Observable<PedidoCreado> {
     return this.http.post<PedidoCreado>(`${apiEmpresa()}/public/pedidos`, p);
+  }
+  /** El cliente adjunta el comprobante de su transferencia. */
+  subirComprobante(codigo: string, celular: string, archivo: File): Observable<Seguimiento> {
+    const datos = new FormData();
+    datos.append('archivo', archivo);
+    const params = new HttpParams().set('celular', celular);
+    return this.http.post<Seguimiento>(`${apiEmpresa()}/public/pedidos/${encodeURIComponent(codigo)}/comprobante`, datos, { params });
   }
   seguimiento(codigo: string, celular: string): Observable<Seguimiento> {
     const params = new HttpParams().set('celular', celular);
@@ -85,8 +95,9 @@ export class AdminApi {
   }
 
   // ---- Pedidos
-  pedidos(filtro: { fecha?: string; estado?: EstadoPedido; q?: string }): Observable<PedidoAdmin[]> {
+  pedidos(filtro: { fecha?: string; estado?: EstadoPedido; q?: string; porPagar?: boolean }): Observable<PedidoAdmin[]> {
     let params = new HttpParams();
+    if (filtro.porPagar) params = params.set('porPagar', 'true');
     if (filtro.fecha) params = params.set('fecha', filtro.fecha);
     if (filtro.estado) params = params.set('estado', filtro.estado);
     if (filtro.q) params = params.set('q', filtro.q);
@@ -100,6 +111,30 @@ export class AdminApi {
   }
   cambiarPago(id: number, estadoPago: EstadoPago): Observable<PedidoAdmin> {
     return this.http.patch<PedidoAdmin>(`${this.base}/pedidos/${id}/pago`, { estadoPago });
+  }
+  /** Comprobante como archivo (con el token del portal); se abre con URL.createObjectURL. */
+  comprobante(id: number): Observable<Blob> {
+    return this.http.get(`${this.base}/pedidos/${id}/comprobante`, { responseType: 'blob' });
+  }
+  asignarDomiciliario(id: number, domiciliarioId: number | null): Observable<PedidoAdmin> {
+    return this.http.patch<PedidoAdmin>(`${this.base}/pedidos/${id}/domiciliario`, { domiciliarioId });
+  }
+
+  // ---- Domiciliarios
+  domiciliarios(): Observable<Domiciliario[]> {
+    return this.http.get<Domiciliario[]>(`${this.base}/domiciliarios`);
+  }
+  guardarDomiciliario(id: number | null, d: { nombre: string; celular: string; activo: boolean }): Observable<Domiciliario[]> {
+    return id ? this.http.put<Domiciliario[]>(`${this.base}/domiciliarios/${id}`, d)
+              : this.http.post<Domiciliario[]>(`${this.base}/domiciliarios`, d);
+  }
+
+  // ---- Avisos del portal
+  avisos(): Observable<Avisos> {
+    return this.http.get<Avisos>(`${this.base}/avisos`);
+  }
+  marcarLeidos(hastaId: number): Observable<Avisos> {
+    return this.http.post<Avisos>(`${this.base}/avisos/leidos`, { hastaId });
   }
 
   // ---- Reportes
@@ -197,8 +232,8 @@ export class PlataformaApi {
   empresa(uuid: string): Observable<EmpresaDetalle> {
     return this.http.get<EmpresaDetalle>(`${this.base}/empresas/${uuid}`);
   }
-  crearEmpresa(e: CrearEmpresa): Observable<EmpresaDetalle> {
-    return this.http.post<EmpresaDetalle>(`${this.base}/empresas`, e);
+  crearEmpresa(e: CrearEmpresa): Observable<EmpresaCreada> {
+    return this.http.post<EmpresaCreada>(`${this.base}/empresas`, e);
   }
   actualizarEmpresa(uuid: string, e: ActualizarEmpresa): Observable<EmpresaDetalle> {
     return this.http.put<EmpresaDetalle>(`${this.base}/empresas/${uuid}`, e);
@@ -222,6 +257,33 @@ export class PlataformaApi {
   }
   reintentar(uuid: string): Observable<EmpresaDetalle> {
     return this.http.post<EmpresaDetalle>(`${this.base}/empresas/${uuid}/reintentar`, {});
+  }
+  correo(): Observable<ConfigCorreo> {
+    return this.http.get<ConfigCorreo>(`${this.base}/correo`);
+  }
+  guardarCorreo(c: ConfigCorreoForm): Observable<ConfigCorreo> {
+    return this.http.put<ConfigCorreo>(`${this.base}/correo`, c);
+  }
+  probarCorreo(destino: string): Observable<ResultadoPrueba> {
+    return this.http.post<ResultadoPrueba>(`${this.base}/correo/prueba`, { destino });
+  }
+  planes(): Observable<Plan[]> {
+    return this.http.get<Plan[]>(`${this.base}/planes`);
+  }
+  crearPlan(p: Plan): Observable<Plan> {
+    return this.http.post<Plan>(`${this.base}/planes`, p);
+  }
+  guardarPlan(p: Plan): Observable<Plan> {
+    return this.http.put<Plan>(`${this.base}/planes/${p.codigo}`, p);
+  }
+  biblioteca(): Observable<Biblioteca> {
+    return this.http.get<Biblioteca>(`${this.base}/biblioteca`);
+  }
+  imagenBiblioteca(nombre: string): string {
+    return `${this.base}/publico/biblioteca/imagenes/${encodeURIComponent(nombre)}`;
+  }
+  importarBiblioteca(uuid: string, slugs: string[], ajustePorcentaje: number): Observable<ResultadoBiblioteca> {
+    return this.http.post<ResultadoBiblioteca>(`${this.base}/empresas/${uuid}/biblioteca`, { slugs, ajustePorcentaje });
   }
   claveAdmin(uuid: string, usuario: string, nueva: string): Observable<void> {
     return this.http.post<void>(`${this.base}/empresas/${uuid}/clave-admin`, { usuario, nueva });

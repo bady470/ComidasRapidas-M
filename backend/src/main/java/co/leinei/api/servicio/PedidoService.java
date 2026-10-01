@@ -1,7 +1,12 @@
 package co.leinei.api.servicio;
 
 import co.leinei.api.dominio.*;
+import co.leinei.api.repositorio.ComprobantePagoRepositorio;
+import co.leinei.api.repositorio.DomiciliarioRepositorio;
+import co.leinei.api.repositorio.NotificacionRepositorio;
 import co.leinei.api.repositorio.PedidoRepositorio;
+import co.leinei.api.empresa.EmpresaContexto;
+import co.leinei.api.tiemporeal.TiempoReal;
 import co.leinei.api.web.dto.AdminDto;
 import co.leinei.api.web.dto.PublicoDto;
 import org.springframework.data.domain.PageRequest;
@@ -9,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -28,10 +34,25 @@ public class PedidoService {
     private final ConfigService configService;
     private final PrecioService precios;
     private final ZoneId zona;
+    private final ComprobantePagoRepositorio comprobantes;
+    private final NotificacionRepositorio notificaciones;
+    private final DomiciliarioRepositorio domiciliarios;
+    private final TiempoReal tiempoReal;
+
+    /** Estados de pago que cuentan como "sin pagar". */
+    static final List<EstadoPago> SIN_PAGAR = List.of(EstadoPago.PENDIENTE, EstadoPago.POR_CONFIRMAR);
+    /** Comprobantes: foto o PDF de hasta 5 MB. */
+    public static final int MAXIMO_COMPROBANTE = 5 * 1024 * 1024;
 
     public PedidoService(PedidoRepositorio pedidoRepo, CatalogoService catalogo, ConfigService configService,
-                         PrecioService precios, co.leinei.api.config.LeineiProperties props) {
+                         PrecioService precios, co.leinei.api.config.LeineiProperties props,
+                         ComprobantePagoRepositorio comprobantes, NotificacionRepositorio notificaciones,
+                         DomiciliarioRepositorio domiciliarios, TiempoReal tiempoReal) {
+        this.tiempoReal = tiempoReal;
         this.zona = ZoneId.of(props.zonaHoraria());
+        this.comprobantes = comprobantes;
+        this.notificaciones = notificaciones;
+        this.domiciliarios = domiciliarios;
         this.pedidoRepo = pedidoRepo;
         this.catalogo = catalogo;
         this.configService = configService;
@@ -83,6 +104,11 @@ public class PedidoService {
         p.setOrigen(OrigenPedido.WEB);
         p.registrarEvento(EstadoPedido.NUEVO, "", "cliente");
         pedidoRepo.save(p);
+        notificaciones.save(Notificacion.de(Notificacion.Tipo.PEDIDO_NUEVO, p.getId(),
+                "Pedido nuevo " + p.getCodigo() + " · " + pesos(p.getTotal()),
+                p.getClienteNombre() + (p.getTipoEntrega() == TipoEntrega.RECOGER ? " · recoge en el local" : " · " + lugar(p))
+                        + " · " + (p.getMetodoPago() == MetodoPago.CUENTA ? "paga por " + p.getCuentaEntidad() : "paga en efectivo")));
+        avisarCambio(p, "nuevo");
 
         return new PublicoDto.PedidoCreado(p.getCodigo(), p.getFechaEntrega(), p.getFranja(), p.getTipoEntrega(),
                 c.getModoPedido(), c.getTiempoMin(), c.getTiempoMax(), p.getTotal(), p.getMetodoPago(),
@@ -93,11 +119,50 @@ public class PedidoService {
     /** El cliente consulta con su código y su celular; si no coinciden, responde como si no existiera. */
     @Transactional(readOnly = true)
     public PublicoDto.Seguimiento seguimiento(String codigo, String celular) {
+        return aSeguimiento(delCliente(codigo, celular));
+    }
+
+    /**
+     * El cliente adjunta el comprobante de su transferencia. El pago queda «por confirmar» y la tienda
+     * recibe un aviso en su portal. Se puede volver a enviar (si se equivocó de foto) mientras no esté confirmado.
+     */
+    @Transactional
+    public PublicoDto.Seguimiento subirComprobante(String codigo, String celular, byte[] datos) {
+        Pedido p = delCliente(codigo, celular);
+        if (p.getMetodoPago() != MetodoPago.CUENTA) throw ReglaNegocioException.invalido("Este pedido se paga en efectivo.");
+        if (p.getEstado() == EstadoPedido.CANCELADO) throw ReglaNegocioException.conflicto("Este pedido fue cancelado.");
+        if (p.getEstadoPago() == EstadoPago.RECIBIDO) throw ReglaNegocioException.conflicto("Este pedido ya aparece como pagado.");
+        if (datos == null || datos.length == 0) throw ReglaNegocioException.invalido("El archivo está vacío.");
+        if (datos.length > MAXIMO_COMPROBANTE) throw ReglaNegocioException.invalido("El comprobante pesa más de 5 MB. Envía una captura de pantalla.");
+        String tipo = tipoComprobante(datos);
+        if (tipo == null) throw ReglaNegocioException.invalido("Envía el comprobante como imagen (PNG, JPG o WebP) o PDF.");
+        if (comprobantes.countByPedidoId(p.getId()) >= 5) {
+            throw ReglaNegocioException.conflicto("Ya enviaste varios comprobantes. Escríbenos por WhatsApp si necesitas corregirlo.");
+        }
+        ComprobantePago c = new ComprobantePago();
+        c.setPedidoId(p.getId());
+        c.setTipoContenido(tipo);
+        c.setDatos(datos);
+        comprobantes.save(c);
+        p.setEstadoPago(EstadoPago.POR_CONFIRMAR);
+        p.setPagoReportado(Instant.now());
+        notificaciones.save(Notificacion.de(Notificacion.Tipo.PAGO_REPORTADO, p.getId(),
+                "Pago reportado " + p.getCodigo() + " · " + pesos(p.getTotal()),
+                p.getClienteNombre() + " adjuntó el comprobante de su transferencia por " + p.getCuentaEntidad()
+                        + ". Revísalo y confirma el pago."));
+        avisarCambio(p, "pago");
+        return aSeguimiento(p);
+    }
+
+    private Pedido delCliente(String codigo, String celular) {
         String limpio = celular == null ? "" : celular.replaceAll("\\D", "");
-        Pedido p = pedidoRepo.findByCodigo(codigo.trim().toUpperCase(Locale.ROOT))
+        return pedidoRepo.findByCodigo(codigo.trim().toUpperCase(Locale.ROOT))
                 .filter(x -> !limpio.isEmpty() && x.getClienteCelular().equals(limpio))
                 .orElseThrow(() -> ReglaNegocioException.noEncontrado(
                         "No encontramos un pedido con ese código y ese celular. Revisa los datos."));
+    }
+
+    private PublicoDto.Seguimiento aSeguimiento(Pedido p) {
         TipoEntrega tipo = p.getTipoEntrega();
         List<PublicoDto.Evento> eventos = p.getEventos().stream()
                 .map(e -> new PublicoDto.Evento(e.getEstado(), e.getEstado().mensaje(tipo), e.getNota(), e.getCreado()))
@@ -111,23 +176,60 @@ public class PedidoService {
                 tipo, EstadoPedido.flujo(tipo), p.getFechaEntrega(), p.getFranja(), nombre, p.getBarrio(), p.getZona(),
                 items, p.getSubtotal(), p.getDescuento(), p.getPromocionAplicada(), p.getDomicilio(), p.getTotal(),
                 p.getMetodoPago(), p.getCuentaEntidad(), p.getCuentaTitular(), p.getCuentaNumero(), eventos,
-                p.getCreado(), direccionTienda);
+                p.getCreado(), direccionTienda, p.getPagoReportado() != null, p.getPagoReportado(),
+                p.getDomiciliario() == null ? "" : p.getDomiciliario().getNombre(),
+                p.getDomiciliario() == null ? "" : p.getDomiciliario().getCelular());
     }
 
     // ------------------------------------------------------------------ administrador
 
+    /**
+     * Lista del portal. Con porPagar=true trae TODOS los pedidos sin pagar (de cualquier día, sin cancelar),
+     * para que un pedido pendiente de pago nunca desaparezca de la vista al cambiar de día.
+     */
     @Transactional(readOnly = true)
-    public List<AdminDto.Pedido> listar(LocalDate fecha, EstadoPedido estado, String busqueda) {
-        List<Pedido> base = fecha != null
+    public List<AdminDto.Pedido> listar(LocalDate fecha, EstadoPedido estado, String busqueda, boolean porPagar) {
+        List<Pedido> base = porPagar
+                ? pedidoRepo.findByEstadoPagoInAndEstadoNotOrderByCreadoDesc(SIN_PAGAR, EstadoPedido.CANCELADO)
+                : fecha != null
                 ? pedidoRepo.findByFechaEntregaOrderByCreadoDesc(fecha)
                 : pedidoRepo.findAllByOrderByCreadoDesc(PageRequest.of(0, 300));
         String q = busqueda == null ? "" : busqueda.trim().toLowerCase(Locale.ROOT);
-        return base.stream()
+        List<Pedido> lista = base.stream()
                 .filter(p -> estado == null || p.getEstado() == estado)
                 .filter(p -> q.isEmpty() || (p.getCodigo() + " " + p.getClienteNombre() + " " + p.getClienteCelular()
                         + " " + p.getBarrio() + " " + p.getZona()).toLowerCase(Locale.ROOT).contains(q))
-                .map(this::aDto)
                 .toList();
+        Set<Long> conComprobante = lista.isEmpty() ? Set.of()
+                : new HashSet<>(comprobantes.pedidosConComprobante(lista.stream().map(Pedido::getId).toList()));
+        return lista.stream().map(p -> aDto(p, conComprobante.contains(p.getId()))).toList();
+    }
+
+    /** Último comprobante que adjuntó el cliente. */
+    @Transactional(readOnly = true)
+    public ArchivoService.Imagen comprobante(Long pedidoId) {
+        buscar(pedidoId);
+        ComprobantePago c = comprobantes.findFirstByPedidoIdOrderByIdDesc(pedidoId)
+                .orElseThrow(() -> ReglaNegocioException.noEncontrado("Este pedido no tiene comprobante."));
+        return new ArchivoService.Imagen(c.getDatos(), c.getTipoContenido());
+    }
+
+    /** Asigna (o quita, con null) el domiciliario que lleva el pedido. */
+    @Transactional
+    public AdminDto.Pedido asignarDomiciliario(Long pedidoId, Long domiciliarioId) {
+        Pedido p = buscar(pedidoId);
+        if (p.getTipoEntrega() != TipoEntrega.DOMICILIO) throw ReglaNegocioException.invalido("Este pedido es para recoger en el local.");
+        if (p.getEstado() == EstadoPedido.CANCELADO) throw ReglaNegocioException.conflicto("Este pedido está cancelado.");
+        if (domiciliarioId == null) {
+            p.setDomiciliario(null);
+        } else {
+            Domiciliario d = domiciliarios.findById(domiciliarioId)
+                    .orElseThrow(() -> ReglaNegocioException.noEncontrado("Ese domiciliario no existe."));
+            if (!d.isActivo()) throw ReglaNegocioException.conflicto(d.getNombre() + " está inactivo.");
+            p.setDomiciliario(d);
+        }
+        avisarCambio(p, "domiciliario");
+        return aDto(p);
     }
 
     /** Pedido que llegó por WhatsApp o por teléfono. No revisa el horario ni el pedido mínimo. */
@@ -145,7 +247,9 @@ public class PedidoService {
         p.setEstado(EstadoPedido.CONFIRMADO);
         p.registrarEvento(EstadoPedido.NUEVO, "Pedido por WhatsApp", autor);
         p.registrarEvento(EstadoPedido.CONFIRMADO, "", autor);
-        return aDto(pedidoRepo.save(p));
+        Pedido guardado = pedidoRepo.save(p);
+        avisarCambio(guardado, "nuevo");
+        return aDto(guardado);
     }
 
     @Transactional
@@ -157,6 +261,7 @@ public class PedidoService {
         }
         p.setEstado(destino);
         p.registrarEvento(destino, nota, autor);
+        avisarCambio(p, "estado");
         return aDto(p);
     }
 
@@ -164,6 +269,7 @@ public class PedidoService {
     public AdminDto.Pedido cambiarPago(Long id, EstadoPago estadoPago) {
         Pedido p = buscar(id);
         p.setEstadoPago(estadoPago);
+        avisarCambio(p, "pago");
         return aDto(p);
     }
 
@@ -311,6 +417,11 @@ public class PedidoService {
     private static boolean blanco(String s) { return s == null || s.isBlank(); }
 
     AdminDto.Pedido aDto(Pedido p) {
+        return aDto(p, p.getId() != null && comprobantes.countByPedidoId(p.getId()) > 0);
+    }
+
+    AdminDto.Pedido aDto(Pedido p, boolean tieneComprobante) {
+        Domiciliario d = p.getDomiciliario();
         List<AdminDto.Item> items = p.getItems().stream()
                 .map(i -> new AdminDto.Item(i.getProductoId(), i.getNombre(), i.getDetalle(), i.getCantidad(),
                         i.getPrecioUnitario(), i.getCostoUnitario()))
@@ -323,6 +434,32 @@ public class PedidoService {
                 p.getClienteNombre(), p.getClienteCelular(), p.getBarrio(), p.getDireccion(), p.getReferencia(),
                 p.getNotas(), items, p.getSubtotal(), p.getDescuento(), p.getPromocionAplicada(), p.getDomicilio(),
                 p.getTotal(), p.getCostoTotal(), p.getMetodoPago(), p.getCuentaEntidad(), p.getCuentaTitular(),
-                p.getCuentaNumero(), p.getEstadoPago(), p.getEstado(), p.getOrigen(), eventos);
+                p.getCuentaNumero(), p.getEstadoPago(), p.getEstado(), p.getOrigen(), eventos,
+                tieneComprobante, p.getPagoReportado(),
+                d == null ? null : d.getId(), d == null ? "" : d.getNombre(), d == null ? "" : d.getCelular());
+    }
+
+    /** Avisa al portal de la empresa y al cliente que sigue ese pedido (después de guardar). */
+    private void avisarCambio(Pedido p, String motivo) {
+        long empresa = EmpresaContexto.requerida().id();
+        tiempoReal.publicar("pedido", Map.of("id", p.getId(), "codigo", p.getCodigo(), "motivo", motivo),
+                TiempoReal.admin(empresa), TiempoReal.pedido(empresa, p.getCodigo()));
+    }
+
+    private static String pesos(int valor) {
+        return "$" + String.format(ES_CO, "%,d", valor);
+    }
+
+    private static String lugar(Pedido p) {
+        String zonaOBarrio = !p.getZona().isBlank() ? p.getZona() : p.getBarrio();
+        return zonaOBarrio.isBlank() ? "domicilio" : zonaOBarrio;
+    }
+
+    /** Imagen (PNG, JPG, WebP) o PDF, revisando los primeros bytes. */
+    static String tipoComprobante(byte[] b) {
+        String imagen = ArchivoService.tipoDe(b);
+        if (imagen != null) return imagen;
+        if (b.length > 4 && b[0] == '%' && b[1] == 'P' && b[2] == 'D' && b[3] == 'F') return "application/pdf";
+        return null;
     }
 }

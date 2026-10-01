@@ -2,10 +2,12 @@ import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, injec
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TiendaApi, mensajeError } from '../core/api';
-import { EmpresaActual } from '../core/empresa';
+import { EmpresaActual, apiEmpresa } from '../core/empresa';
+import { escucharCanal } from '../core/tiempo-real';
 import { DiaLargoPipe, DineroPipe, HoraPipe } from '../core/formato';
 import { EstadoPedido, NOMBRE_ESTADO, Seguimiento } from '../core/modelos';
 import { guardarPedidoReciente, pedidosRecientes } from './recientes';
+import { PagarPedido } from '../compartido/pagar-pedido';
 
 const PASOS: Record<string, { titulo: string; detalle: string }> = {
   NUEVO: { titulo: 'Recibimos tu pedido', detalle: 'Lo vamos a revisar y confirmar.' },
@@ -18,7 +20,7 @@ const PASOS: Record<string, { titulo: string; detalle: string }> = {
 
 @Component({
   selector: 'app-seguimiento',
-  imports: [FormsModule, RouterLink, DineroPipe, DiaLargoPipe, HoraPipe],
+  imports: [FormsModule, RouterLink, DineroPipe, DiaLargoPipe, HoraPipe, PagarPedido],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="wrap">
@@ -37,6 +39,9 @@ const PASOS: Record<string, { titulo: string; detalle: string }> = {
             <b style="font-size:18px">{{ p.fechaEntrega | diaLargo }}{{ p.franja ? ' · ' + p.franja : '' }}</b>
             @if (p.tipoEntrega === 'RECOGER') { <span class="muted">{{ p.direccionTienda }}</span> }
             @else if (p.zona || p.barrio) { <span class="muted">{{ p.zona || p.barrio }}</span> }
+            @if (p.domiciliarioNombre) {
+              <span>Lo lleva <b>{{ p.domiciliarioNombre }}</b>@if (p.domiciliarioCelular) { · <a class="num" [href]="'tel:' + p.domiciliarioCelular">{{ p.domiciliarioCelular }}</a> }</span>
+            }
           </div>
 
           @if (p.estado === 'CANCELADO') {
@@ -58,7 +63,8 @@ const PASOS: Record<string, { titulo: string; detalle: string }> = {
                   </li>
                 }
               </ol>
-              <p class="muted">Esta página se actualiza sola cada 30 segundos.</p>
+              <p class="muted"><span class="en-vivo" [class.off]="!enVivo()">{{ enVivo() ? 'En vivo' : 'Conectando' }}</span>
+                Esta página se actualiza sola cuando tu pedido cambia.</p>
             </div>
           }
 
@@ -73,12 +79,16 @@ const PASOS: Record<string, { titulo: string; detalle: string }> = {
               <div class="grand"><span>Total</span><span>{{ p.total | dinero }}</span></div>
             </div>
             <div class="row">
-              <span class="st pay-{{ p.estadoPago }}">{{ p.estadoPago === 'RECIBIDO' ? 'Pago recibido' : 'Pago pendiente' }}</span>
-              @if (p.metodoPago === 'CUENTA' && p.estadoPago === 'PENDIENTE') {
-                <span class="muted">{{ p.cuentaEntidad }} · {{ p.cuentaTitular }}: <b class="num">{{ p.cuentaNumero }}</b></span>
-              }
+              <span class="st pay-{{ p.estadoPago }}">{{ p.estadoPago === 'RECIBIDO' ? 'Pago recibido' : p.estadoPago === 'POR_CONFIRMAR' ? 'Comprobante en revisión' : 'Pago pendiente' }}</span>
+              <span class="muted">{{ p.metodoPago === 'CUENTA' ? 'Transferencia a ' + p.cuentaEntidad : 'Efectivo' }}</span>
             </div>
           </div>
+
+          @if (p.metodoPago === 'CUENTA' && p.estadoPago !== 'RECIBIDO' && p.estado !== 'CANCELADO') {
+            <app-pagar-pedido [codigo]="p.codigo" [celular]="celularActual" [total]="p.total"
+              [entidad]="p.cuentaEntidad" [titular]="p.cuentaTitular" [numero]="p.cuentaNumero"
+              [estadoPago]="p.estadoPago" (enviado)="pedido.set($event)" />
+          }
           <button class="linkbtn" (click)="otro()">Consultar otro pedido</button>
         } @else {
           <h1 style="font-size:32px">¿Por dónde va mi pedido?</h1>
@@ -121,21 +131,41 @@ export class SeguimientoPage implements OnInit {
   protected error = signal('');
   protected codigoForm = '';
   protected celularForm = '';
-  private celularActual = '';
+  protected celularActual = '';
 
   protected indice = computed(() => {
     const p = this.pedido();
     return p ? p.flujo.indexOf(p.estado) : -1;
   });
 
+  /** Canal en vivo del pedido: cada cambio de estado, pago o domiciliario se ve al instante. */
+  private canal: { codigo: string; cerrar: () => void } | null = null;
+  protected enVivo = signal(false);
+
   constructor() {
-    const intervalo = setInterval(() => {
-      const p = this.pedido();
-      if (p && document.visibilityState === 'visible' && p.estado !== 'ENTREGADO' && p.estado !== 'CANCELADO') {
-        this.api.seguimiento(p.codigo, this.celularActual).subscribe({ next: (s) => this.pedido.set(s), error: () => {} });
-      }
-    }, 30_000);
-    inject(DestroyRef).onDestroy(() => clearInterval(intervalo));
+    // Respaldo por si la conexión en vivo no está disponible.
+    const intervalo = setInterval(() => this.refrescar(), 60_000);
+    inject(DestroyRef).onDestroy(() => { clearInterval(intervalo); this.canal?.cerrar(); });
+  }
+
+  private refrescar(): void {
+    const p = this.pedido();
+    if (p && document.visibilityState === 'visible') {
+      this.api.seguimiento(p.codigo, this.celularActual).subscribe({ next: (s) => this.pedido.set(s), error: () => {} });
+    }
+  }
+
+  private escuchar(codigo: string, celular: string): void {
+    if (this.canal?.codigo === codigo) return;
+    this.canal?.cerrar();
+    const url = `${apiEmpresa()}/public/pedidos/${encodeURIComponent(codigo)}/eventos?celular=${encodeURIComponent(celular)}`;
+    this.canal = {
+      codigo,
+      cerrar: escucharCanal(url, {
+        alEvento: (e) => { if (e.tipo === 'pedido') this.refrescar(); },
+        alReconectar: () => this.refrescar(),
+      }, (v) => this.enVivo.set(v)),
+    };
   }
 
   ngOnInit(): void {
@@ -171,6 +201,7 @@ export class SeguimientoPage implements OnInit {
         this.celularActual = cel;
         guardarPedidoReciente(s.codigo, cel);
         this.pedido.set(s);
+        this.escuchar(s.codigo, cel);
         this.cargando.set(false);
         if (this.codigo() !== s.codigo) this.router.navigateByUrl(this.emp.url('/pedido/' + encodeURIComponent(s.codigo)), { replaceUrl: true });
       },
@@ -179,6 +210,8 @@ export class SeguimientoPage implements OnInit {
   }
 
   protected otro(): void {
+    this.canal?.cerrar();
+    this.canal = null;
     this.pedido.set(null);
     this.recientes = pedidosRecientes();
     this.router.navigateByUrl(this.emp.url('/seguimiento'));

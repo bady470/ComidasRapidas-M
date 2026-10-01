@@ -2,13 +2,13 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, u
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TiendaApi, mensajeError } from '../core/api';
-import { Avisos } from '../core/avisos';
 import { Carrito, claveLinea } from '../core/carrito';
 import { claveLocal, EmpresaActual } from '../core/empresa';
 import { EstadoTienda } from '../core/estado-tienda';
-import { CelularPipe, DiaLargoPipe, DineroPipe, copiar, cuando, diaLargo, dinero, linkWhatsapp } from '../core/formato';
-import { Cotizacion, MetodoPago, PedidoCreado, TipoEntrega } from '../core/modelos';
+import { CelularPipe, DiaLargoPipe, DineroPipe, cuando, diaLargo, dinero, linkWhatsapp } from '../core/formato';
+import { Cotizacion, EstadoPago, MetodoPago, PedidoCreado, TipoEntrega } from '../core/modelos';
 import { guardarPedidoReciente } from './recientes';
+import { PagarPedido } from '../compartido/pagar-pedido';
 
 interface DatosCliente {
   nombre: string; celular: string; barrio: string; direccion: string; referencia: string;
@@ -18,7 +18,7 @@ const CLAVE_CLIENTE = () => claveLocal('cliente');
 
 @Component({
   selector: 'app-carrito',
-  imports: [FormsModule, RouterLink, DineroPipe, DiaLargoPipe, CelularPipe],
+  imports: [FormsModule, RouterLink, DineroPipe, DiaLargoPipe, CelularPipe, PagarPedido],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="wrap">
@@ -38,14 +38,9 @@ const CLAVE_CLIENTE = () => claveLocal('cliente');
             @if (p.tipoEntrega === 'RECOGER' && p.direccionTienda) { <span class="muted">Recoges en {{ p.direccionTienda }}</span> }
           </div>
           @if (p.metodoPago === 'CUENTA') {
-            <div class="panel">
-              <b>Paga {{ p.total | dinero }} por {{ p.cuentaEntidad }}</b>
-              <div class="cuenta-pago">
-                <div><span class="muted">{{ p.cuentaTitular }}</span><br><b class="num">{{ p.cuentaNumero }}</b></div>
-                <button class="copy" (click)="copiarNumero(p.cuentaNumero)">Copiar</button>
-              </div>
-              <p class="muted">Después de pagar, envía el comprobante por WhatsApp con tu código {{ p.codigo }}.</p>
-            </div>
+            <app-pagar-pedido [codigo]="p.codigo" [celular]="celularPedido()" [total]="p.total"
+              [entidad]="p.cuentaEntidad" [titular]="p.cuentaTitular" [numero]="p.cuentaNumero"
+              [estadoPago]="estadoPago()" (enviado)="estadoPago.set($event.estadoPago)" />
           } @else {
             <div class="panel"><b>Pagas {{ p.total | dinero }} en efectivo {{ p.tipoEntrega === 'RECOGER' ? 'al recoger' : 'al recibir' }}.</b></div>
           }
@@ -174,7 +169,7 @@ const CLAVE_CLIENTE = () => claveLocal('cliente');
             }
             @if (error()) { <p class="err" role="alert">{{ error() }}</p> }
             <button class="primary" type="button" (click)="pedir()" [disabled]="enviando() || !cotizacion() || !tienda()?.recibePedidos || !!faltaMinimo()">
-              {{ enviando() ? 'Enviando pedido…' : 'Hacer pedido' + (cotizacion() ? ' · ' + precio(cotizacion()!.total) : '') }}
+              {{ enviando() ? 'Enviando pedido…' : (pago.startsWith('C') ? 'Hacer pedido y pagar' : 'Hacer pedido') + (cotizacion() ? ' · ' + precio(cotizacion()!.total) : '') }}
             </button>
             <a class="linkbtn" [routerLink]="emp.url()">Seguir viendo el menú</a>
           </aside>
@@ -186,13 +181,15 @@ const CLAVE_CLIENTE = () => claveLocal('cliente');
 export class CarritoPage {
   private api = inject(TiendaApi);
   private estado = inject(EstadoTienda);
-  private avisos = inject(Avisos);
   protected carrito = inject(Carrito);
   protected emp = inject(EmpresaActual);
 
   protected tienda = computed(() => this.estado.catalogo()?.tienda ?? null);
   protected cotizacion = signal<Cotizacion | null>(null);
   protected creado = signal<PedidoCreado | null>(null);
+  /** Celular con que se hizo el pedido (para adjuntar el comprobante) y estado de su pago. */
+  protected celularPedido = signal('');
+  protected estadoPago = signal<EstadoPago>('PENDIENTE');
   protected enviando = signal(false);
   protected error = signal('');
   protected tipo = signal<TipoEntrega>('DOMICILIO');
@@ -256,10 +253,6 @@ export class CarritoPage {
     return p ? linkWhatsapp(p.whatsappTienda, this.ultimoMensaje) : '#';
   }
 
-  protected async copiarNumero(numero: string): Promise<void> {
-    this.avisos.mostrar((await copiar(numero)) ? 'Número copiado' : 'Mantén presionado el número para copiarlo');
-  }
-
   protected pedir(): void {
     const t = this.tienda();
     if (!t) return;
@@ -290,6 +283,8 @@ export class CarritoPage {
         try { localStorage.setItem(CLAVE_CLIENTE(), JSON.stringify({ ...d, celular: cel })); } catch { /* nada */ }
         guardarPedidoReciente(p.codigo, cel);
         this.ultimoMensaje = this.mensaje(p, cot);
+        this.celularPedido.set(cel);
+        this.estadoPago.set('PENDIENTE');
         this.creado.set(p);
         this.carrito.vaciar();
         this.enviando.set(false);

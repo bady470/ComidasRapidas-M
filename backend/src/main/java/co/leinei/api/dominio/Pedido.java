@@ -61,6 +61,11 @@ public class Pedido {
     private EstadoPedido estado = EstadoPedido.NUEVO;
     @Enumerated(EnumType.STRING)
     private OrigenPedido origen = OrigenPedido.WEB;
+    @Column(name = "pago_reportado_en")
+    private Instant pagoReportado;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "domiciliario_id")
+    private Domiciliario domiciliario;
 
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id ASC")
@@ -138,6 +143,10 @@ public class Pedido {
     public String getCuentaNumero() { return cuentaNumero; }
     public void setCuentaNumero(String v) { cuentaNumero = v == null ? "" : v; }
     public EstadoPago getEstadoPago() { return estadoPago; }
+    public Instant getPagoReportado() { return pagoReportado; }
+    public void setPagoReportado(Instant v) { pagoReportado = v; }
+    public Domiciliario getDomiciliario() { return domiciliario; }
+    public void setDomiciliario(Domiciliario v) { domiciliario = v; }
     public void setEstadoPago(EstadoPago v) { estadoPago = v; }
     public EstadoPedido getEstado() { return estado; }
     public void setEstado(EstadoPedido v) { estado = v; }

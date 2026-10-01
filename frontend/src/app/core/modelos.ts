@@ -1,7 +1,13 @@
 // Tipos que devuelve la API de Spring Boot (ver co.leinei.api.web.dto).
 
 export type EstadoPedido = 'NUEVO' | 'CONFIRMADO' | 'PREPARANDO' | 'EN_CAMINO' | 'LISTO' | 'ENTREGADO' | 'CANCELADO';
-export type EstadoPago = 'PENDIENTE' | 'RECIBIDO';
+export type EstadoPago = 'PENDIENTE' | 'POR_CONFIRMAR' | 'RECIBIDO';
+
+export const NOMBRE_PAGO: Record<EstadoPago, string> = {
+  PENDIENTE: 'Sin pagar',
+  POR_CONFIRMAR: 'Comprobante por revisar',
+  RECIBIDO: 'Pagado',
+};
 export type MetodoPago = 'CUENTA' | 'EFECTIVO';
 export type TipoEntrega = 'DOMICILIO' | 'RECOGER';
 export type ModoPedido = 'INMEDIATO' | 'PROGRAMADO';
@@ -107,6 +113,8 @@ export interface Seguimiento {
   subtotal: number; descuento: number; promocion: string; domicilio: number; total: number;
   metodoPago: MetodoPago; cuentaEntidad: string; cuentaTitular: string; cuentaNumero: string;
   eventos: EventoPublico[]; creado: string; direccionTienda: string;
+  tieneComprobante: boolean; pagoReportado: string | null;
+  domiciliarioNombre: string; domiciliarioCelular: string;
 }
 
 // ---------- Administración ----------
@@ -122,7 +130,18 @@ export interface PedidoAdmin {
   metodoPago: MetodoPago; cuentaEntidad: string; cuentaTitular: string; cuentaNumero: string;
   estadoPago: EstadoPago; estado: EstadoPedido; origen: 'WEB' | 'WHATSAPP';
   eventos: { estado: EstadoPedido; nota: string; autor: string; fecha: string }[];
+  tieneComprobante: boolean; pagoReportado: string | null;
+  domiciliarioId: number | null; domiciliarioNombre: string; domiciliarioCelular: string;
 }
+
+export interface Domiciliario { id: number; nombre: string; celular: string; activo: boolean; }
+
+export interface Notificacion {
+  id: number; tipo: 'PEDIDO_NUEVO' | 'PAGO_REPORTADO'; pedidoId: number | null; codigo: string;
+  titulo: string; mensaje: string; leida: boolean; creado: string;
+}
+
+export interface Avisos { noLeidas: number; porPagar: number; porConfirmar: number; lista: Notificacion[]; }
 
 export interface PedidoManual {
   items: ItemPedido[]; tipoEntrega: TipoEntrega; zonaId: number | null; nombre: string; celular: string;
@@ -191,6 +210,7 @@ export interface EmpresaResumen {
   uuid: string; identificador: string; nombreComercial: string; razonSocial: string; estado: EstadoEmpresa;
   plan: string | null; colorPrimario: string; colorSecundario: string; logoUrl: string | null;
   dominioPropio: string | null; modulos: string[]; creadoEn: string;
+  cicloFacturacion: CicloFacturacion; precioPlan: number;
 }
 
 export interface EmpresaDetalle {
@@ -202,11 +222,12 @@ export interface EmpresaDetalle {
   conexion: { host: string; puerto: number; nombreBase: string; usuarioOwner: string; usuarioApp: string; usuarioLectura: string } | null;
   versiones: { ultimaMigracionAplicada: string; aplicadaEn: string }[];
   aprovisionamiento: { estado: string; intentos: number; pasoActual: string | null; registro: string | null; actualizadoEn: string } | null;
+  cicloFacturacion: CicloFacturacion; precioPlan: number;
 }
 
 export interface ActualizarEmpresa {
   razonSocial: string; nit: string; responsableNombre: string; responsableCorreo: string; responsableCelular: string;
-  plan: string; notas: string; nombreComercial: string; colorPrimario: string; colorSecundario: string; dominioPropio: string;
+  plan: string; cicloFacturacion: CicloFacturacion; notas: string; nombreComercial: string; colorPrimario: string; colorSecundario: string; dominioPropio: string;
 }
 
 export interface CrearEmpresa extends ActualizarEmpresa {
@@ -216,3 +237,35 @@ export interface CrearEmpresa extends ActualizarEmpresa {
   modulos: string[];
   adminNombre: string; adminUsuario: string; adminClave: string;
 }
+
+// ---- Biblioteca de productos precargados (superadmin)
+export interface BibOpcion { nombre: string; precioExtra: number; }
+export interface BibGrupo { nombre: string; minimo: number; maximo: number; opciones: BibOpcion[]; }
+export interface BibItem {
+  slug: string; categoria: string; nombre: string; descripcion: string; precio: number; costo: number;
+  imagen: string; etiqueta: string; filtros: string[]; grupos: BibGrupo[];
+}
+export interface BibCategoria { nombre: string; orden: number; cantidad: number; }
+export interface Biblioteca { categorias: BibCategoria[]; filtros: string[]; productos: BibItem[]; }
+export interface ResultadoBiblioteca { importados: number; omitidos: number; categoriasNuevas: number; }
+
+// ---- Planes comerciales
+export type CicloFacturacion = 'MENSUAL' | 'ANUAL';
+export interface Plan {
+  codigo: string; nombre: string; descripcion: string; precioMensual: number; precioAnual: number;
+  modulos: string[]; activo: boolean;
+}
+export type PlanForm = Plan;
+export type EstadoCorreo = 'ENVIADO' | 'NO_CONFIGURADO' | 'SIN_CORREO' | 'FALLO';
+export interface EmpresaCreada { empresa: EmpresaDetalle; correo: EstadoCorreo; }
+
+// ---- Correo de envío (superadmin)
+export type SeguridadCorreo = 'STARTTLS' | 'SSL' | 'NINGUNA';
+export interface ConfigCorreo {
+  host: string; puerto: number; seguridad: SeguridadCorreo; usuario: string; tieneClave: boolean;
+  remitente: string; urlPublica: string; configurado: boolean; origen: 'PANEL' | 'ENTORNO' | 'NINGUNO';
+}
+export interface ConfigCorreoForm {
+  host: string; puerto: number; seguridad: SeguridadCorreo; usuario: string; clave: string; remitente: string; urlPublica: string;
+}
+export interface ResultadoPrueba { enviado: boolean; mensaje: string; }

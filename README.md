@@ -89,6 +89,28 @@ Tablas `tbl_` en plural, índices `idx_`, funciones `fn_`, triggers `trg_`. Toda
 - Dominio propio: si la empresa tiene `pedidos.laparrilla.com` y ese dominio apunta al mismo servidor, la app lo reconoce al abrir (`/api/plataforma/publico/dominio`) y muestra la tienda en la raíz (`/`, `/carrito`, `/admin`).
 - El carrito, los datos del cliente, los pedidos recientes y la sesión del portal se guardan **separados por empresa** en el navegador.
 
+### Pagos por transferencia, avisos y domiciliarios
+
+1. Si el cliente escoge transferencia, el botón dice **«Hacer pedido y pagar»**. Al confirmar ve **«Pagar pedido»**: la cuenta, el valor y un botón para **adjuntar el comprobante** (foto, captura o PDF). También puede hacerlo después desde «Mi pedido».
+2. Al adjuntarlo, el pago queda **«Comprobante por revisar»** y la empresa recibe un **aviso en su portal** (con sonido y, si lo activa, notificación del navegador): «Pago reportado P-XXXX · $…».
+3. En **Pedidos → Por pagar** están todos los pedidos sin pagar **de cualquier día**; no desaparecen al cambiar de día. Desde ahí: **Ver comprobante**, **Confirmar pago** o **No llegó el pago**.
+4. En **Domiciliarios** se registran las personas que llevan los pedidos; en cada pedido a domicilio se escoge quién lo lleva y se le envía el pedido por WhatsApp. El cliente ve en su seguimiento quién le lleva el pedido.
+
+Los comprobantes se guardan aparte de las fotos del menú (`producto.tbl_comprobantes_pago`) y solo los puede ver la empresa.
+
+### Tiempo real
+
+Todo se actualiza solo, sin recargar, con **Server-Sent Events** (`co.leinei.api.tiemporeal`):
+
+| Canal | Quién lo escucha | Qué avisa |
+|---|---|---|
+| `GET /api/t/{empresa}/admin/eventos` (token) | Portal de la empresa | Pedido nuevo, cambio de estado, pago reportado o confirmado, domiciliario asignado, avisos, catálogo |
+| `GET /api/t/{empresa}/public/eventos` | Tienda | Cambió un producto, un precio, una promoción, el horario o la marca |
+| `GET /api/t/{empresa}/public/pedidos/{codigo}/eventos?celular=` | Seguimiento del cliente | Su pedido cambió (estado, pago, domiciliario) |
+| `GET /api/plataforma/eventos` (token) | Superadmin | Empresa creada, cada paso del aprovisionamiento, cambios de estado, marca o módulos |
+
+Por los canales solo viajan avisos pequeños (`{"id": 12, "codigo": "P-ABC234", "motivo": "pago"}`); al recibirlos, la página vuelve a pedir los datos con su sesión. Los avisos se envían después de guardar (al confirmar la transacción). El navegador se reconecta solo si se cae la conexión, y cada página muestra el indicador **«En vivo»**. Nginx sirve estas rutas sin búfer. Con varias instancias de la API detrás de un balanceador hay que reenviar los avisos entre ellas (por ejemplo con `LISTEN/NOTIFY` de PostgreSQL o Redis).
+
 ### Seguridad
 
 - Tokens de sesión aleatorios; en la base solo se guarda su hash SHA-256. Claves con BCrypt.
@@ -117,6 +139,7 @@ Los errores llegan como `{ "status": 400, "detail": "Mensaje para mostrar" }` y 
 | POST | `/cotizar` | Total del carrito según entrega y zona |
 | POST | `/pedidos` | Crea el pedido y devuelve el código |
 | GET | `/pedidos/{codigo}?celular=` | Seguimiento |
+| POST | `/pedidos/{codigo}/comprobante?celular=` | Adjuntar el comprobante de la transferencia (imagen o PDF, hasta 5 MB) |
 | GET | `/archivos/{id}` | Foto de un producto |
 
 **Portal de la empresa (token)** — `/api/t/{empresa}/admin`
@@ -126,7 +149,12 @@ Los errores llegan como `{ "status": 400, "detail": "Mensaje para mostrar" }` y 
 | POST | `/auth/login` · `/auth/logout` · `/auth/clave` | Sesión y cambio de clave |
 | GET/POST | `/auth/usuarios` | Administradores de la empresa |
 | GET/POST | `/pedidos` | Lista con filtros y pedido manual (módulo `pedido_manual`) |
-| PATCH | `/pedidos/{id}/estado` · `/pedidos/{id}/pago` | Estado y pago |
+| PATCH | `/pedidos/{id}/estado` · `/pedidos/{id}/pago` | Estado y pago (`PENDIENTE`, `POR_CONFIRMAR`, `RECIBIDO`) |
+| GET | `/pedidos?porPagar=true` | Todos los pedidos sin pagar, de cualquier día |
+| GET | `/pedidos/{id}/comprobante` | Ver el comprobante que adjuntó el cliente |
+| PATCH | `/pedidos/{id}/domiciliario` | Asignar o quitar el domiciliario |
+| GET/POST/PUT | `/domiciliarios` | Domiciliarios (se desactivan, no se borran) |
+| GET · POST | `/avisos` · `/avisos/leidos` | Avisos del portal (pedido nuevo, pago reportado) y conteo de pedidos por pagar |
 | GET | `/reportes/fechas` · `/reportes/produccion?fecha=` | Días con pedidos y ventas del día (módulo `reportes`) |
 | CRUD | `/categorias`, `/productos`, `/promociones` | Catálogo |
 | POST | `/archivos` | Subir foto de producto |
@@ -150,6 +178,26 @@ Los errores llegan como `{ "status": 400, "detail": "Mensaje para mostrar" }` y 
 **Público de la plataforma** — `GET /api/plataforma/publico/dominio?host=` y `GET /api/plataforma/publico/empresas/{identificador}/logo`.
 
 ---
+
+### Planes y correo de bienvenida
+
+- **Planes:** en **Superadmin → Planes** defines cuánto cuesta cada plan por mes y por año, y qué módulos incluye (vienen Básico, Pro y Empresarial con precios de partida que puedes cambiar). Al crear una empresa eliges el plan y si paga **mensual o anual**; la empresa queda con el precio con que se contrató. API: `GET/POST /api/plataforma/planes`, `PUT /api/plataforma/planes/{codigo}`.
+- **Correo de bienvenida:** al crear una empresa, si tiene correo, se le envían la dirección de su tienda y su portal, el usuario y la clave del administrador y su plan. Las credenciales del correo remitente se ingresan en **Superadmin → Correo de envío** (servidor, puerto, seguridad, usuario, contraseña, remitente y dirección pública). La contraseña se guarda **cifrada** (AES‑256‑GCM con `LEINEI_LLAVE_MAESTRA`) y nunca se vuelve a mostrar; si dejas el campo vacío al guardar, se conserva la actual. El botón **Enviar prueba** manda un correo de ensayo para confirmar que funciona. En Gmail usa una «contraseña de aplicación». API: `GET/PUT /api/plataforma/correo`, `POST /api/plataforma/correo/prueba`.
+  Como respaldo, si el panel no está configurado se usan las variables de entorno `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM` y `PUBLIC_URL`. Sin ninguna de las dos, no se envía nada.
+
+- **Diseño y animaciones:** los paneles usan un marco con menú lateral y barra superior que llena todo el ancho y se adapta a celular (menú tipo cajón). Las animaciones usan GSAP (`npm install` lo instala) y se desactivan solas si el sistema pide «reducir movimiento». La tienda de cada empresa abre con una portada tipo landing (estado, tiempo de entrega, fotos de sus productos y «cómo pedir») con los colores de la empresa, y `/` es la landing de la plataforma.
+- **Direcciones por correo:** el correo de bienvenida lleva dos direcciones bien separadas: la de los clientes (para publicar; con dominio propio es `https://su-dominio`) y la de ingreso al portal (`…/admin/entrar`, con usuario y clave). Si el dominio se asigna o cambia después, se avisa con un correo aparte. La página `/` solo pide el identificador y ofrece «Ver la tienda» o «Entrar a mi portal»./
+- **Módulos por plan:** al elegir un plan, sus módulos se marcan solos; la lista se puede filtrar por «Del plan» y «Extras», y «Restablecer al plan» devuelve la selección original. Cambiar el plan de una empresa existente ajusta la lista y se aplica con «Guardar módulos».
+- **Categorías iniciales:** toda empresa nueva trae Hamburguesas, Salchipapas, Perros calientes, Pizzas, Pollo y alitas, Combos, Acompañantes, Bebidas y Postres (las edita, oculta o borra desde su portal).
+- **Valor del domicilio:** cada empresa lo cambia desde su portal (Mi tienda → Entrega), con un valor general y, si quiere, un valor distinto por zona.
+
+### Productos precargados (biblioteca)
+
+El superadmin tiene una biblioteca de **68 productos listos** (salchipapas, hamburguesas, perros calientes, pizzas de 10 sabores con tamaños y borde, pollo y alitas, combos, acompañantes, bebidas y postres), con precio, foto, adiciones y etiquetas. En **Productos precargados** se filtra por categoría, etiqueta (picante, vegetariano, para compartir…), precio máximo y texto; se marcan los que se quieren y se asignan a una empresa. Cada empresa recibe **su propia copia** (con su categoría y su imagen) y la edita desde su portal; repetir la asignación no duplica nada. Se puede subir o bajar todos los precios con un porcentaje.
+
+- Datos: `backend/src/main/resources/catalogo-base/` (`catalogo.txt` + `img/*.png`). Se regeneran con `python3 herramientas/generar-biblioteca.py`.
+- API: `GET /api/plataforma/biblioteca` · `POST /api/plataforma/empresas/{uuid}/biblioteca` `{slugs, ajustePorcentaje}`.
+- Las imágenes son ilustraciones propias; cada empresa puede reemplazarlas por fotos reales.
 
 ## 3. Correrlo en tu computador
 

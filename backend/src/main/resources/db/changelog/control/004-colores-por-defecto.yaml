@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: control-004-colores-por-defecto
+      author: leinei
+      comment: Nueva paleta por defecto (naranja vivo + violeta). Las empresas que seguían con los colores anteriores pasan a los nuevos.
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE plataforma.tbl_empresas_marca ALTER COLUMN color_primario SET DEFAULT '#FF5A1F';
+              ALTER TABLE plataforma.tbl_empresas_marca ALTER COLUMN color_secundario SET DEFAULT '#6D28D9';
+              UPDATE plataforma.tbl_empresas_marca SET color_primario = '#FF5A1F' WHERE upper(color_primario) = '#E9A23B';
+              UPDATE plataforma.tbl_empresas_marca SET color_secundario = '#6D28D9' WHERE upper(color_secundario) = '#3A2620';
+      rollback:
+        - sql:
+            sql: |
+              ALTER TABLE plataforma.tbl_empresas_marca ALTER COLUMN color_primario SET DEFAULT '#E9A23B';
+              ALTER TABLE plataforma.tbl_empresas_marca ALTER COLUMN color_secundario SET DEFAULT '#3A2620';

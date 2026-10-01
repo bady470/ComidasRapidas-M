@@ -44,6 +44,17 @@ services:
       SUPERADMIN_USER: superadmin
       SUPERADMIN_NAME: Superadministrador
       SUPERADMIN_PASSWORD: cambia-esta-clave
+      # Dirección con la que los clientes abren la plataforma (va en los correos de bienvenida).
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
+      # Correo de bienvenida (opcional). Sin MAIL_HOST no se envía nada. Ejemplo con Gmail: smtp.gmail.com, puerto 587 y
+      # una «contraseña de aplicación». Se define en un archivo .env junto a este compose.
+      SPRING_MAIL_HOST: ${MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${MAIL_USER:-}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+      MAIL_FROM: ${MAIL_FROM:-}
       # El navegador solo habla con el frontend (Nginx reenvía /api), así que no hace falta CORS_ORIGINS.
     # Solo se publica para pruebas directas a la API (http://localhost:8081/api/...). Puedes quitarlo.
     ports:

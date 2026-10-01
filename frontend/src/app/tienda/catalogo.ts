@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, signal } from '@angular/core';
+import { gsap } from 'gsap';
 import { RouterLink } from '@angular/router';
 import { Foto } from '../compartido/foto';
 import { SelectorProducto, Seleccion } from '../compartido/selector-producto';
+import { revelarAlDesplazar, sinMovimiento } from '../core/animar';
 import { Avisos } from '../core/avisos';
 import { Carrito } from '../core/carrito';
 import { EmpresaActual } from '../core/empresa';
@@ -16,38 +18,57 @@ interface Seccion { id: string; nombre: string; productos: Producto[]; }
   imports: [RouterLink, Foto, SelectorProducto, DineroPipe, DiaLargoPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <main class="wrap">
+    <main>
       @if (estado.error() && !estado.catalogo()) {
-        <div class="empty" style="margin-top:28px">
-          <p>{{ estado.error() }}</p>
-          <p style="margin-top:12px"><button class="ghost" (click)="estado.cargar()">Intentar de nuevo</button></p>
+        <div class="wrap">
+          <div class="empty" style="margin-top:28px">
+            <p>{{ estado.error() }}</p>
+            <p style="margin-top:12px"><button class="ghost" (click)="estado.cargar()">Intentar de nuevo</button></p>
+          </div>
         </div>
       }
 
       @if (estado.catalogo(); as c) {
-        <section class="hero">
-          <div>
-            <h1>{{ c.tienda.tituloPortada || c.tienda.nombre }}</h1>
-            @if (c.tienda.mensaje) { <p>{{ c.tienda.mensaje }}</p> }
-          </div>
-          <div class="delivery">
-            @if (c.tienda.modoPedido === 'PROGRAMADO') {
-              <span class="lbl">Próxima entrega</span>
-              <span class="when">{{ c.tienda.fechaServicio | diaLargo }}</span>
-              @if (c.tienda.cierre) { <span class="muted">Pide hasta {{ texto(c.tienda.cierre) }}</span> }
-            } @else if (c.tienda.enHorario) {
-              <span class="estado-tienda abierta">Abierto ahora</span>
-              <span class="when">Entrega en {{ c.tienda.tiempoMin }}–{{ c.tienda.tiempoMax }} min</span>
-              @if (c.tienda.cierre) { <span class="muted">Recibimos pedidos hasta {{ texto(c.tienda.cierre) }}</span> }
-            } @else {
-              <span class="estado-tienda cerrada">Cerrado</span>
-              <span class="when">{{ c.tienda.proximaApertura ? 'Abrimos ' + texto(c.tienda.proximaApertura) : 'Vuelve pronto' }}</span>
-              <span class="muted">Puedes ver el menú mientras tanto.</span>
+        <section class="lp" aria-label="Presentación">
+          <span class="lp-blob b1" aria-hidden="true"></span><span class="lp-blob b2" aria-hidden="true"></span>
+          <div class="wrap lp-grid">
+            <div class="lp-texto">
+              @if (c.tienda.modoPedido === 'PROGRAMADO') {
+                <span class="lp-estado"><i></i> Próxima entrega · {{ c.tienda.fechaServicio | diaLargo }}</span>
+              } @else if (c.tienda.enHorario) {
+                <span class="lp-estado abierta"><i></i> Abierto ahora</span>
+              } @else {
+                <span class="lp-estado cerrada"><i></i> Cerrado{{ c.tienda.proximaApertura ? ' · abrimos ' + texto(c.tienda.proximaApertura) : '' }}</span>
+              }
+              <h1>{{ c.tienda.tituloPortada || c.tienda.nombre }}</h1>
+              @if (c.tienda.mensaje) { <p class="lp-sub">{{ c.tienda.mensaje }}</p> }
+              <div class="lp-botones">
+                <button class="lp-btn principal" type="button" (click)="irAlMenu()">Ver el menú</button>
+                <a class="lp-btn" [routerLink]="emp.url('/seguimiento')">Seguir mi pedido</a>
+              </div>
+              <ul class="lp-datos">
+                @if (c.tienda.modoPedido !== 'PROGRAMADO') { <li><b>{{ c.tienda.tiempoMin }}–{{ c.tienda.tiempoMax }} min</b><span>de entrega</span></li> }
+                @if (c.tienda.cierre) { <li><b>{{ texto(c.tienda.cierre) }}</b><span>{{ c.tienda.modoPedido === 'PROGRAMADO' ? 'cierre de pedidos' : 'pedidos hasta' }}</span></li> }
+                @if (entrega()) { <li><b>{{ entrega() }}</b><span>cómo recibirlo</span></li> }
+              </ul>
+            </div>
+            @if (portada().length) {
+              <div class="lp-fotos" aria-hidden="true">
+                @for (p of portada(); track p.id; let i = $index) {
+                  <figure [class]="'lp-foto f' + i"><app-foto [imagenId]="p.imagenId" [nombre]="p.nombre" /><figcaption>{{ p.nombre }}</figcaption></figure>
+                }
+              </div>
             }
-            <span class="muted">{{ entrega() }}</span>
           </div>
         </section>
 
+        <section class="pasos wrap" aria-label="Cómo pedir">
+          <div class="paso"><span class="n">1</span><div><b>Escoge</b><span>Mira el menú y agrega lo que se te antoje.</span></div></div>
+          <div class="paso"><span class="n">2</span><div><b>Dinos dónde</b><span>Domicilio a tu puerta o recoges en el local.</span></div></div>
+          <div class="paso"><span class="n">3</span><div><b>Paga y sigue tu pedido</b><span>Elige cómo pagar y míralo avanzar en vivo.</span></div></div>
+        </section>
+
+        <div class="wrap" id="menu">
         @if (!c.tienda.abierto) {
           <div class="alerta mala">Por ahora no estamos recibiendo pedidos. Escríbenos por WhatsApp y te avisamos cuándo abrimos.</div>
         }
@@ -113,8 +134,15 @@ interface Seccion { id: string; nombre: string; productos: Producto[]; }
           <div class="empty" style="margin-top:20px">Pronto vas a ver aquí nuestros productos.</div>
         }
         <div class="fin-catalogo"></div>
+        </div>
       } @else if (!estado.error()) {
-        <p class="muted" style="padding-block:40px">Cargando…</p>
+        <div class="wrap" aria-busy="true" aria-label="Cargando el menú">
+          <div class="hero"><div class="stack"><div class="esqueleto" style="height:56px;width:85%"></div><div class="esqueleto" style="height:20px;width:60%"></div></div>
+            <div class="esqueleto" style="height:120px"></div></div>
+          <div class="grid" style="margin-top:24px">
+            @for (i of [1, 2, 3]; track i) { <div class="esqueleto" style="height:330px"></div> }
+          </div>
+        </div>
       }
     </main>
 
@@ -137,6 +165,41 @@ export class CatalogoPage {
 
   protected abierto = signal<Producto | null>(null);
   protected activa = signal('');
+  private raiz = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private animado = false;
+
+  /** Hasta tres productos con foto para la portada. */
+  protected portada = computed(() => (this.estado.catalogo()?.productos ?? []).filter((p) => p.imagenId && p.disponible).slice(0, 3));
+
+  constructor() {
+    // Cuando llega el menú, la portada entra con movimiento y el resto aparece al hacer scroll.
+    effect(() => {
+      if (!this.estado.catalogo() || this.animado) return;
+      this.animado = true;
+      requestAnimationFrame(() => this.animarPortada());
+    });
+    const limpiar = revelarAlDesplazar(this.raiz, '.paso, .sec-h, .card, .promo');
+    inject(DestroyRef).onDestroy(() => { limpiar(); this.flotando?.kill?.(); });
+  }
+
+  private flotando: { kill?: () => void } | null = null;
+
+  private animarPortada(): void {
+    if (sinMovimiento()) return;
+    const r = this.raiz;
+    const t = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    t.fromTo(r.querySelector('.lp-estado'), { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.4, clearProps: 'all' })
+      .fromTo(r.querySelector('.lp h1'), { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.6, clearProps: 'all' }, '-=0.2')
+      .fromTo(r.querySelectorAll('.lp-sub, .lp-botones, .lp-datos li'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.45, stagger: 0.08, clearProps: 'all' }, '-=0.3')
+      .fromTo(r.querySelectorAll('.lp-foto'), { opacity: 0, scale: 0.8, y: 30 }, { opacity: 1, scale: 1, y: 0, duration: 0.7, stagger: 0.12, ease: 'back.out(1.5)' }, 0.2);
+    // Las fotos y los círculos de fondo flotan despacio.
+    this.flotando = gsap.to(r.querySelectorAll('.lp-foto'), { y: -10, duration: 2.6, ease: 'sine.inOut', yoyo: true, repeat: -1, stagger: { each: 0.5, from: 'start' } });
+    gsap.to(r.querySelectorAll('.lp-blob'), { x: 30, y: -20, duration: 7, ease: 'sine.inOut', yoyo: true, repeat: -1, stagger: 1.5 });
+  }
+
+  protected irAlMenu(): void {
+    document.getElementById('menu')?.scrollIntoView({ behavior: sinMovimiento() ? 'auto' : 'smooth', block: 'start' });
+  }
 
   protected secciones = computed<Seccion[]>(() => {
     const c = this.estado.catalogo();

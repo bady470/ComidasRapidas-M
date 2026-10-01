@@ -39,7 +39,7 @@ public class ManejadorErrores {
 
     @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
     public ProblemDetail archivoGrande(Exception e) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, "La imagen pesa más de 2 MB. Usa una más liviana.");
+        return ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, "El archivo es demasiado pesado. Las fotos del menú pueden pesar hasta 2 MB y los comprobantes hasta 5 MB.");
     }
 
     @ExceptionHandler(HandlerMethodValidationException.class)
