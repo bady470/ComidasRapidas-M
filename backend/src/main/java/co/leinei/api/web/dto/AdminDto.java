@@ -40,7 +40,33 @@ public final class AdminDto {
                          String referencia, String notas, List<Item> items, int subtotal, int descuento,
                          String promocion, int domicilio, int total, int costoTotal, MetodoPago metodoPago,
                          String cuentaEntidad, String cuentaTitular, String cuentaNumero, EstadoPago estadoPago,
-                         EstadoPedido estado, OrigenPedido origen, List<Evento> eventos) {}
+                         EstadoPedido estado, OrigenPedido origen, List<Evento> eventos,
+                         boolean tieneComprobante, Instant pagoReportado,
+                         Long domiciliarioId, String domiciliarioNombre, String domiciliarioCelular,
+                         Double entregaLat, Double entregaLng, Double distanciaKm,
+                         /** Sede del pedido (el nombre solo con varias sedes). */
+                         Long sedeId, String sede) {}
+
+    public record AsignarDomiciliarioRequest(Long domiciliarioId) {}
+
+    /** token: el de su link de reparto (/reparto/{token}). */
+    public record Domiciliario(Long id, String nombre, String celular, boolean activo, String token,
+                               /** Sede para la que trabaja (null = todas). */
+                               Long sedeId) {}
+
+    public record DomiciliarioRequest(
+            @NotBlank(message = "Escribe el nombre del domiciliario") @Size(max = 80) String nombre,
+            @Pattern(regexp = "|3\\d{9}", message = "El celular debe tener 10 dígitos y empezar por 3") String celular,
+            boolean activo,
+            Long sedeId) {}
+
+    public record Notificacion(Long id, String tipo, Long pedidoId, String codigo, String titulo, String mensaje,
+                               boolean leida, Instant creado) {}
+
+    /** Lo que el portal revisa cada pocos segundos: avisos y cuántos pedidos faltan por pagar. */
+    public record Avisos(long noLeidas, long porPagar, long porConfirmar, List<Notificacion> lista) {}
+
+    public record MarcarLeidasRequest(@NotNull Long hastaId) {}
 
     public record CambiarEstadoRequest(@NotNull EstadoPedido estado, @Size(max = 200) String nota) {}
 
@@ -90,6 +116,18 @@ public final class AdminDto {
             @Size(max = 10, message = "Máximo 10 grupos de opciones") List<@Valid Grupo> grupos) {}
 
     public record DisponibleRequest(boolean disponible) {}
+
+    public record Banner(Long id, String titulo, String subtitulo, String boton, Long imagenId, String color, boolean activo, int orden) {}
+
+    public record BannerRequest(
+            @NotBlank(message = "Escribe el título del banner") @Size(max = 80) String titulo,
+            @Size(max = 200) String subtitulo,
+            @Size(max = 30) String boton,
+            Long imagenId,
+            @Pattern(regexp = "^(#[0-9A-Fa-f]{6})?$", message = "El color debe ser como #1D4ED8") String color,
+            boolean activo) {}
+
+    public record OrdenRequest(@NotNull List<Long> ids) {}
 
     public record Promocion(Long id, String nombre, String descripcion, TipoPromocion tipo, Integer cantidad,
                             Integer precio, Integer porcentaje, int minimo, Long productoId, List<Long> productoIds,

@@ -92,3 +92,8 @@ export class HoraPipe implements PipeTransform {
 export class CelularPipe implements PipeTransform {
   transform(t: string): string { return celular(t); }
 }
+
+/** Solo la hora de un instante: «8:40 p. m.» (hora de Colombia). */
+export function soloHora(isoInstante: string): string {
+  return new Date(isoInstante).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Bogota' });
+}

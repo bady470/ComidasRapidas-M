@@ -4,12 +4,18 @@ import co.leinei.api.config.TokenAuthFilter.AdminActual;
 import co.leinei.api.dominio.EstadoPedido;
 import co.leinei.api.empresa.EmpresaContexto;
 import co.leinei.api.empresa.Modulos;
+import co.leinei.api.servicio.ArchivoService;
+import co.leinei.api.servicio.AvisosService;
+import co.leinei.api.servicio.DomiciliarioService;
 import co.leinei.api.servicio.PedidoService;
 import co.leinei.api.servicio.ReporteService;
 import co.leinei.api.web.dto.AdminDto;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,18 +28,69 @@ public class AdminPedidoController {
 
     private final PedidoService pedidos;
     private final ReporteService reportes;
+    private final DomiciliarioService domiciliarios;
+    private final AvisosService avisos;
 
-    public AdminPedidoController(PedidoService pedidos, ReporteService reportes) {
+    public AdminPedidoController(PedidoService pedidos, ReporteService reportes, DomiciliarioService domiciliarios,
+                                 AvisosService avisos) {
         this.pedidos = pedidos;
         this.reportes = reportes;
+        this.domiciliarios = domiciliarios;
+        this.avisos = avisos;
     }
 
     @GetMapping("/pedidos")
     public List<AdminDto.Pedido> listar(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
             @RequestParam(required = false) EstadoPedido estado,
-            @RequestParam(required = false) String q) {
-        return pedidos.listar(fecha, estado, q);
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "false") boolean porPagar) {
+        return pedidos.listar(fecha, estado, q, porPagar);
+    }
+
+    /** Comprobante de pago que adjuntó el cliente. Solo lo ve el administrador (nunca se guarda en caché compartida). */
+    @GetMapping("/pedidos/{id}/comprobante")
+    public ResponseEntity<byte[]> comprobante(@PathVariable Long id) {
+        ArchivoService.Imagen c = pedidos.comprobante(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(c.tipoContenido()))
+                .cacheControl(CacheControl.noStore())
+                .header("X-Content-Type-Options", "nosniff")
+                .header("Content-Disposition", "inline; filename=comprobante-" + id + (c.tipoContenido().equals("application/pdf") ? ".pdf" : ""))
+                .body(c.datos());
+    }
+
+    @PatchMapping("/pedidos/{id}/domiciliario")
+    public AdminDto.Pedido domiciliario(@PathVariable Long id, @RequestBody AdminDto.AsignarDomiciliarioRequest req) {
+        return pedidos.asignarDomiciliario(id, req.domiciliarioId());
+    }
+
+    // ---- Domiciliarios
+    @GetMapping("/domiciliarios")
+    public List<AdminDto.Domiciliario> domiciliarios() {
+        return domiciliarios.listar();
+    }
+
+    @PostMapping("/domiciliarios")
+    @ResponseStatus(HttpStatus.CREATED)
+    public List<AdminDto.Domiciliario> crearDomiciliario(@Valid @RequestBody AdminDto.DomiciliarioRequest req) {
+        return domiciliarios.guardar(null, req);
+    }
+
+    @PutMapping("/domiciliarios/{id}")
+    public List<AdminDto.Domiciliario> editarDomiciliario(@PathVariable Long id, @Valid @RequestBody AdminDto.DomiciliarioRequest req) {
+        return domiciliarios.guardar(id, req);
+    }
+
+    // ---- Avisos del portal
+    @GetMapping("/avisos")
+    public AdminDto.Avisos avisos() {
+        return avisos.avisos();
+    }
+
+    @PostMapping("/avisos/leidos")
+    public AdminDto.Avisos leidos(@Valid @RequestBody AdminDto.MarcarLeidasRequest req) {
+        return avisos.marcarLeidas(req.hastaId());
     }
 
     @PostMapping("/pedidos")

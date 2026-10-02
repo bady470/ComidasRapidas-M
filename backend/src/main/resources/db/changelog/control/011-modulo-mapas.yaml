@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: control-011-modulo-mapas
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO plataforma.tbl_modulos (codigo, nombre, descripcion, es_base, orden) VALUES
+                ('mapas', 'Mapas y domiciliario en vivo', 'Domicilio según la distancia y el cliente ve a su domiciliario acercarse en el mapa.', FALSE, 11);
+              UPDATE plataforma.tbl_planes SET modulos = modulos || ',mapas', actualizado_en = now()
+                  WHERE codigo IN ('pro', 'empresarial') AND modulos NOT LIKE '%mapas%';
+      rollback:
+        - sql:
+            sql: |
+              UPDATE plataforma.tbl_planes SET modulos = replace(modulos, ',mapas', '');
+              DELETE FROM plataforma.tbl_modulos WHERE codigo = 'mapas';

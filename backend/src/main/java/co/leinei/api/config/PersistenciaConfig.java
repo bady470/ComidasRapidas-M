@@ -76,12 +76,16 @@ public class PersistenciaConfig {
         return new DataSourceTransactionManager(ds);
     }
 
-    /** DataSource de las entidades JPA: enruta a la base de la empresa de la petición. */
+    /**
+     * DataSource de las entidades JPA: enruta a la base de la empresa de la petición.
+     * Recibe el DataSource de control (no el bean JdbcClient): Spring Boot hace que los beans JdbcClient
+     * esperen a los inicializadores de bases, y eso formaba un ciclo con este DataSource.
+     */
     @Bean(destroyMethod = "cerrarTodo")
     @Primary
-    public EnrutadorDataSource dataSource(@Qualifier("controlJdbc") JdbcClient control, CifradoClaves cifrado,
+    public EnrutadorDataSource dataSource(@Qualifier("controlDataSource") DataSource control, CifradoClaves cifrado,
                                           ServidorPostgres servidor, LeineiProperties props) {
-        return new EnrutadorDataSource(control, cifrado, servidor, props.plataforma().poolPorEmpresa());
+        return new EnrutadorDataSource(JdbcClient.create(control), cifrado, servidor, props.plataforma().poolPorEmpresa());
     }
 
     @Bean
@@ -95,6 +99,15 @@ public class PersistenciaConfig {
     public FilterRegistrationBean<EmpresaFilter> filtroEmpresa(RegistroEmpresas registro) {
         FilterRegistrationBean<EmpresaFilter> r = new FilterRegistrationBean<>(new EmpresaFilter(registro));
         r.setOrder(-200);
+        r.addUrlPatterns("/api/t/*");
+        return r;
+    }
+
+    /** Sede escogida en la petición (encabezado X-Sede), para las empresas con varias sedes. */
+    @Bean
+    public FilterRegistrationBean<co.leinei.api.empresa.SedeContexto.Filtro> filtroSede() {
+        FilterRegistrationBean<co.leinei.api.empresa.SedeContexto.Filtro> r = new FilterRegistrationBean<>(new co.leinei.api.empresa.SedeContexto.Filtro());
+        r.setOrder(-190);
         r.addUrlPatterns("/api/t/*");
         return r;
     }

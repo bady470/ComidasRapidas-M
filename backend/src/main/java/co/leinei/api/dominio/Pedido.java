@@ -37,6 +37,8 @@ public class Pedido {
     private String direccion = "";
     private String referencia = "";
     private String notas = "";
+    /** false mientras un pedido de pago en línea espera el pago: la empresa aún no lo ve. */
+    private boolean publicado = true;
     private int subtotal;
     private int descuento;
     @Column(name = "promocion_aplicada")
@@ -61,6 +63,21 @@ public class Pedido {
     private EstadoPedido estado = EstadoPedido.NUEVO;
     @Enumerated(EnumType.STRING)
     private OrigenPedido origen = OrigenPedido.WEB;
+    @Column(name = "pago_reportado_en")
+    private Instant pagoReportado;
+    /** Punto de entrega que marcó el cliente en el mapa (domicilio por distancia). */
+    @Column(name = "entrega_lat")
+    private Double entregaLat;
+    @Column(name = "entrega_lng")
+    private Double entregaLng;
+    @Column(name = "distancia_km")
+    private Double distanciaKm;
+    /** Sede que atiende el pedido. */
+    @Column(name = "sede_id")
+    private Long sedeId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "domiciliario_id")
+    private Domiciliario domiciliario;
 
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id ASC")
@@ -137,7 +154,21 @@ public class Pedido {
     public void setCuentaTitular(String v) { cuentaTitular = v == null ? "" : v; }
     public String getCuentaNumero() { return cuentaNumero; }
     public void setCuentaNumero(String v) { cuentaNumero = v == null ? "" : v; }
+    public boolean isPublicado() { return publicado; }
+    public void setPublicado(boolean v) { publicado = v; }
     public EstadoPago getEstadoPago() { return estadoPago; }
+    public Instant getPagoReportado() { return pagoReportado; }
+    public void setPagoReportado(Instant v) { pagoReportado = v; }
+    public Double getEntregaLat() { return entregaLat; }
+    public void setEntregaLat(Double v) { entregaLat = v; }
+    public Double getEntregaLng() { return entregaLng; }
+    public void setEntregaLng(Double v) { entregaLng = v; }
+    public Long getSedeId() { return sedeId; }
+    public void setSedeId(Long v) { sedeId = v; }
+    public Double getDistanciaKm() { return distanciaKm; }
+    public void setDistanciaKm(Double v) { distanciaKm = v; }
+    public Domiciliario getDomiciliario() { return domiciliario; }
+    public void setDomiciliario(Domiciliario v) { domiciliario = v; }
     public void setEstadoPago(EstadoPago v) { estadoPago = v; }
     public EstadoPedido getEstado() { return estado; }
     public void setEstado(EstadoPedido v) { estado = v; }

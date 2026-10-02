@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface HorarioRepositorio extends JpaRepository<Horario, Long> {
-    List<Horario> findAllByOrderByDiaAsc();
-    Optional<Horario> findByDia(short dia);
+    /** Horario de una sede (sin varias sedes, el de la principal). */
+    List<Horario> findBySedeIdOrderByDiaAsc(Long sedeId);
+    Optional<Horario> findBySedeIdAndDia(Long sedeId, short dia);
 }

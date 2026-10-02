@@ -60,6 +60,29 @@ public class Producto {
     public String getDescripcion() { return descripcion; }
     public void setDescripcion(String v) { descripcion = v; }
     public int getPrecio() { return precio; }
+
+    // Lo que cambia en la sede del pedido (no se guarda: lo pone SedeService al cargar el producto para una sede).
+    @Transient
+    private Integer precioSede;
+    @Transient
+    private Boolean disponibleSede;
+    @Transient
+    private boolean ofrecidoSede = true;
+
+    public void aplicarSede(Integer precio, boolean disponible, boolean ofrecido) {
+        precioSede = precio;
+        disponibleSede = disponible;
+        ofrecidoSede = ofrecido;
+    }
+
+    /** Precio de venta: el de la sede si tiene uno propio, si no el del producto. */
+    public int precioVenta() { return precioSede != null ? precioSede : precio; }
+
+    /** Disponible para vender: el producto y, si hay sede, también en esa sede. */
+    public boolean disponibleVenta() { return disponible && (disponibleSede == null || disponibleSede); }
+
+    /** La sede lo tiene en su menú (con el menú personalizado por sede). */
+    public boolean ofrecidoEnSede() { return ofrecidoSede; }
     public void setPrecio(int v) { precio = v; }
     public int getCosto() { return costo; }
     public void setCosto(int v) { costo = v; }

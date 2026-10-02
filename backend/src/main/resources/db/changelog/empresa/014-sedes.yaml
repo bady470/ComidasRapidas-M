@@ -1,0 +1,117 @@
+# Varias sedes por empresa. Toda empresa tiene al menos una sede (la principal), creada aquí con los datos actuales;
+# sin el módulo «sedes» todo sigue funcionando como una sola tienda.
+databaseChangeLog:
+  - changeSet:
+      id: empresa-014-sedes
+      author: leinei
+      comment: >
+        Cada sede tiene su dirección, ubicación, tramos de domicilio, horario, abierto/cerrado, tiempos de entrega y
+        su propio «estamos llenos». El menú es el de la empresa; tbl_productos_sede guarda lo que cambia por sede.
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE cliente.tbl_sedes (
+                  id                        BIGSERIAL PRIMARY KEY,
+                  uuid                      UUID          NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  nombre                    VARCHAR(60)   NOT NULL,
+                  direccion                 VARCHAR(160)  NOT NULL DEFAULT '',
+                  ciudad                    VARCHAR(80)   NOT NULL DEFAULT '',
+                  whatsapp                  VARCHAR(20)   NOT NULL DEFAULT '',
+                  local_lat                 NUMERIC(9, 6) CHECK (local_lat BETWEEN -90 AND 90),
+                  local_lng                 NUMERIC(9, 6) CHECK (local_lng BETWEEN -180 AND 180),
+                  domicilio_tramos          VARCHAR(300)  NOT NULL DEFAULT '',
+                  es_abierta                BOOLEAN       NOT NULL DEFAULT TRUE,
+                  tiempo_minimo             SMALLINT      NOT NULL DEFAULT 30,
+                  tiempo_maximo             SMALLINT      NOT NULL DEFAULT 45,
+                  minutos_extra             SMALLINT      NOT NULL DEFAULT 0 CHECK (minutos_extra BETWEEN 0 AND 180),
+                  demora_hasta              TIMESTAMPTZ,
+                  domicilios_pausados_hasta TIMESTAMPTZ,
+                  pedidos_pausados_hasta    TIMESTAMPTZ,
+                  es_activa                 BOOLEAN       NOT NULL DEFAULT TRUE,
+                  es_principal              BOOLEAN       NOT NULL DEFAULT FALSE,
+                  orden                     INTEGER       NOT NULL DEFAULT 0,
+                  creado_en                 TIMESTAMPTZ   NOT NULL DEFAULT now()
+              );
+              -- Solo una sede principal.
+              CREATE UNIQUE INDEX idx_sedes_principal ON cliente.tbl_sedes (es_principal) WHERE es_principal;
+              CREATE TRIGGER trg_auditar_sedes AFTER INSERT OR UPDATE OR DELETE ON cliente.tbl_sedes
+                  FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+
+              -- La sede principal sale de la configuración actual de la tienda.
+              INSERT INTO cliente.tbl_sedes (nombre, direccion, ciudad, whatsapp, local_lat, local_lng, domicilio_tramos,
+                                             es_abierta, tiempo_minimo, tiempo_maximo, es_principal, orden)
+              SELECT 'Principal', direccion, ciudad, whatsapp, local_lat, local_lng, domicilio_tramos,
+                     es_abierta, tiempo_minimo, tiempo_maximo, TRUE, 1
+                FROM cliente.tbl_configuraciones WHERE id = 1;
+
+              -- Menú: el mismo en todas las sedes (COMPARTIDO) o personalizado por sede (POR_SEDE).
+              ALTER TABLE cliente.tbl_configuraciones ADD COLUMN sedes_menu VARCHAR(10) NOT NULL DEFAULT 'COMPARTIDO'
+                  CHECK (sedes_menu IN ('COMPARTIDO', 'POR_SEDE'));
+      rollback:
+        - sql: { sql: ALTER TABLE cliente.tbl_configuraciones DROP COLUMN sedes_menu; DROP TABLE cliente.tbl_sedes; }
+
+  - changeSet:
+      id: empresa-014-sede-en-tablas
+      author: leinei
+      comment: Horarios, pedidos, cierres de caja y domiciliarios pasan a tener sede; lo que ya existe queda en la principal.
+      changes:
+        - sql:
+            sql: |
+              -- Horario por sede (antes un día era único en toda la tienda).
+              ALTER TABLE cliente.tbl_horarios ADD COLUMN sede_id BIGINT REFERENCES cliente.tbl_sedes(id) ON DELETE CASCADE;
+              UPDATE cliente.tbl_horarios SET sede_id = (SELECT id FROM cliente.tbl_sedes WHERE es_principal);
+              ALTER TABLE cliente.tbl_horarios ALTER COLUMN sede_id SET NOT NULL;
+              ALTER TABLE cliente.tbl_horarios DROP CONSTRAINT tbl_horarios_dia_key;
+              ALTER TABLE cliente.tbl_horarios ADD CONSTRAINT tbl_horarios_sede_dia_key UNIQUE (sede_id, dia);
+
+              ALTER TABLE producto.tbl_pedidos ADD COLUMN sede_id BIGINT REFERENCES cliente.tbl_sedes(id) ON DELETE SET NULL;
+              UPDATE producto.tbl_pedidos SET sede_id = (SELECT id FROM cliente.tbl_sedes WHERE es_principal);
+              CREATE INDEX idx_pedidos_sede_id ON producto.tbl_pedidos (sede_id);
+
+              -- El cierre de caja es por día y por sede.
+              ALTER TABLE cliente.tbl_cierres_caja ADD COLUMN sede_id BIGINT REFERENCES cliente.tbl_sedes(id) ON DELETE CASCADE;
+              UPDATE cliente.tbl_cierres_caja SET sede_id = (SELECT id FROM cliente.tbl_sedes WHERE es_principal);
+              ALTER TABLE cliente.tbl_cierres_caja ALTER COLUMN sede_id SET NOT NULL;
+              ALTER TABLE cliente.tbl_cierres_caja DROP CONSTRAINT tbl_cierres_caja_fecha_key;
+              ALTER TABLE cliente.tbl_cierres_caja ADD CONSTRAINT tbl_cierres_caja_fecha_sede_key UNIQUE (fecha, sede_id);
+              CREATE INDEX idx_cierres_caja_sede_id ON cliente.tbl_cierres_caja (sede_id);
+
+              -- Domiciliario de una sede (NULL = trabaja para todas).
+              ALTER TABLE cliente.tbl_domiciliarios ADD COLUMN sede_id BIGINT REFERENCES cliente.tbl_sedes(id) ON DELETE SET NULL;
+              CREATE INDEX idx_domiciliarios_sede_id ON cliente.tbl_domiciliarios (sede_id);
+      rollback:
+        - sql:
+            sql: |
+              ALTER TABLE cliente.tbl_domiciliarios DROP COLUMN sede_id;
+              ALTER TABLE cliente.tbl_cierres_caja DROP CONSTRAINT tbl_cierres_caja_fecha_sede_key;
+              ALTER TABLE cliente.tbl_cierres_caja DROP COLUMN sede_id;
+              ALTER TABLE cliente.tbl_cierres_caja ADD CONSTRAINT tbl_cierres_caja_fecha_key UNIQUE (fecha);
+              ALTER TABLE producto.tbl_pedidos DROP COLUMN sede_id;
+              ALTER TABLE cliente.tbl_horarios DROP CONSTRAINT tbl_horarios_sede_dia_key;
+              ALTER TABLE cliente.tbl_horarios DROP COLUMN sede_id;
+              ALTER TABLE cliente.tbl_horarios ADD CONSTRAINT tbl_horarios_dia_key UNIQUE (dia);
+
+  - changeSet:
+      id: empresa-014-productos-sede
+      author: leinei
+      comment: >
+        Lo que cambia de un producto en una sede. es_disponible aplica siempre (agotado en esa sede); es_ofrecido y
+        precio solo con el menú personalizado por sede. Sin fila, el producto es como el base.
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE producto.tbl_productos_sede (
+                  id            BIGSERIAL PRIMARY KEY,
+                  uuid          UUID    NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  producto_id   BIGINT  NOT NULL REFERENCES producto.tbl_productos(id) ON DELETE CASCADE,
+                  sede_id       BIGINT  NOT NULL REFERENCES cliente.tbl_sedes(id) ON DELETE CASCADE,
+                  es_disponible BOOLEAN NOT NULL DEFAULT TRUE,
+                  es_ofrecido   BOOLEAN NOT NULL DEFAULT TRUE,
+                  precio        INTEGER CHECK (precio IS NULL OR precio > 0),
+                  UNIQUE (producto_id, sede_id)
+              );
+              CREATE INDEX idx_productos_sede_sede_id ON producto.tbl_productos_sede (sede_id);
+              CREATE TRIGGER trg_auditar_productos_sede AFTER INSERT OR UPDATE OR DELETE ON producto.tbl_productos_sede
+                  FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+      rollback:
+        - sql: { sql: DROP TABLE producto.tbl_productos_sede; }

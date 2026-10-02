@@ -1,0 +1,16 @@
+# Fotos reales que el superadmin sube para los productos precargados (reemplazan a las que trae la aplicación).
+databaseChangeLog:
+  - changeSet:
+      id: control-012-fotos-biblioteca
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE plataforma.tbl_biblioteca_fotos (
+                  slug           VARCHAR(80) PRIMARY KEY,
+                  tipo_contenido VARCHAR(30) NOT NULL,
+                  datos          BYTEA       NOT NULL,
+                  actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+              );
+      rollback:
+        - sql: { sql: "DROP TABLE plataforma.tbl_biblioteca_fotos" }

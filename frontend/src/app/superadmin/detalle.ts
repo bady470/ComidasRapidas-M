@@ -3,17 +3,21 @@ import { FormsModule, NgForm } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
 import { Logo } from '../compartido/logo';
+import { SelectorModulos } from '../compartido/selector-modulos';
+import { SelectorPlan } from '../compartido/selector-plan';
 import { PlataformaApi, mensajeError } from '../core/api';
+import { enVivoPlataforma } from './en-vivo';
+import { PagosEmpresa } from './pagos-empresa';
 import { Avisos } from '../core/avisos';
-import { HoraPipe } from '../core/formato';
-import { ActualizarEmpresa, EmpresaDetalle, EstadoEmpresa, ModuloPlataforma, NOMBRE_ESTADO_EMPRESA } from '../core/modelos';
+import { DineroPipe, HoraPipe } from '../core/formato';
+import { ActualizarEmpresa, EmpresaDetalle, EstadoEmpresa, ModuloPlataforma, NOMBRE_ESTADO_EMPRESA, Plan } from '../core/modelos';
 
 const EN_PREPARACION: EstadoEmpresa[] = ['pendiente_aprovisionamiento', 'aprovisionando'];
 
 /** Detalle de una empresa: estado del aprovisionamiento, datos, marca, módulos y acciones. */
 @Component({
   selector: 'app-detalle-empresa',
-  imports: [FormsModule, RouterLink, Logo, HoraPipe],
+  imports: [FormsModule, RouterLink, Logo, HoraPipe, DineroPipe, SelectorPlan, SelectorModulos, PagosEmpresa],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <p style="margin-bottom:10px"><a class="linkbtn" routerLink="/superadmin/empresas">← Empresas</a></p>
@@ -26,7 +30,8 @@ const EN_PREPARACION: EstadoEmpresa[] = ['pendiente_aprovisionamiento', 'aprovis
           <div class="stack" style="gap:2px">
             <h1>{{ e.nombreComercial }}</h1>
             <div class="row" style="gap:8px"><span [class]="'st st-' + e.estado">{{ nombreEstado(e.estado) }}</span>
-              <span class="muted num">/{{ e.identificador }}</span></div>
+              <span class="muted num">/{{ e.identificador }}</span>
+              <span class="muted">· Plan {{ nombrePlan(e.plan) }} · {{ e.precioPlan | dinero }}/{{ e.cicloFacturacion === 'ANUAL' ? 'año' : 'mes' }}</span></div>
           </div>
         </div>
         <div class="row" style="flex-wrap:wrap;gap:6px">
@@ -55,7 +60,7 @@ const EN_PREPARACION: EstadoEmpresa[] = ['pendiente_aprovisionamiento', 'aprovis
             <h3>{{ enPreparacion() ? 'Preparando la empresa…' : 'La preparación falló' }}</h3>
             <p class="muted" style="font-size:14px">
               Paso: <b>{{ a.pasoActual || 'en cola' }}</b> · intentos {{ a.intentos }} · {{ a.actualizadoEn | hora }}
-              @if (enPreparacion()) { · se actualiza solo }
+              @if (enPreparacion()) { · <span class="en-vivo" [class.off]="!vivo.enVivo()">{{ vivo.enVivo() ? 'En vivo' : 'Reconectando' }}</span> }
             </p>
             @if (a.registro) { <pre class="registro">{{ a.registro }}</pre> }
           </div>
@@ -69,8 +74,10 @@ const EN_PREPARACION: EstadoEmpresa[] = ['pendiente_aprovisionamiento', 'aprovis
           <div class="field"><label for="dRazon">Razón social</label><input id="dRazon" name="dRazon" [(ngModel)]="f.razonSocial"></div>
           <div class="row2">
             <div class="field"><label for="dNit">NIT</label><input id="dNit" name="dNit" [(ngModel)]="f.nit"></div>
-            <div class="field"><label for="dPlan">Plan</label><input id="dPlan" name="dPlan" [(ngModel)]="f.plan"></div>
           </div>
+          <div class="field"><span class="flabel">Plan y facturación</span>
+            <app-selector-plan [planes]="planesVisibles()" [(plan)]="f.plan" [(ciclo)]="f.cicloFacturacion" (elegido)="elegidos.set(modulosDe($event))" />
+            <span class="hint">Al cambiar de plan, los módulos de abajo se ajustan a los que incluye; revísalos y pulsa «Guardar módulos» para aplicarlos.</span></div>
           <div class="field"><label for="dResp">Responsable</label><input id="dResp" name="dResp" [(ngModel)]="f.responsableNombre"></div>
           <div class="row2">
             <div class="field"><label for="dCorreo">Correo</label><input id="dCorreo" name="dCorreo" type="email" [(ngModel)]="f.responsableCorreo"></div>
@@ -103,18 +110,16 @@ const EN_PREPARACION: EstadoEmpresa[] = ['pendiente_aprovisionamiento', 'aprovis
 
           <div class="panel">
             <h3>Módulos</h3>
-            <div class="modulos">
-              @for (m of modulos(); track m.codigo) {
-                <label>
-                  <input type="checkbox" [name]="'m-' + m.codigo" [checked]="m.esBase || elegidos().has(m.codigo)" [disabled]="m.esBase" (change)="alternar(m.codigo)">
-                  <b>{{ m.nombre }}</b><span class="muted">{{ m.descripcion }}</span>
-                </label>
-              }
-            </div>
+            <app-selector-modulos [modulos]="modulos()" [(elegidos)]="elegidos" [plan]="planActual()" />
             <div><button class="btn main" type="button" [disabled]="ocupado() || !modulosCambiados()" (click)="guardarModulos()">Guardar módulos</button></div>
           </div>
 
           @if (e.estado === 'activa') {
+            <div class="panel">
+              <h3>Productos precargados</h3>
+              <p class="muted">Salchipapas, hamburguesas, perros, pizzas, bebidas y más, con fotos y precios listos para asignarle a esta empresa.</p>
+              <div><a class="btn main" [routerLink]="['/superadmin/biblioteca']" [queryParams]="{ empresa: e.uuid }">Elegir productos</a></div>
+            </div>
             <form class="panel" (ngSubmit)="restablecer(fk)" #fk="ngForm">
               <h3>Clave de un administrador</h3>
               <p class="muted" style="font-size:14px">Si la empresa olvidó su clave, asígnale una nueva y compártela.</p>
@@ -128,6 +133,10 @@ const EN_PREPARACION: EstadoEmpresa[] = ['pendiente_aprovisionamiento', 'aprovis
           }
         </div>
       </div>
+
+      @if (e.estado === 'activa' || e.estado === 'suspendida') {
+        <div style="margin-top:16px"><app-pagos-empresa [uuid]="e.uuid" /></div>
+      }
 
       <div class="two" style="margin-block:16px 40px">
         <div class="panel">
@@ -170,6 +179,7 @@ export class DetalleEmpresaPage {
   protected credenciales = signal<{ usuario: string; clave: string } | null>(null);
   protected f: ActualizarEmpresa = vacio();
   protected clave = { usuario: '', nueva: '' };
+  protected vivo: { enVivo: () => boolean };
 
   protected enPreparacion = computed(() => EN_PREPARACION.includes(this.empresa()?.estado as EstadoEmpresa));
   protected modulosCambiados = computed(() => {
@@ -179,6 +189,15 @@ export class DetalleEmpresaPage {
     const elegidos = this.elegidos();
     return this.modulos().some((m) => !m.esBase && actuales.has(m.codigo) !== elegidos.has(m.codigo));
   });
+
+  protected planes = signal<Plan[]>([]);
+  /** Los planes activos, más el que la empresa ya tiene aunque esté desactivado. */
+  protected planesVisibles = computed(() => this.planes().filter((p) => p.activo || p.codigo === this.empresa()?.plan));
+  protected planActual(): Plan | null { return this.planes().find((p) => p.codigo === this.f.plan) ?? null; }
+  protected modulosDe(p: Plan): Set<string> { return new Set(p.modulos); }
+  protected nombrePlan(codigo: string | null): string {
+    return this.planes().find((p) => p.codigo === codigo)?.nombre ?? codigo ?? '';
+  }
 
   constructor() {
     // Clave del administrador recién creada (llega desde "Nueva empresa").
@@ -190,11 +209,14 @@ export class DetalleEmpresaPage {
     }
 
     this.api.modulos().subscribe((l) => this.modulos.set(l));
+    this.api.planes().subscribe((l) => this.planes.set(l));
     effect(() => {
       const uuid = this.uuid();
       untracked(() => this.cargar(uuid, true));
     });
-    const t = setInterval(() => { if (this.enPreparacion()) this.cargar(this.uuid(), false); }, 3000);
+    // En vivo: cada paso del aprovisionamiento y cada cambio de estado se ve al instante.
+    this.vivo = enVivoPlataforma(() => this.cargar(this.uuid(), false));
+    const t = setInterval(() => { if (this.enPreparacion()) this.cargar(this.uuid(), false); }, 10_000);
     inject(DestroyRef).onDestroy(() => clearInterval(t));
   }
 
@@ -213,7 +235,7 @@ export class DetalleEmpresaPage {
     if (formulario) {
       this.f = {
         razonSocial: e.razonSocial, nit: e.nit ?? '', responsableNombre: e.responsableNombre,
-        responsableCorreo: e.responsableCorreo ?? '', responsableCelular: e.responsableCelular ?? '', plan: e.plan ?? '',
+        responsableCorreo: e.responsableCorreo ?? '', responsableCelular: e.responsableCelular ?? '', plan: e.plan ?? 'basico', cicloFacturacion: e.cicloFacturacion,
         notas: e.notas ?? '', nombreComercial: e.nombreComercial, colorPrimario: e.colorPrimario,
         colorSecundario: e.colorSecundario, dominioPropio: e.dominioPropio ?? '',
       };
@@ -222,12 +244,6 @@ export class DetalleEmpresaPage {
 
   protected nombreEstado(e: EstadoEmpresa): string {
     return NOMBRE_ESTADO_EMPRESA[e] ?? e;
-  }
-
-  protected alternar(codigo: string): void {
-    const s = new Set(this.elegidos());
-    if (s.has(codigo)) s.delete(codigo); else s.add(codigo);
-    this.elegidos.set(s);
   }
 
   /** Ejecuta una acción que devuelve la empresa actualizada. */
@@ -307,7 +323,7 @@ export class DetalleEmpresaPage {
 
 function vacio(): ActualizarEmpresa {
   return {
-    razonSocial: '', nit: '', responsableNombre: '', responsableCorreo: '', responsableCelular: '', plan: '', notas: '',
-    nombreComercial: '', colorPrimario: '#E9A23B', colorSecundario: '#3A2620', dominioPropio: '',
+    razonSocial: '', nit: '', responsableNombre: '', responsableCorreo: '', responsableCelular: '', plan: 'basico', cicloFacturacion: 'MENSUAL', notas: '',
+    nombreComercial: '', colorPrimario: '#1D4ED8', colorSecundario: '#0F172A', dominioPropio: '',
   };
 }

@@ -17,7 +17,10 @@ public class ReporteService {
     private final PedidoRepositorio pedidoRepo;
     private final ConfigService configService;
 
-    public ReporteService(PedidoRepositorio pedidoRepo, ConfigService configService) {
+    private final SedeService sedes;
+
+    public ReporteService(PedidoRepositorio pedidoRepo, ConfigService configService, SedeService sedes) {
+        this.sedes = sedes;
         this.pedidoRepo = pedidoRepo;
         this.configService = configService;
     }
@@ -30,8 +33,10 @@ public class ReporteService {
     @Transactional(readOnly = true)
     public AdminDto.Produccion produccion(LocalDate fecha) {
         int costoOperativoUnidad = configService.tienda().getCostoOperativoUnidad();
-        List<Pedido> pedidos = pedidoRepo.findByFechaEntregaOrderByCreadoDesc(fecha).stream()
-                .filter(p -> p.getEstado() != EstadoPedido.CANCELADO).toList();
+        Long sede = sedes.filtro(); // con varias sedes, la escogida en la barra (null = todas)
+        List<Pedido> pedidos = pedidoRepo.findByPublicadoTrueAndFechaEntregaOrderByCreadoDesc(fecha).stream()
+                .filter(p -> p.getEstado() != EstadoPedido.CANCELADO)
+                .filter(p -> sede == null || sede.equals(p.getSedeId())).toList();
 
         Map<String, int[]> porProducto = new LinkedHashMap<>(); // unidades, ventas, costo
         Map<String, Integer> porDetalle = new LinkedHashMap<>();  // "producto|detalle" → unidades
@@ -45,8 +50,11 @@ public class ReporteService {
             if (p.getTipoEntrega() == TipoEntrega.RECOGER) aRecoger++; else aDomicilio++;
             if (p.getEstadoPago() == EstadoPago.RECIBIDO) cobrado += p.getTotal();
 
-            String cuenta = p.getMetodoPago() == MetodoPago.CUENTA
-                    ? p.getCuentaEntidad() + " · " + p.getCuentaTitular() : "Efectivo";
+            String cuenta = switch (p.getMetodoPago()) {
+                case CUENTA -> p.getCuentaEntidad() + " · " + p.getCuentaTitular();
+                case EN_LINEA -> "En línea · " + p.getCuentaTitular();
+                case EFECTIVO -> "Efectivo";
+            };
             int[] c = porCuenta.computeIfAbsent(cuenta, k -> new int[3]);
             c[0]++;
             c[1] += p.getTotal();

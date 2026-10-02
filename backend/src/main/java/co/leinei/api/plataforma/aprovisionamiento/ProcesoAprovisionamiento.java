@@ -1,5 +1,6 @@
 package co.leinei.api.plataforma.aprovisionamiento;
 
+import co.leinei.api.tiemporeal.TiempoReal;
 import co.leinei.api.config.LeineiProperties;
 import co.leinei.api.empresa.RegistroEmpresas;
 import org.slf4j.Logger;
@@ -31,9 +32,11 @@ public class ProcesoAprovisionamiento {
     private final CifradoClaves cifrado;
     private final LeineiProperties props;
     private final RegistroEmpresas registro;
+    private final TiempoReal tiempoReal;
 
     public ProcesoAprovisionamiento(ServidorPostgres servidor, CifradoClaves cifrado, LeineiProperties props,
-                                    RegistroEmpresas registro) {
+                                    RegistroEmpresas registro, TiempoReal tiempoReal) {
+        this.tiempoReal = tiempoReal;
         this.servidor = servidor;
         this.cifrado = cifrado;
         this.props = props;
@@ -64,6 +67,7 @@ public class ProcesoAprovisionamiento {
             log.error("Falló el aprovisionamiento de {}", s.identificador(), e);
         } finally {
             registro.invalidar(s.identificador());
+            avisar(s);
         }
     }
 
@@ -118,6 +122,12 @@ public class ProcesoAprovisionamiento {
         } catch (SQLException e) {
             log.warn("No se pudo anotar el paso del aprovisionamiento {}", s.id(), e);
         }
+        avisar(s);
+    }
+
+    /** El superadmin ve cada paso en vivo. */
+    private void avisar(Solicitud s) {
+        tiempoReal.publicar("empresa", java.util.Map.of("identificador", s.identificador()), TiempoReal.PLATAFORMA);
     }
 
     private void terminar(Solicitud s, String estado, StringBuilder bitacora, String estadoEmpresa) {

@@ -2,6 +2,10 @@ package co.leinei.api.plataforma.web;
 
 import co.leinei.api.config.TokenAuthFilter;
 import co.leinei.api.empresa.RegistroEmpresas;
+import co.leinei.api.plataforma.servicio.BibliotecaService;
+import co.leinei.api.plataforma.servicio.ConfiguracionCorreoService;
+import co.leinei.api.plataforma.servicio.CorreoService;
+import co.leinei.api.plataforma.servicio.PlanesService;
 import co.leinei.api.plataforma.servicio.EmpresasService;
 import co.leinei.api.plataforma.servicio.MarcaService;
 import co.leinei.api.plataforma.servicio.SuperadminAuthService;
@@ -73,8 +77,42 @@ public final class PlataformaControllers {
     @RequestMapping("/api/plataforma")
     public static class Empresas {
         private final EmpresasService empresas;
+        private final PlanesService planes;
+        private final CorreoService correo;
 
-        public Empresas(EmpresasService empresas) { this.empresas = empresas; }
+        private final ConfiguracionCorreoService configCorreo;
+
+        public Empresas(EmpresasService empresas, PlanesService planes, CorreoService correo, ConfiguracionCorreoService configCorreo) {
+            this.configCorreo = configCorreo;
+            this.empresas = empresas;
+            this.planes = planes;
+            this.correo = correo;
+        }
+
+        @GetMapping("/correo")
+        public PlataformaDto.ConfigCorreo correo() { return configCorreo.ver(); }
+
+        @PutMapping("/correo")
+        public PlataformaDto.ConfigCorreo guardarCorreo(@Valid @RequestBody PlataformaDto.ConfigCorreoRequest req) {
+            return configCorreo.guardar(req);
+        }
+
+        @PostMapping("/correo/prueba")
+        public PlataformaDto.ResultadoPrueba pruebaCorreo(@Valid @RequestBody PlataformaDto.PruebaCorreoRequest req) {
+            return correo.prueba(req.destino());
+        }
+
+        @GetMapping("/planes")
+        public List<PlataformaDto.Plan> planes() { return planes.listar(); }
+
+        @PostMapping("/planes")
+        @ResponseStatus(HttpStatus.CREATED)
+        public PlataformaDto.Plan crearPlan(@Valid @RequestBody PlataformaDto.PlanRequest req) { return planes.crear(req); }
+
+        @PutMapping("/planes/{codigo}")
+        public PlataformaDto.Plan actualizarPlan(@PathVariable String codigo, @Valid @RequestBody PlataformaDto.PlanRequest req) {
+            return planes.actualizar(codigo, req);
+        }
 
         @GetMapping("/modulos")
         public List<PlataformaDto.Modulo> modulos() { return empresas.modulos(); }
@@ -87,9 +125,14 @@ public final class PlataformaControllers {
 
         @PostMapping("/empresas")
         @ResponseStatus(HttpStatus.CREATED)
-        public PlataformaDto.EmpresaDetalle crear(@AuthenticationPrincipal SuperadminActual s,
-                                                  @Valid @RequestBody PlataformaDto.CrearEmpresaRequest req) {
-            return empresas.crear(req, s.usuario());
+        public PlataformaDto.EmpresaCreada crear(@AuthenticationPrincipal SuperadminActual s,
+                                                 @Valid @RequestBody PlataformaDto.CrearEmpresaRequest req) {
+            PlataformaDto.EmpresaDetalle d = empresas.crear(req, s.usuario());
+            // Después de guardar: si el correo falla la empresa queda creada igual y el panel lo avisa.
+            String plan = planes.buscar(d.plan()).nombre();
+            String resultado = correo.bienvenida(d.responsableCorreo(), d.responsableNombre(), d.nombreComercial(),
+                    d.identificador(), d.dominioPropio(), req.adminUsuario().trim().toLowerCase(), req.adminClave(), plan, d.cicloFacturacion(), d.precioPlan());
+            return new PlataformaDto.EmpresaCreada(d, resultado);
         }
 
         @GetMapping("/empresas/{uuid}")
@@ -98,7 +141,13 @@ public final class PlataformaControllers {
         @PutMapping("/empresas/{uuid}")
         public PlataformaDto.EmpresaDetalle actualizar(@AuthenticationPrincipal SuperadminActual s, @PathVariable UUID uuid,
                                                        @Valid @RequestBody PlataformaDto.ActualizarEmpresaRequest req) {
-            return empresas.actualizar(uuid, req, s.usuario());
+            String antes = empresas.detalle(uuid).dominioPropio();
+            PlataformaDto.EmpresaDetalle d = empresas.actualizar(uuid, req, s.usuario());
+            // Si se asignó o cambió el dominio, se le avisa al responsable (si el correo falla, el cambio ya quedó guardado).
+            if (d.dominioPropio() != null && !d.dominioPropio().equalsIgnoreCase(antes == null ? "" : antes)) {
+                correo.avisoDominio(d.responsableCorreo(), d.responsableNombre(), d.nombreComercial(), d.dominioPropio());
+            }
+            return d;
         }
 
         @PostMapping(value = "/empresas/{uuid}/logo", consumes = "multipart/form-data")
@@ -130,11 +179,41 @@ public final class PlataformaControllers {
             return empresas.reintentar(uuid, s.usuario());
         }
 
+        @PostMapping("/empresas/{uuid}/biblioteca")
+        public BibliotecaService.Resultado importarBiblioteca(@AuthenticationPrincipal SuperadminActual s, @PathVariable UUID uuid,
+                                                              @Valid @RequestBody PlataformaDto.ImportarBibliotecaRequest req) {
+            return empresas.importarBiblioteca(uuid, req.slugs(), req.ajustePorcentaje(), s.usuario());
+        }
+
         @PostMapping("/empresas/{uuid}/clave-admin")
         @ResponseStatus(HttpStatus.NO_CONTENT)
         public void claveAdmin(@AuthenticationPrincipal SuperadminActual s, @PathVariable UUID uuid,
                                @Valid @RequestBody PlataformaDto.ClaveAdminRequest req) {
             empresas.restablecerClaveAdmin(uuid, req.usuario(), req.nueva(), s.usuario());
+        }
+    }
+
+    /** Biblioteca de productos precargados para asignar a las empresas. */
+    @RestController
+    @RequestMapping("/api/plataforma/biblioteca")
+    public static class Biblioteca {
+        private final BibliotecaService biblioteca;
+
+        public Biblioteca(BibliotecaService biblioteca) { this.biblioteca = biblioteca; }
+
+        @GetMapping
+        public BibliotecaService.Biblioteca todo() { return biblioteca.todo(); }
+
+        @PostMapping(value = "/{slug}/foto", consumes = "multipart/form-data")
+        public BibliotecaService.Biblioteca subirFoto(@PathVariable String slug, @RequestParam("archivo") MultipartFile archivo) throws IOException {
+            biblioteca.guardarFoto(slug, archivo.getBytes());
+            return biblioteca.todo();
+        }
+
+        @DeleteMapping("/{slug}/foto")
+        public BibliotecaService.Biblioteca quitarFoto(@PathVariable String slug) {
+            biblioteca.quitarFoto(slug);
+            return biblioteca.todo();
         }
     }
 
@@ -145,14 +224,29 @@ public final class PlataformaControllers {
         private final RegistroEmpresas registro;
         private final MarcaService marca;
 
-        public Publico(RegistroEmpresas registro, MarcaService marca) {
+        private final BibliotecaService biblioteca;
+
+        public Publico(RegistroEmpresas registro, MarcaService marca, BibliotecaService biblioteca) {
             this.registro = registro;
             this.marca = marca;
+            this.biblioteca = biblioteca;
         }
 
         @GetMapping("/dominio")
         public PlataformaDto.Dominio dominio(@RequestParam String host) {
             return new PlataformaDto.Dominio(registro.identificadorPorDominio(host).orElse(null));
+        }
+
+        /** Fotos de la biblioteca (públicas: es contenido de ejemplo y un <img> no envía el token). Sin caché larga: el superadmin puede cambiarlas. */
+        @GetMapping("/biblioteca/fotos/{slug}")
+        public ResponseEntity<byte[]> fotoBiblioteca(@PathVariable String slug) {
+            var img = biblioteca.foto(slug);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(img.tipoContenido()))
+                    .cacheControl(CacheControl.noCache().cachePublic())
+                    .eTag("\"" + Integer.toHexString(java.util.Arrays.hashCode(img.datos())) + "\"")
+                    .header("X-Content-Type-Options", "nosniff")
+                    .body(img.datos());
         }
 
         @GetMapping("/empresas/{identificador}/logo")

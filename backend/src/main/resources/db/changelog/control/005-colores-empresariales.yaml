@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: control-005-colores-empresariales
+      author: leinei
+      comment: Paleta empresarial por defecto (azul + pizarra). Las empresas que conservaban una paleta por defecto anterior pasan a esta.
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE plataforma.tbl_empresas_marca ALTER COLUMN color_primario SET DEFAULT '#1D4ED8';
+              ALTER TABLE plataforma.tbl_empresas_marca ALTER COLUMN color_secundario SET DEFAULT '#0F172A';
+              UPDATE plataforma.tbl_empresas_marca SET color_primario = '#1D4ED8' WHERE upper(color_primario) IN ('#E9A23B', '#FF5A1F');
+              UPDATE plataforma.tbl_empresas_marca SET color_secundario = '#0F172A' WHERE upper(color_secundario) IN ('#3A2620', '#6D28D9');
+      rollback:
+        - sql:
+            sql: |
+              ALTER TABLE plataforma.tbl_empresas_marca ALTER COLUMN color_primario SET DEFAULT '#FF5A1F';
+              ALTER TABLE plataforma.tbl_empresas_marca ALTER COLUMN color_secundario SET DEFAULT '#6D28D9';

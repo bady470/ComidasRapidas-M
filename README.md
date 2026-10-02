@@ -82,12 +82,135 @@ Tablas `tbl_` en plural, índices `idx_`, funciones `fn_`, triggers `trg_`. Toda
 | `zonas` | Valor de domicilio por zona o barrio |
 | `reportes` | Ventas del día, costos y ganancia |
 | `pedido_manual` | Registrar pedidos que llegan por WhatsApp o teléfono |
+| `pagos_en_linea` | Cobrar con Wompi o Bold (Nequi, PSE, tarjeta) y confirmar el pago solo, al instante |
+| `caja` | Cierre de caja del día: efectivo, transferencias, pagos en línea y lo que entrega cada domiciliario |
+| `cocina` | Pantalla de cocina y comandas impresas (manual o automática) en impresora térmica |
+| `clientes` | Clientes frecuentes y los que dejaron de pedir, con mensaje de WhatsApp para que vuelvan |
+| `mapas` | Domicilio según la distancia en el mapa y domiciliario en vivo (link de reparto y seguimiento) |
+| `sedes` | Varios locales con su horario, domicilio y caja; el menú igual en todas o personalizado por sede |
 
 ### Direcciones y dominio propio
 
 - Plataforma: `https://tu-plataforma.com/{empresa}` (tienda) y `/{empresa}/admin` (portal).
 - Dominio propio: si la empresa tiene `pedidos.laparrilla.com` y ese dominio apunta al mismo servidor, la app lo reconoce al abrir (`/api/plataforma/publico/dominio`) y muestra la tienda en la raíz (`/`, `/carrito`, `/admin`).
 - El carrito, los datos del cliente, los pedidos recientes y la sesión del portal se guardan **separados por empresa** en el navegador.
+
+### Pagos por transferencia, avisos y domiciliarios
+
+1. Si el cliente escoge transferencia, el botón dice **«Hacer pedido y pagar»**. Al confirmar ve **«Pagar pedido»**: la cuenta, el valor y un botón para **adjuntar el comprobante** (foto, captura o PDF). También puede hacerlo después desde «Mi pedido».
+2. Al adjuntarlo, el pago queda **«Comprobante por revisar»** y la empresa recibe un **aviso en su portal** (con sonido y, si lo activa, notificación del navegador): «Pago reportado P-XXXX · $…».
+3. En **Pedidos → Por pagar** están todos los pedidos sin pagar **de cualquier día**; no desaparecen al cambiar de día. Desde ahí: **Ver comprobante**, **Confirmar pago** o **No llegó el pago**.
+4. En **Domiciliarios** se registran las personas que llevan los pedidos; en cada pedido a domicilio se escoge quién lo lleva y se le envía el pedido por WhatsApp. El cliente ve en su seguimiento quién le lleva el pedido.
+
+Los comprobantes se guardan aparte de las fotos del menú (`producto.tbl_comprobantes_pago`) y solo los puede ver la empresa.
+
+### Pagos en línea (Wompi y Bold) con confirmación automática
+
+Cada empresa tiene una **modalidad** que define el superadmin en el detalle de la empresa (*Pagos en línea*). Requiere el módulo `pagos_en_linea`:
+
+| Modalidad | Con qué cuenta se cobra | A quién le llega la plata |
+|---|---|---|
+| **Apagado** (por defecto) | No hay pago en línea: transferencia con comprobante o efectivo, como siempre | A la empresa |
+| **Cuenta propia** | La cuenta de Wompi o Bold de la empresa. Escribe sus llaves en su portal (*Pagos en línea*), si el superadmin lo permite, o las escribe el superadmin | Directo a la empresa |
+| **Cuenta de la plataforma** | La cuenta de la plataforma (*Superadmin → Pagos en línea → Cuentas de la plataforma*) | A la plataforma, que le liquida a la empresa descontando su comisión (% + valor fijo por pago) |
+
+- **Respaldo:** si la modalidad está apagada, la empresa pausó el pago en línea, faltan llaves o el plan no incluye el módulo, la tienda simplemente no muestra «Pagar en línea» y todo sigue funcionando con transferencia y efectivo. Si el pago no pasa, el cliente puede volver a intentarlo o cambiar a transferencia o efectivo desde «Mi pedido».
+- **Cómo se confirma el pago:**
+  1. El cliente escoge «Pagar en línea» y se crea un intento con una referencia única (`LN{empresa}-{pedido}-{n}`) en `plataforma.tbl_transacciones_pago`.
+  2. El cliente paga en el checkout de la pasarela.
+  3. La pasarela avisa por webhook:
+     - **Cuenta propia:** cada empresa tiene su propio link, `POST /api/plataforma/publico/pagos/{wompi|bold}/eventos/{identificador}`, que se registra en su cuenta de la pasarela. Por ese link solo se aceptan cobros de esa empresa.
+     - **Cuenta de la plataforma:** se usa un solo link, `POST /api/plataforma/publico/pagos/{wompi|bold}/eventos`, y por ahí solo se aceptan cobros hechos con las cuentas de la plataforma.
+
+     En los dos casos, la referencia dice de qué pedido es el pago y con qué llaves se verifica la firma.
+  4. Si la firma es válida (Wompi: SHA-256 con el secreto de eventos; Bold: HMAC-SHA256 con la llave secreta), el pedido queda **Pagado**. El portal recibe el aviso «Pago recibido P-XXXX» y el seguimiento del cliente se actualiza al instante, por tiempo real.
+- **Respaldos del aviso:** al volver del checkout, la tienda le pregunta a la pasarela cómo quedó el pago. Además, cada 30 s un proceso revisa los intentos pendientes y los resultados que no alcanzaron a reflejarse en el pedido. Todo se puede repetir sin efectos dobles: un aviso repetido no cambia nada.
+- **Controles:**
+  - Si la pasarela aprueba un valor distinto al del pedido, el intento queda «Con error» y el pedido **no** se marca pagado.
+  - Un reverso de la pasarela devuelve el pedido a «sin pagar» y avisa a la empresa.
+  - Un segundo pago aprobado del mismo pedido se avisa como «Pago repetido».
+- **Seguridad:**
+  - Las llaves y los secretos se guardan cifrados (AES-256-GCM con `LEINEI_LLAVE_MAESTRA`), nunca se devuelven y la auditoría no los copia.
+  - La dirección de regreso del checkout solo puede ser de la plataforma, del dominio propio de la empresa o de los orígenes de desarrollo.
+- **Liquidaciones (cuenta de la plataforma):** en *Superadmin → Pagos en línea → Pagos y liquidaciones* se ven todos los pagos con su comisión y lo que se le debe a cada empresa. Se seleccionan y se marcan como liquidados, con una nota (por ejemplo, el número de la transferencia).
+- **Dirección de avisos:** se arma con la «Dirección de la plataforma» de *Correo de envío*, o con `PUBLIC_URL`. Debe ser pública y con https para que la pasarela llegue. En desarrollo, sin una dirección pública, los pagos se confirman al volver del checkout y con la revisión periódica.
+
+### Estadísticas, cierre de caja y modo «estamos llenos»
+
+- **Estadísticas** (*Portal → Estadísticas*, módulo `reportes`):
+  - Rangos: hoy, 7 o 30 días, este mes, mes pasado, 90 días, este año u otro rango.
+  - Fichas de ventas, pedidos, ticket promedio, ganancia estimada y clientes (con cuántos son nuevos), cada una con su variación contra el periodo anterior del mismo largo.
+  - Gráficas de ventas por día (por hora si el rango es de un solo día), productos más vendidos, horas con más pedidos, días de la semana, cómo pagan, cómo reciben y por dónde piden. Cada gráfica tiene vista de tabla.
+  - Las gráficas están dibujadas a mano en SVG y HTML, sin librerías, y su paleta está validada para daltonismo en modo claro y oscuro.
+- **Cierre de caja** (*Portal → Cierre de caja*, módulo `caja`):
+  - Para cada día muestra lo recibido y lo pendiente por medio de pago (efectivo, cada cuenta y cada pasarela), lo que falta por cobrar y, por domiciliario, el efectivo que debe entregar y los domicilios que hizo.
+  - El cuadre es: base + efectivo recibido − gastos, comparado con lo contado, y dice si la caja cuadra, sobra o falta.
+  - El cierre queda guardado en `cliente.tbl_cierres_caja` (auditado). El efectivo cuenta como recibido cuando el pedido se marca pagado o se entrega.
+- **Modo «estamos llenos»** (botón 🔥 en la barra del portal):
+  - Permite subir el tiempo de entrega (+15 a +60 min), pausar solo los domicilios o dejar de recibir pedidos, por un tiempo que escoge el negocio (15 min a 2 h).
+  - Cada ajuste vence solo. La tienda lo muestra al instante con un aviso y los tiempos ya ajustados, y la API rechaza los pedidos durante la pausa con un mensaje claro.
+
+### Cocina, comandas impresas y recuperar clientes
+
+- **Pantalla de cocina** (*Portal → Cocina*, módulo `cocina`):
+  - Los pedidos activos van en tres columnas: por preparar, preparando, y listos o en camino. Cada uno muestra su código, cómo se entrega, los minutos que lleva (en amarillo y luego en rojo según el tiempo máximo de entrega), los productos con letra grande y las notas.
+  - Un botón por pedido lo pasa al siguiente paso. La pantalla se actualiza sola y tiene botón de pantalla completa.
+- **Comandas impresas**: todo es opcional y se configura por empresa y por equipo.
+  - Modo: `APAGADA`, `MANUAL` (botón «Imprimir comanda» en la cocina y en el detalle del pedido) o `AUTOMATICA`.
+  - En automática se escoge cuándo imprimir (al llegar o al confirmar) y si los pagos en línea esperan a que el pago se confirme. También se configura el papel (58 u 80 mm), las copias (1 a 3), si se muestran precios y un texto al final.
+  - Solo imprime el equipo que tenga activado «Este equipo imprime», así no sale doble. Cada pedido se imprime una sola vez (el equipo lo recuerda) y solo los que llegan después de activarlo.
+  - Se imprime desde el navegador, sin instalar nada. Con Chrome abierto con `--kiosk-printing` y la térmica como impresora predeterminada, sale sin diálogo. La configuración vive en `cliente.tbl_configuraciones` (`impresion_*`).
+- **Recuperar clientes** (*Portal → Clientes*, módulo `clientes`):
+  - Los clientes se agrupan por celular, con cuánto piden, cuánto gastan, lo que más piden y hace cuánto no piden. Hay filtros para los que dejaron de pedir (15, 30, 60 o 90 días o más), los frecuentes (3 pedidos o más), los nuevos y a los que ya se les escribió.
+  - «💬 Escribir» abre WhatsApp con un mensaje armado. El mensaje se puede editar y usa `{nombre}`, `{tienda}`, `{favorito}`, `{dias}` y `{link}`.
+  - Cada mensaje queda registrado en `cliente.tbl_contactos_clientes`, y si el cliente vuelve a pedir se cuenta como **recuperado**.
+
+### Mapas: domicilio por distancia y domiciliario en vivo
+
+Módulo `mapas`. Usa OpenStreetMap con Leaflet, sin llaves ni costo.
+
+- **Domicilio por distancia** (*Portal → Domicilios y mapa*):
+  - La empresa marca su local en el mapa y define tramos «hasta X km → $Y» (máximo 10). El último tramo es el radio hasta donde llega.
+  - En el carrito, el cliente busca su dirección (Nominatim de OpenStreetMap), usa su ubicación o toca el mapa y ajusta el pin. El valor se calcula al instante y el servidor lo recalcula al crear el pedido.
+  - Fuera del radio, el pedido no se acepta y se ofrece recoger en el local.
+  - La distancia es **en línea recta** (haversine). El punto queda en el pedido (`entrega_lat`, `entrega_lng`, `distancia_km`), con un enlace «Ver en el mapa» en el portal y en el WhatsApp al domiciliario.
+  - Con el modo «valor fijo o por zonas», todo sigue como antes.
+- **Link de reparto** (*Portal → Domiciliarios*, botones 🔗 y 💬):
+  - Cada domiciliario tiene un link personal (`/{empresa}/reparto/{token}`, 32 caracteres aleatorios) que se puede cambiar. No necesita cuenta ni instalar nada.
+  - Ahí ve sus pedidos asignados con la dirección, lo que debe cobrar y los botones «Cómo llegar» (Google Maps), «Salí» y «Entregado».
+  - Mientras tiene la página abierta y compartiendo, su celular manda la ubicación cada 15 s, o antes si se movió más de 30 m, y pide que la pantalla no se apague.
+- **En vivo**:
+  - El cliente ve a su domiciliario acercarse en «Mi pedido» mientras el pedido va en camino. La ubicación llega por tiempo real (evento `ubicacion`) y se oculta si tiene más de 5 minutos.
+  - El negocio ve a todos sus domiciliarios en un mapa en *Domiciliarios*. El seguimiento en vivo se puede apagar en *Domicilios y mapa*.
+- **En producción**: los mosaicos de `tile.openstreetmap.org` y la búsqueda de Nominatim tienen políticas de uso para volúmenes bajos. Con mucho tráfico conviene un proveedor de mapas propio o pago.
+
+### Varias sedes
+
+Módulo `sedes`. Toda empresa tiene una **sede principal**, que la migración crea con los datos de la tienda. Sin el módulo, todo funciona como una sola tienda y la principal se mantiene igual a la configuración.
+
+- **Lo que cambia por sede** (*Portal → Sedes*): nombre, dirección, ciudad, WhatsApp, ubicación en el mapa, tramos de domicilio, abierta o cerrada, tiempos de entrega, horario de los 7 días y su propio «estamos llenos». Lo demás es de la empresa: marca, formas de pago, cocina, mensajes, etc.
+- **Menú**: se escoge en *Sedes*.
+  - **El mismo en todas**: mismos productos y precios. Cada sede solo marca lo que se le agotó (*Productos → Por sede*).
+  - **Personalizado por sede**: además, cada sede escoge qué productos vende y puede tener su propio precio (vacío = el precio del producto).
+  - Lo que cambia por sede se guarda en `producto.tbl_productos_sede`. Al cotizar y crear el pedido se cobra el precio de la sede y se rechaza lo que esa sede no vende o tiene agotado.
+- **Tienda**: con más de una sede, la barra muestra «📍 Sede» para cambiarla (o escoger «la más cercana a mí»). La primera vez se pregunta sola. La sede viaja a la API en el encabezado `X-Sede`, y el pedido queda en esa sede (`producto.tbl_pedidos.sede_id`).
+- **Portal**: un selector en la barra filtra todo por sede: pedidos, cocina, estadísticas, ventas del día y caja. «Todas las sedes» suma todo. Con una sede escogida, *Mi tienda*, *Domicilios y mapa* y «estamos llenos» cambian esa sede.
+  - La caja se cierra por sede (`tbl_cierres_caja` es única por fecha y sede).
+  - Los domiciliarios pueden ser de una sede o de todas.
+- **Lo que hizo la migración**: horarios, pedidos y cierres de caja quedaron en la sede principal.
+
+### Tiempo real
+
+Todo se actualiza solo, sin recargar, con **Server-Sent Events** (`co.leinei.api.tiemporeal`):
+
+| Canal | Quién lo escucha | Qué avisa |
+|---|---|---|
+| `GET /api/t/{empresa}/admin/eventos` (token) | Portal de la empresa | Pedido nuevo, cambio de estado, pago reportado o confirmado, domiciliario asignado, avisos, catálogo |
+| `GET /api/t/{empresa}/public/eventos` | Tienda | Cambió un producto, un precio, una promoción, el horario o la marca |
+| `GET /api/t/{empresa}/public/pedidos/{codigo}/eventos?celular=` | Seguimiento del cliente | Su pedido cambió (estado, pago, domiciliario) |
+| `GET /api/plataforma/eventos` (token) | Superadmin | Empresa creada, cada paso del aprovisionamiento, cambios de estado, marca o módulos |
+
+Por los canales solo viajan avisos pequeños (`{"id": 12, "codigo": "P-ABC234", "motivo": "pago"}`); al recibirlos, la página vuelve a pedir los datos con su sesión. Los avisos se envían después de guardar (al confirmar la transacción). El navegador se reconecta solo si se cae la conexión, y cada página muestra el indicador **«En vivo»**. Nginx sirve estas rutas sin búfer. Con varias instancias de la API detrás de un balanceador hay que reenviar los avisos entre ellas (por ejemplo con `LISTEN/NOTIFY` de PostgreSQL o Redis).
 
 ### Seguridad
 
@@ -117,6 +240,7 @@ Los errores llegan como `{ "status": 400, "detail": "Mensaje para mostrar" }` y 
 | POST | `/cotizar` | Total del carrito según entrega y zona |
 | POST | `/pedidos` | Crea el pedido y devuelve el código |
 | GET | `/pedidos/{codigo}?celular=` | Seguimiento |
+| POST | `/pedidos/{codigo}/comprobante?celular=` | Adjuntar el comprobante de la transferencia (imagen o PDF, hasta 5 MB) |
 | GET | `/archivos/{id}` | Foto de un producto |
 
 **Portal de la empresa (token)** — `/api/t/{empresa}/admin`
@@ -126,7 +250,12 @@ Los errores llegan como `{ "status": 400, "detail": "Mensaje para mostrar" }` y 
 | POST | `/auth/login` · `/auth/logout` · `/auth/clave` | Sesión y cambio de clave |
 | GET/POST | `/auth/usuarios` | Administradores de la empresa |
 | GET/POST | `/pedidos` | Lista con filtros y pedido manual (módulo `pedido_manual`) |
-| PATCH | `/pedidos/{id}/estado` · `/pedidos/{id}/pago` | Estado y pago |
+| PATCH | `/pedidos/{id}/estado` · `/pedidos/{id}/pago` | Estado y pago (`PENDIENTE`, `POR_CONFIRMAR`, `RECIBIDO`) |
+| GET | `/pedidos?porPagar=true` | Todos los pedidos sin pagar, de cualquier día |
+| GET | `/pedidos/{id}/comprobante` | Ver el comprobante que adjuntó el cliente |
+| PATCH | `/pedidos/{id}/domiciliario` | Asignar o quitar el domiciliario |
+| GET/POST/PUT | `/domiciliarios` | Domiciliarios (se desactivan, no se borran) |
+| GET · POST | `/avisos` · `/avisos/leidos` | Avisos del portal (pedido nuevo, pago reportado) y conteo de pedidos por pagar |
 | GET | `/reportes/fechas` · `/reportes/produccion?fecha=` | Días con pedidos y ventas del día (módulo `reportes`) |
 | CRUD | `/categorias`, `/productos`, `/promociones` | Catálogo |
 | POST | `/archivos` | Subir foto de producto |
@@ -149,7 +278,61 @@ Los errores llegan como `{ "status": 400, "detail": "Mensaje para mostrar" }` y 
 
 **Público de la plataforma** — `GET /api/plataforma/publico/dominio?host=` y `GET /api/plataforma/publico/empresas/{identificador}/logo`.
 
+**Estadísticas, caja y modo «estamos llenos»** — `/api/t/{empresa}/admin`
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| GET | `/estadisticas?desde=&hasta=` | Fichas, comparación con el periodo anterior y datos de las gráficas (módulo `reportes`, rango máximo de un año) |
+| GET · PUT | `/caja?fecha=` | Cierre de caja del día (sin fecha: el día de servicio actual) y guardar el cuadre (módulo `caja`) |
+| GET · PUT | `/cocina/config` | Impresión de comandas (módulo `cocina`) |
+| GET | `/clientes` | Clientes agrupados por celular, con resumen (módulo `clientes`) |
+| POST · PUT | `/clientes/contactos` · `/clientes/mensaje` | Registrar que se le escribió a un cliente · guardar el mensaje |
+| GET · PUT | `/mapa` | Ubicación del local, modo de domicilio, tramos y seguimiento en vivo (módulo `mapas`) |
+| GET | `/domiciliarios/ubicaciones` | Domiciliarios en el mapa |
+| POST | `/domiciliarios/{id}/renovar-link` | Link de reparto nuevo (el anterior deja de servir) |
+| POST | `/saturacion` | `DEMORA`, `PAUSAR_DOMICILIOS`, `PAUSAR_PEDIDOS`, `QUITAR_DEMORA`, `REANUDAR_*` o `NORMAL` |
+
+**Sedes** — `/api/t/{empresa}/admin`: `GET` `/sedes` (sedes y modo del menú) · `POST /sedes` · `PUT /sedes/{id}` · `PUT /sedes/menu` · `GET`/`PUT` `/productos/{id}/sedes`. La sede de cada petición va en el encabezado `X-Sede`.
+
+**Página del domiciliario** — `/api/t/{empresa}/public/reparto/{token}`: `GET` sus pedidos · `POST /ubicacion` · `POST /pedidos/{codigo}/sali` · `POST /pedidos/{codigo}/entregado`.
+
+**Pagos en línea**
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| POST | `/api/t/{empresa}/public/pedidos/{codigo}/pago-en-linea?celular=` | Crea el cobro y devuelve la dirección del checkout (`{retorno}` en el cuerpo) |
+| POST | `/api/t/{empresa}/public/pedidos/{codigo}/pago-en-linea/verificar?celular=&transaccion=` | Al volver del checkout: consulta a la pasarela y devuelve el seguimiento |
+| POST | `/api/t/{empresa}/public/pedidos/{codigo}/metodo-pago?celular=` | Cambia un pedido sin pagar de «en línea» a transferencia o efectivo |
+| POST | `/api/plataforma/publico/pagos/{wompi\|bold}/eventos/{empresa}` | Webhook de la cuenta propia de una empresa (firma verificada) |
+| POST | `/api/plataforma/publico/pagos/{wompi\|bold}/eventos` | Webhook de las cuentas de la plataforma (firma verificada) |
+| GET · PUT | `/api/t/{empresa}/admin/pagos-en-linea` · `/llaves` · `/pausa` | Portal: estado, llaves de la cuenta propia y pausar |
+| GET · PUT | `/api/plataforma/pagos/pasarelas` · `/pasarelas/{proveedor}` | Superadmin: cuentas de la plataforma |
+| GET · PUT | `/api/plataforma/pagos/empresas/{uuid}` | Superadmin: modalidad, pasarela, comisión y llaves de una empresa |
+| GET · POST | `/api/plataforma/pagos/transacciones` · `/transacciones/liquidar` | Superadmin: pagos y liquidaciones |
+
 ---
+
+### Planes y correo de bienvenida
+
+- **Planes:** en **Superadmin → Planes** defines cuánto cuesta cada plan por mes y por año, y qué módulos incluye (vienen Básico, Pro y Empresarial con precios de partida que puedes cambiar). Al crear una empresa eliges el plan y si paga **mensual o anual**; la empresa queda con el precio con que se contrató. API: `GET/POST /api/plataforma/planes`, `PUT /api/plataforma/planes/{codigo}`.
+- **Correo de bienvenida:** al crear una empresa, si tiene correo, se le envían la dirección de su tienda y su portal, el usuario y la clave del administrador y su plan. Las credenciales del correo remitente se ingresan en **Superadmin → Correo de envío** (servidor, puerto, seguridad, usuario, contraseña, remitente y dirección pública). La contraseña se guarda **cifrada** (AES‑256‑GCM con `LEINEI_LLAVE_MAESTRA`) y nunca se vuelve a mostrar; si dejas el campo vacío al guardar, se conserva la actual. El botón **Enviar prueba** manda un correo de ensayo para confirmar que funciona. En Gmail usa una «contraseña de aplicación». API: `GET/PUT /api/plataforma/correo`, `POST /api/plataforma/correo/prueba`.
+  Como respaldo, si el panel no está configurado se usan las variables de entorno `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM` y `PUBLIC_URL`. Sin ninguna de las dos, no se envía nada.
+
+- **Banners:** en el portal, Banners (módulo de promociones) la administradora crea las láminas del carrusel de la portada: título, texto, botón, color o foto, orden y visible/oculto, con vista previa. La tienda las muestra en un slider que avanza solo, con flechas, puntos y deslizar con el dedo. La plataforma es solo modo claro.
+- **Menú de la tienda:** buscador, círculos de categoría con foto que siguen el scroll, promociones en carrusel, tarjetas con foto y botón «+» flotante (o cantidad), y barra de carrito siempre visible.
+- **Diseño y animaciones:** los paneles usan un marco con menú lateral y barra superior que llena todo el ancho y se adapta a celular (menú tipo cajón). Las animaciones usan GSAP (`npm install` lo instala) y se desactivan solas si el sistema pide «reducir movimiento». La tienda de cada empresa abre con una portada tipo landing (estado, tiempo de entrega, fotos de sus productos y «cómo pedir») con los colores de la empresa, y `/` es la landing de la plataforma.
+- **Direcciones por correo:** el correo de bienvenida lleva dos direcciones bien separadas: la de los clientes (para publicar; con dominio propio es `https://su-dominio`) y la de ingreso al portal (`…/admin/entrar`, con usuario y clave). Si el dominio se asigna o cambia después, se avisa con un correo aparte. La página `/` solo pide el identificador y ofrece «Ver la tienda» o «Entrar a mi portal»./
+- **Módulos por plan:** al elegir un plan, sus módulos se marcan solos; la lista se puede filtrar por «Del plan» y «Extras», y «Restablecer al plan» devuelve la selección original. Cambiar el plan de una empresa existente ajusta la lista y se aplica con «Guardar módulos».
+- **Categorías iniciales:** toda empresa nueva trae Hamburguesas, Salchipapas, Perros calientes, Pizzas, Pollo y alitas, Combos, Acompañantes, Bebidas y Postres (las edita, oculta o borra desde su portal).
+- **Valor del domicilio:** cada empresa lo cambia desde su portal (Mi tienda → Entrega), con un valor general y, si quiere, un valor distinto por zona.
+
+### Productos precargados (biblioteca)
+
+El superadmin tiene una biblioteca de **68 productos listos** (salchipapas, hamburguesas, perros calientes, pizzas de 10 sabores con tamaños y borde, pollo y alitas, combos, acompañantes, bebidas y postres), con precio, foto, adiciones y etiquetas. En **Productos precargados** se filtra por categoría, etiqueta (picante, vegetariano, para compartir…), precio máximo y texto; se marcan los que se quieren y se asignan a una empresa. Cada empresa recibe **su propia copia** (con su categoría y su imagen) y la edita desde su portal; repetir la asignación no duplica nada. Se puede subir o bajar todos los precios con un porcentaje.
+
+- Datos: `backend/src/main/resources/catalogo-base/` (`catalogo.txt` + `img/*.png`). Se regeneran con `python3 herramientas/generar-biblioteca.py`.
+- API: `GET /api/plataforma/biblioteca` · `POST /api/plataforma/empresas/{uuid}/biblioteca` `{slugs, ajustePorcentaje}`.
+- Las imágenes son ilustraciones propias; cada empresa puede reemplazarlas por fotos reales.
 
 ## 3. Correrlo en tu computador
 
