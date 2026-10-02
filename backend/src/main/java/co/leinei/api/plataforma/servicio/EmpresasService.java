@@ -1,5 +1,6 @@
 package co.leinei.api.plataforma.servicio;
 
+import co.leinei.api.tiemporeal.TiempoReal;
 import co.leinei.api.empresa.EmpresaActual;
 import co.leinei.api.empresa.EmpresaContexto;
 import co.leinei.api.empresa.EnrutadorDataSource;
@@ -36,10 +37,17 @@ public class EmpresasService {
     private final MarcaService marca;
     private final AuthService authEmpresa;
     private final TransactionTemplate txEmpresa;
+    private final TiempoReal tiempoReal;
+    private final BibliotecaService biblioteca;
+    private final PlanesService planes;
 
     public EmpresasService(@Qualifier("controlJdbc") JdbcClient control, PasswordEncoder encoder, RegistroEmpresas registro,
                            EnrutadorDataSource enrutador, MarcaService marca, AuthService authEmpresa,
-                           PlatformTransactionManager transactionManager) {
+                           PlatformTransactionManager transactionManager, TiempoReal tiempoReal, BibliotecaService biblioteca,
+                           PlanesService planes) {
+        this.planes = planes;
+        this.tiempoReal = tiempoReal;
+        this.biblioteca = biblioteca;
         this.control = control;
         this.encoder = encoder;
         this.registro = registro;
@@ -47,6 +55,14 @@ public class EmpresasService {
         this.marca = marca;
         this.authEmpresa = authEmpresa;
         this.txEmpresa = new TransactionTemplate(transactionManager);
+    }
+
+    /** Avisa al superadmin conectado y, si cambió la marca o los módulos, a la tienda y al portal de la empresa. */
+    private PlataformaDto.EmpresaDetalle avisar(long id, PlataformaDto.EmpresaDetalle d) {
+        tiempoReal.publicar("empresa", java.util.Map.of("uuid", d.uuid().toString(), "estado", d.estado()),
+                TiempoReal.PLATAFORMA);
+        tiempoReal.publicar("catalogo", java.util.Map.of(), TiempoReal.tienda(id), TiempoReal.admin(id));
+        return d;
     }
 
     // ------------------------------------------------------------------ consultas
@@ -76,13 +92,13 @@ public class EmpresasService {
         return control.sql("""
                         SELECT e.id, e.uuid, e.identificador, m.nombre_comercial, e.razon_social, e.estado, e.plan,
                                m.color_primario, m.color_secundario, (m.logo_datos IS NOT NULL), m.logo_version,
-                               m.dominio_propio, e.creado_en
+                               m.dominio_propio, e.creado_en, e.ciclo_facturacion, e.precio_plan
                         FROM plataforma.tbl_empresas e JOIN plataforma.tbl_empresas_marca m ON m.empresa_id = e.id
                         ORDER BY e.creado_en DESC""")
                 .query((rs, n) -> new PlataformaDto.EmpresaResumen(rs.getObject(2, UUID.class), rs.getString(3),
                         rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8),
                         rs.getString(9), logoUrl(rs.getString(3), rs.getBoolean(10), rs.getInt(11)), rs.getString(12),
-                        modulosDe(rs.getLong(1)), rs.getTimestamp(13).toInstant()))
+                        modulosDe(rs.getLong(1)), rs.getTimestamp(13).toInstant(), rs.getString(14), rs.getInt(15)))
                 .list();
     }
 
@@ -112,7 +128,8 @@ public class EmpresasService {
         return control.sql("""
                         SELECT e.uuid, e.identificador, e.razon_social, e.nit, e.responsable_nombre, e.responsable_correo,
                                e.responsable_celular, e.plan, e.estado, e.notas, e.creado_en, m.nombre_comercial,
-                               m.color_primario, m.color_secundario, (m.logo_datos IS NOT NULL), m.logo_version, m.dominio_propio
+                               m.color_primario, m.color_secundario, (m.logo_datos IS NOT NULL), m.logo_version, m.dominio_propio,
+                               e.ciclo_facturacion, e.precio_plan
                         FROM plataforma.tbl_empresas e JOIN plataforma.tbl_empresas_marca m ON m.empresa_id = e.id
                         WHERE e.id = ?""")
                 .param(id)
@@ -121,7 +138,7 @@ public class EmpresasService {
                         rs.getString(8), rs.getString(9), rs.getString(10), rs.getTimestamp(11).toInstant(),
                         rs.getString(12), rs.getString(13), rs.getString(14),
                         logoUrl(rs.getString(2), rs.getBoolean(15), rs.getInt(16)), rs.getString(17),
-                        modulosDe(id), conexion, versiones, aprov))
+                        modulosDe(id), conexion, versiones, aprov, rs.getString(18), rs.getInt(19)))
                 .single();
     }
 
@@ -140,6 +157,7 @@ public class EmpresasService {
         String dominio = dominioLimpio(r.dominioPropio());
         validarDominio(dominio, null);
         Set<String> modulos = validarModulos(r.modulos());
+        PlataformaDto.Plan plan = planes.activo(r.plan());
         if (!r.tieneDomicilio() && !r.tieneRecogida()) {
             throw ReglaNegocioException.invalido("Activa al menos una forma de entrega: domicilio o recoger en el local.");
         }
@@ -147,10 +165,11 @@ public class EmpresasService {
 
         long id = control.sql("""
                         INSERT INTO plataforma.tbl_empresas (identificador, razon_social, nit, responsable_nombre,
-                            responsable_correo, responsable_celular, plan, notas)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""")
+                            responsable_correo, responsable_celular, plan, ciclo_facturacion, precio_plan, notas)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""")
                 .params(identificador, r.razonSocial().trim(), limpio(r.nit()), r.responsableNombre().trim(),
-                        limpio(r.responsableCorreo()), limpio(r.responsableCelular()), planDe(r.plan()), limpio(r.notas()))
+                        limpio(r.responsableCorreo()), limpio(r.responsableCelular()), plan.codigo(), r.cicloFacturacion(),
+                        PlanesService.precio(plan, r.cicloFacturacion()), limpio(r.notas()))
                 .query(Long.class).single();
         control.sql("""
                         INSERT INTO plataforma.tbl_empresas_marca (empresa_id, nombre_comercial, color_primario, color_secundario, dominio_propio)
@@ -171,7 +190,7 @@ public class EmpresasService {
                         limpio(r.direccion()), r.tieneDomicilio(), r.tieneRecogida(), r.domicilioValor(),
                         String.join(",", modulos))
                 .update();
-        return detalle(uuidDe(id));
+        return avisar(id, detalle(uuidDe(id)));
     }
 
     @Transactional("controlTx")
@@ -179,13 +198,16 @@ public class EmpresasService {
         long id = idDe(uuid);
         String dominio = dominioLimpio(r.dominioPropio());
         validarDominio(dominio, id);
+        PlataformaDto.Plan plan = planes.buscar(r.plan());
         auditarComo(superadmin);
         control.sql("""
                         UPDATE plataforma.tbl_empresas SET razon_social = ?, nit = ?, responsable_nombre = ?,
-                            responsable_correo = ?, responsable_celular = ?, plan = ?, notas = ?, actualizado_en = now()
+                            responsable_correo = ?, responsable_celular = ?, plan = ?, ciclo_facturacion = ?, precio_plan = ?,
+                            notas = ?, actualizado_en = now()
                         WHERE id = ?""")
                 .params(r.razonSocial().trim(), limpio(r.nit()), r.responsableNombre().trim(), limpio(r.responsableCorreo()),
-                        limpio(r.responsableCelular()), planDe(r.plan()), limpio(r.notas()), id)
+                        limpio(r.responsableCelular()), plan.codigo(), r.cicloFacturacion(),
+                        PlanesService.precio(plan, r.cicloFacturacion()), limpio(r.notas()), id)
                 .update();
         MarcaService.validar(r.nombreComercial(), r.colorPrimario(), r.colorSecundario());
         control.sql("""
@@ -196,19 +218,19 @@ public class EmpresasService {
                         r.colorSecundario().toUpperCase(Locale.ROOT), dominio, id)
                 .update();
         registro.invalidar(identificadorDe(id));
-        return detalle(uuid);
+        return avisar(id, detalle(uuid));
     }
 
     public PlataformaDto.EmpresaDetalle subirLogo(UUID uuid, byte[] datos) {
         long id = idDe(uuid);
         marca.guardarLogo(id, identificadorDe(id), datos);
-        return detalle(uuid);
+        return avisar(id, detalle(uuid));
     }
 
     public PlataformaDto.EmpresaDetalle quitarLogo(UUID uuid) {
         long id = idDe(uuid);
         marca.quitarLogo(id, identificadorDe(id));
-        return detalle(uuid);
+        return avisar(id, detalle(uuid));
     }
 
     /** Activa o desactiva módulos. No toca la base de la empresa: las tablas ya existen; es solo el permiso. */
@@ -226,7 +248,7 @@ public class EmpresasService {
                 .params(id, String.join(",", activos))
                 .update();
         registro.invalidar(identificadorDe(id));
-        return detalle(uuid);
+        return avisar(id, detalle(uuid));
     }
 
     @Transactional("controlTx")
@@ -240,7 +262,7 @@ public class EmpresasService {
                 .params(activar ? "activa" : "suspendida", id).update();
         if (!activar) enrutador.cerrar(id);
         registro.invalidar(identificadorDe(id));
-        return detalle(uuid);
+        return avisar(id, detalle(uuid));
     }
 
     /** Vuelve a poner en cola un aprovisionamiento que falló (o que quedó a medias). */
@@ -260,7 +282,7 @@ public class EmpresasService {
         control.sql("UPDATE plataforma.tbl_empresas SET estado = 'pendiente_aprovisionamiento', actualizado_en = now() WHERE id = ?")
                 .param(id).update();
         registro.invalidar(identificadorDe(id));
-        return detalle(uuid);
+        return avisar(id, detalle(uuid));
     }
 
     /** Le asigna una clave nueva a un administrador de la empresa, escribiendo en la base de ESA empresa. */
@@ -272,6 +294,17 @@ public class EmpresasService {
             authEmpresa.restablecerClave(usuario, nueva);
             return null;
         }));
+    }
+
+    /** Copia productos de la biblioteca precargada al catálogo de ESA empresa (su propia base). */
+    public BibliotecaService.Resultado importarBiblioteca(UUID uuid, List<String> slugs, int ajustePorcentaje, String superadmin) {
+        long id = idDe(uuid);
+        EmpresaActual empresa = registro.porId(id).orElseThrow();
+        if (!empresa.activa()) throw ReglaNegocioException.conflicto("La empresa debe estar activa para cargarle productos.");
+        BibliotecaService.Resultado r = EmpresaContexto.conEmpresa(empresa, "superadmin:" + superadmin,
+                () -> txEmpresa.execute(t -> biblioteca.aplicar(slugs, ajustePorcentaje)));
+        tiempoReal.publicar("catalogo", java.util.Map.of(), TiempoReal.tienda(id), TiempoReal.admin(id));
+        return r;
     }
 
     // ------------------------------------------------------------------ apoyo
@@ -339,9 +372,6 @@ public class EmpresasService {
         return d.trim().toLowerCase(Locale.ROOT).replaceFirst("^https?://", "").replaceAll("/+$", "");
     }
 
-    private static String planDe(String plan) {
-        return plan == null || plan.isBlank() ? "basico" : plan.trim();
-    }
 
     private static String limpio(String s) {
         return s == null ? "" : s.trim();

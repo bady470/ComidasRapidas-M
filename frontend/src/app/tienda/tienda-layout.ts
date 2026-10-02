@@ -1,14 +1,17 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter, map } from 'rxjs';
+import { CarritoFlotante } from '../compartido/carrito-flotante';
 import { Logo } from '../compartido/logo';
 import { Carrito } from '../core/carrito';
 import { EmpresaActual } from '../core/empresa';
 import { EstadoTienda } from '../core/estado-tienda';
-import { CelularPipe } from '../core/formato';
+import { CelularPipe, soloHora } from '../core/formato';
 
 @Component({
   selector: 'app-tienda-layout',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, CelularPipe, Logo],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, CelularPipe, Logo, CarritoFlotante],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="top">
@@ -25,7 +28,22 @@ import { CelularPipe } from '../core/formato';
       </div>
     </header>
 
+    @if (tienda(); as t) {
+      @let s = t.saturacion;
+      @if (s.pedidosPausadosHasta || s.domiciliosPausadosHasta || s.minutosExtra) {
+        <div class="aviso-demanda" role="status"><div class="wrap">
+          <span aria-hidden="true">🔥</span>
+          @if (s.pedidosPausadosHasta) { Estamos a tope de pedidos. Volvemos a recibir a las {{ hora(s.pedidosPausadosHasta) }}. }
+          @else if (s.domiciliosPausadosHasta) { Pausamos los domicilios hasta las {{ hora(s.domiciliosPausadosHasta) }}.{{ t.recogerActivo ? ' Puedes pedir para recoger en el local.' : '' }} }
+          @else { Hay mucha demanda: tu pedido puede tardar {{ t.tiempoMin }}–{{ t.tiempoMax }} minutos. }
+        </div></div>
+      }
+    }
+
     <router-outlet />
+
+    <!-- Carrito flotante: siempre en el menú; en las demás páginas, solo si hay algo. Nunca en la página del carrito. -->
+    <app-carrito-flotante [visible]="!enCarrito() && (enMenu() || carrito.totalUnidades() > 0)" />
 
     @if (tienda(); as t) {
       <footer class="site">
@@ -47,6 +65,15 @@ export class TiendaLayout implements OnInit {
   protected carrito = inject(Carrito);
   protected emp = inject(EmpresaActual);
   protected tienda = computed(() => this.estado.catalogo()?.tienda ?? null);
+
+  private router = inject(Router);
+  private ruta = toSignal(this.router.events.pipe(filter((e) => e instanceof NavigationEnd), map(() => this.router.url)),
+    { initialValue: this.router.url });
+  private camino = computed(() => this.ruta().split(/[?#]/)[0]!.replace(/\/+$/, ''));
+  protected enCarrito = computed(() => this.camino().endsWith('/carrito'));
+  protected enMenu = computed(() => this.camino() === this.emp.url().replace(/\/+$/, ''));
+
+  protected hora(iso: string): string { return soloHora(iso); }
 
   ngOnInit(): void {
     this.estado.asegurar();

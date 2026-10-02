@@ -1,0 +1,43 @@
+databaseChangeLog:
+  - changeSet:
+      id: control-006-planes
+      author: leinei
+      comment: Planes comerciales (precio mensual y anual, módulos que incluyen) y plan/ciclo/precio contratado por cada empresa.
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE plataforma.tbl_planes (
+                  id             BIGSERIAL PRIMARY KEY,
+                  uuid           UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  codigo         VARCHAR(30)  NOT NULL UNIQUE CHECK (codigo ~ '^[a-z0-9_-]{2,30}$'),
+                  nombre         VARCHAR(60)  NOT NULL,
+                  descripcion    VARCHAR(200) NOT NULL DEFAULT '',
+                  precio_mensual INTEGER      NOT NULL DEFAULT 0 CHECK (precio_mensual >= 0),
+                  precio_anual   INTEGER      NOT NULL DEFAULT 0 CHECK (precio_anual >= 0),
+                  -- Códigos de módulo separados por coma (los módulos base siempre se incluyen).
+                  modulos        VARCHAR(400) NOT NULL DEFAULT '',
+                  es_activo      BOOLEAN      NOT NULL DEFAULT TRUE,
+                  orden          INTEGER      NOT NULL DEFAULT 0,
+                  creado_en      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+                  actualizado_en TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+              -- Precios de partida (en pesos). Se cambian desde el panel: Superadmin → Planes.
+              INSERT INTO plataforma.tbl_planes (codigo, nombre, descripcion, precio_mensual, precio_anual, modulos, orden) VALUES
+                ('basico',      'Básico',      'Tienda, pedidos y seguimiento para empezar.',                         39900,  399000, 'tienda,opciones', 1),
+                ('pro',         'Pro',         'Suma promociones, zonas de domicilio y pedidos por WhatsApp.',        79900,  799000, 'tienda,opciones,promociones,zonas,pedido_manual', 2),
+                ('empresarial', 'Empresarial', 'Todo incluido, con reportes de ventas y ganancia.',                  149900, 1499000, 'tienda,opciones,promociones,zonas,reportes,pedido_manual', 3);
+
+              ALTER TABLE plataforma.tbl_empresas ADD COLUMN ciclo_facturacion VARCHAR(10) NOT NULL DEFAULT 'MENSUAL'
+                  CHECK (ciclo_facturacion IN ('MENSUAL', 'ANUAL'));
+              ALTER TABLE plataforma.tbl_empresas ADD COLUMN precio_plan INTEGER NOT NULL DEFAULT 0 CHECK (precio_plan >= 0);
+              -- Empresas anteriores: cualquier plan escrito a mano pasa a «basico» y toma su precio mensual.
+              UPDATE plataforma.tbl_empresas SET plan = 'basico'
+                  WHERE plan NOT IN (SELECT codigo FROM plataforma.tbl_planes);
+              UPDATE plataforma.tbl_empresas e SET precio_plan = p.precio_mensual
+                  FROM plataforma.tbl_planes p WHERE p.codigo = e.plan;
+      rollback:
+        - sql:
+            sql: |
+              ALTER TABLE plataforma.tbl_empresas DROP COLUMN precio_plan;
+              ALTER TABLE plataforma.tbl_empresas DROP COLUMN ciclo_facturacion;
+              DROP TABLE plataforma.tbl_planes;

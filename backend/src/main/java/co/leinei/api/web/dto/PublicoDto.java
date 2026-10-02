@@ -34,7 +34,19 @@ public final class PublicoDto {
             boolean domicilioActivo, int domicilioValor, List<Zona> zonas, boolean recogerActivo,
             boolean efectivo, List<Cuenta> cuentas,
             // Módulos activos del plan de la empresa
-            List<String> modulos) {}
+            List<String> modulos,
+            // Pago en línea con pasarela (null si la tienda no lo ofrece ahora).
+            co.leinei.api.pagos.PagosDto.PagoPublico pagoEnLinea,
+            // Modo «estamos llenos» vigente (los tiempos y el domicilio de arriba ya lo tienen en cuenta).
+            Saturacion saturacion,
+            // Cómo se cobra el domicilio (valor fijo, por zona o por distancia en el mapa).
+            MapaDto.EntregaPublica entrega) {}
+
+    /**
+     * minutosExtra: cuánto se sumó al tiempo de entrega (0 = normal), hasta demoraHasta.
+     * domiciliosPausadosHasta / pedidosPausadosHasta: hasta cuándo (null = no hay pausa).
+     */
+    public record Saturacion(int minutosExtra, Instant demoraHasta, Instant domiciliosPausadosHasta, Instant pedidosPausadosHasta) {}
 
     public record Categoria(Long id, String nombre) {}
 
@@ -62,8 +74,9 @@ public final class PublicoDto {
         }
     }
 
+    /** lat/lng: punto de entrega en el mapa (domicilio por distancia). */
     public record CotizarRequest(@NotEmpty(message = "Agrega al menos un producto") List<@Valid ItemPedido> items,
-                                 TipoEntrega tipoEntrega, Long zonaId) {}
+                                 TipoEntrega tipoEntrega, Long zonaId, Double lat, Double lng) {}
 
     public record CrearPedidoRequest(
             @NotEmpty(message = "Agrega al menos un producto") List<@Valid ItemPedido> items,
@@ -77,7 +90,9 @@ public final class PublicoDto {
             @Size(max = 60) String franja,
             @NotNull(message = "Escoge cómo vas a pagar") MetodoPago metodoPago,
             Long cuentaId,
-            @Size(max = 300) String notas) {}
+            @Size(max = 300) String notas,
+            @DecimalMin("-90") @DecimalMax("90") Double lat,
+            @DecimalMin("-180") @DecimalMax("180") Double lng) {}
 
     public record PedidoCreado(String codigo, LocalDate fechaEntrega, String franja, TipoEntrega tipoEntrega,
                                ModoPedido modoPedido, int tiempoMin, int tiempoMax, int total, MetodoPago metodoPago,
@@ -94,5 +109,13 @@ public final class PublicoDto {
                               List<ItemSeguimiento> items, int subtotal, int descuento, String promocion,
                               int domicilio, int total, MetodoPago metodoPago, String cuentaEntidad,
                               String cuentaTitular, String cuentaNumero, List<Evento> eventos, Instant creado,
-                              String direccionTienda) {}
+                              String direccionTienda,
+                              // Pago por transferencia: si ya adjuntó comprobante y cuándo.
+                              boolean tieneComprobante, Instant pagoReportado,
+                              // Quién lleva el pedido (solo nombre y celular del domiciliario).
+                              String domiciliarioNombre, String domiciliarioCelular,
+                              // Último intento de pago en línea (null si nunca intentó pagar en línea).
+                              co.leinei.api.pagos.PagosDto.EstadoPublico pagoEnLinea,
+                              // Mapa del pedido (null si la empresa no tiene mapas).
+                              MapaDto.MapaSeguimiento mapa) {}
 }

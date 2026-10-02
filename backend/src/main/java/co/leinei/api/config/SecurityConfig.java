@@ -2,6 +2,7 @@ package co.leinei.api.config;
 
 import co.leinei.api.plataforma.servicio.SuperadminAuthService;
 import co.leinei.api.servicio.AuthService;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -11,6 +12,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -28,6 +31,15 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * Los usuarios se validan con tokens propios (TokenAuthFilter), no con usuario/clave de Spring.
+     * Este bean vacío evita que Spring Boot cree un usuario "user" con clave aleatoria en el log.
+     */
+    @Bean
+    public UserDetailsService sinUsuariosSpring() {
+        return new InMemoryUserDetailsManager();
+    }
+
     @Bean
     public SecurityFilterChain cadena(HttpSecurity http, AuthService auth, SuperadminAuthService superadmins) throws Exception {
         http
@@ -38,6 +50,8 @@ public class SecurityConfig {
             .logout(l -> l.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
+                // Las conexiones de tiempo real (SSE) terminan en un despacho asíncrono: ya se autorizaron al abrirse.
+                .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // Tienda de cada empresa: pública.
                 .requestMatchers("/api/t/*/public/**").permitAll()

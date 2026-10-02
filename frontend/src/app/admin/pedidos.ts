@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SelectorProducto, Seleccion } from '../compartido/selector-producto';
 import { AdminApi, mensajeError } from '../core/api';
@@ -6,9 +6,12 @@ import { Avisos } from '../core/avisos';
 import { claveLinea } from '../core/carrito';
 import { EstadoTienda } from '../core/estado-tienda';
 import { CelularPipe, DiaCortoPipe, DineroPipe, HoraPipe, dinero, linkWhatsapp } from '../core/formato';
-import { ACCION_HACIA, EstadoPedido, MODULOS, MetodoPago, NOMBRE_ESTADO, PedidoAdmin, Producto, TipoEntrega } from '../core/modelos';
+import { ACCION_HACIA, Domiciliario, EstadoPago, EstadoPedido, MODULOS, MetodoPago, NOMBRE_ESTADO, NOMBRE_PAGO, PedidoAdmin, Producto, TipoEntrega } from '../core/modelos';
+import { ImpresionCocina } from '../core/impresion-cocina';
+import { EmpresaActual } from '../core/empresa';
+import { AvisosPortal } from '../core/avisos-portal';
 
-type Filtro = 'ACTIVOS' | 'TODOS' | EstadoPedido;
+type Filtro = 'ACTIVOS' | 'POR_PAGAR' | 'TODOS' | EstadoPedido;
 
 interface LineaManual { clave: string; producto: Producto; opcionIds: number[]; detalle: string; cantidad: number; }
 
@@ -30,7 +33,7 @@ interface LineaManual { clave: string; producto: Producto; opcionIds: number[]; 
     <div class="toolbar">
       <div class="seg">
         @for (s of segmentos; track s.k) {
-          <button [attr.aria-pressed]="filtro() === s.k" (click)="filtro.set(s.k)">
+          <button [attr.aria-pressed]="filtro() === s.k" (click)="elegir(s.k)">
             {{ s.t }} @if (conteo()[s.k]) { <span class="num">{{ conteo()[s.k] }}</span> }
           </button>
         }
@@ -113,67 +116,139 @@ interface LineaManual { clave: string; producto: Producto; opcionIds: number[]; 
     }
 
     @if (error()) { <div class="alerta mala" style="margin-bottom:12px">{{ error() }}</div> }
+    @if (filtro() === 'POR_PAGAR') {
+      <p class="muted" style="margin:-4px 0 12px">Todos los pedidos sin pagar de cualquier día (menos los cancelados). Se quedan aquí hasta que marques el pago.</p>
+    }
 
-    <div class="aorders">
-      @for (p of visibles(); track p.id) {
-        <article class="aorder e-{{ p.estado }}">
-          <div class="hd">
-            <div class="stack" style="gap:2px">
-              <b style="font-size:16px">{{ p.clienteNombre }} · <span class="num">{{ p.codigo }}</span></b>
-              @if (p.tipoEntrega === 'DOMICILIO') {
-                <span class="meta">{{ p.direccion }}{{ (p.zona || p.barrio) ? ', ' + (p.zona || p.barrio) : '' }}{{ p.referencia ? ' · ' + p.referencia : '' }}</span>
-              } @else {
-                <span class="meta"><b>Recoge en el local</b></span>
-              }
-              <span class="meta num">{{ p.clienteCelular | celular }} · {{ p.fechaEntrega | diaCorto }}{{ p.franja ? ' · ' + p.franja : '' }}
-                · pedido {{ p.creado | hora }}{{ p.origen === 'WHATSAPP' ? ' · por WhatsApp' : '' }}</span>
-            </div>
-            <div class="stack" style="gap:6px;justify-items:end">
-              <b class="price num" style="font-size:20px">{{ p.total | dinero }}</b>
-              <span class="st st-{{ p.estado }}">{{ nombre(p.estado) }}</span>
-            </div>
-          </div>
-          <div class="stack" style="gap:4px">
-            @for (i of p.items; track $index) {
-              <div class="meta"><b>{{ i.cantidad }} x {{ i.nombre }}</b>{{ i.detalle ? ' — ' + i.detalle : '' }}</div>
+    <div class="panel tablewrap tabla-datos" style="padding:0">
+      <table class="tabla-pedidos">
+        <thead>
+          <tr><th>Pedido</th><th>Cliente</th><th>Entrega</th><th class="r">Total</th><th>Pago</th><th>Estado</th><th class="r">Acción</th></tr>
+        </thead>
+        @for (p of visibles(); track p.id) {
+          <tbody class="pgrupo e-{{ p.estado }}" [class.recien]="recientes().has(p.id)" [class.abierto]="abierto(p)">
+            <tr class="fila" (click)="alternar(p.id)">
+              <td>
+                <button class="desplegar" type="button" [attr.aria-expanded]="abierto(p)" [attr.aria-label]="'Ver detalle del pedido ' + p.codigo" (click)="alternar(p.id); $event.stopPropagation()">{{ abierto(p) ? '▾' : '▸' }}</button>
+                <b class="num">{{ p.codigo }}</b>
+                <div class="muted">{{ p.creado | hora }}{{ p.origen === 'WHATSAPP' ? ' · WhatsApp' : '' }}</div>
+              </td>
+              <td><b>{{ p.clienteNombre }}</b><div class="muted num">{{ p.clienteCelular | celular }}</div></td>
+              <td>
+                @if (p.tipoEntrega === 'DOMICILIO') {
+                  <div>Domicilio · {{ p.zona || p.barrio || 'sin zona' }}</div>
+                } @else { <div>Recoge en el local</div> }
+                <div class="muted">{{ p.fechaEntrega | diaCorto }}{{ p.franja ? ' · ' + p.franja : '' }}</div>
+              </td>
+              <td class="r num"><b>{{ p.total | dinero }}</b><div class="muted">{{ p.items.length }} {{ p.items.length === 1 ? 'producto' : 'productos' }}</div></td>
+              <td>
+                <span class="st pay-{{ p.estadoPago }}">{{ nombrePago(p.estadoPago) }}</span>
+                <div class="muted">{{ medioCorto(p) }}</div>
+              </td>
+              <td>
+                <span class="st st-{{ p.estado }}">{{ nombre(p.estado) }}</span>
+                @if (p.domiciliarioNombre) { <div class="muted">{{ p.domiciliarioNombre }}</div> }
+              </td>
+              <td class="r">
+                @if (siguiente(p); as s) { <button class="btn main" (click)="estado(p, s); $event.stopPropagation()">{{ accion(s) }}</button> }
+                @else if (p.estadoPago === 'POR_CONFIRMAR') { <button class="btn okb" (click)="pago(p, 'RECIBIDO'); $event.stopPropagation()">Confirmar pago</button> }
+              </td>
+            </tr>
+            @if (abierto(p)) {
+              <tr class="detalle">
+                <td colspan="7">
+                  <div class="detalle-grid">
+                    <section>
+                      <h4>Productos</h4>
+                      @for (i of p.items; track $index) {
+                        <div class="linea-detalle"><span><b>{{ i.cantidad }} ×</b> {{ i.nombre }}@if (i.detalle) { <span class="muted"> — {{ i.detalle }}</span> }</span></div>
+                      }
+                      @if (p.promocion) { <div class="linea-detalle"><span class="chip hot">{{ p.promocion }} −{{ p.descuento | dinero }}</span></div> }
+                      @if (p.notas) { <p class="meta" style="margin-top:8px"><b>Nota:</b> {{ p.notas }}</p> }
+                    </section>
+                    <section>
+                      <h4>Entrega</h4>
+                      @if (p.tipoEntrega === 'DOMICILIO') {
+                        <p>{{ p.direccion }}{{ (p.zona || p.barrio) ? ', ' + (p.zona || p.barrio) : '' }}</p>
+                        @if (p.referencia) { <p class="muted">{{ p.referencia }}</p> }
+                        @if (p.entregaLat != null) {
+                          <p><a class="linkbtn" [href]="mapaPedido(p)" target="_blank" rel="noopener">📍 Ver en el mapa{{ p.distanciaKm != null ? ' · a ' + km(p.distanciaKm) + ' km' : '' }}</a></p>
+                        }
+                        @if (p.estado !== 'CANCELADO') {
+                          <div class="row" style="margin-top:8px">
+                            <label class="meta" [for]="'dom' + p.id"><b>Domiciliario</b></label>
+                            <select [id]="'dom' + p.id" style="width:auto" [ngModel]="p.domiciliarioId" (ngModelChange)="asignar(p, $event)">
+                              <option [ngValue]="null">Sin asignar</option>
+                              @for (d of domiciliariosPara(p); track d.id) { <option [ngValue]="d.id">{{ d.nombre }}{{ d.activo ? '' : ' (inactivo)' }}</option> }
+                            </select>
+                            @if (p.domiciliarioCelular) { <a class="btn" [href]="waDomiciliario(p)" target="_blank" rel="noopener">Enviar a {{ p.domiciliarioNombre }}</a> }
+                            @if (!domiciliarios().length) { <span class="meta">Agrégalos en «Domiciliarios».</span> }
+                          </div>
+                        }
+                      } @else { <p>El cliente recoge en el local.</p> }
+                    </section>
+                    <section>
+                      <h4>Pago</h4>
+                      <p>{{ medioLargo(p) }}</p>
+                      <div class="row" style="margin-top:8px">
+                        @if (p.tieneComprobante) { <button class="btn" (click)="verComprobante(p)">Ver comprobante</button> }
+                        @if (p.estadoPago === 'POR_CONFIRMAR') {
+                          <button class="btn okb" (click)="pago(p, 'RECIBIDO')">Confirmar pago</button>
+                          <button class="btn bad" (click)="pago(p, 'PENDIENTE')">No llegó el pago</button>
+                        } @else if (p.estadoPago === 'PENDIENTE') {
+                          <button class="btn okb" (click)="pago(p, 'RECIBIDO')">{{ p.metodoPago === 'EN_LINEA' ? 'Marcar pagado a mano' : 'Marcar pagado' }}</button>
+                        } @else {
+                          <button class="btn" (click)="pago(p, 'PENDIENTE')">Deshacer pago</button>
+                        }
+                      </div>
+                    </section>
+                  </div>
+                  <div class="row detalle-acciones">
+                    @if (p.clienteCelular) { <a class="btn" [href]="wa(p)" target="_blank" rel="noopener">WhatsApp al cliente</a> }
+                    @if (imp.config().modo !== 'APAGADA' && estadoTienda.tieneModulo(M.cocina)) {
+                      <button class="btn" type="button" (click)="imp.imprimir(p)">🖨 Imprimir comanda{{ imp.yaImpreso(p.id) ? ' (otra vez)' : '' }}</button>
+                    }
+                    @if (p.estado !== 'CANCELADO' && p.estado !== 'ENTREGADO') {
+                      @if (confirmar() === p.id) {
+                        <button class="btn sure" (click)="estado(p, 'CANCELADO')">Sí, cancelar pedido</button>
+                        <button class="btn" (click)="confirmar.set(null)">No</button>
+                      } @else {
+                        <button class="btn bad" (click)="confirmar.set(p.id)">Cancelar pedido</button>
+                      }
+                    }
+                    @if (p.estado === 'CANCELADO') { <button class="btn" (click)="estado(p, 'NUEVO')">Reabrir</button> }
+                  </div>
+                </td>
+              </tr>
             }
-            @if (p.promocion) { <div><span class="chip hot">{{ p.promocion }} −{{ p.descuento | dinero }}</span></div> }
-          </div>
-          @if (p.notas) { <p class="meta">Nota: {{ p.notas }}</p> }
-          <div class="row">
-            <span class="st pay-{{ p.estadoPago }}">{{ p.metodoPago === 'CUENTA' ? p.cuentaEntidad + ' ' + p.cuentaTitular : 'Efectivo' }} · {{ p.estadoPago === 'RECIBIDO' ? 'pagado' : 'sin pagar' }}</span>
-            @if (p.estadoPago === 'PENDIENTE') {
-              <button class="btn okb" (click)="pago(p, 'RECIBIDO')">Marcar pagado</button>
-            } @else {
-              <button class="btn" (click)="pago(p, 'PENDIENTE')">Deshacer pago</button>
-            }
-            @if (siguiente(p); as s) { <button class="btn main" (click)="estado(p, s)">{{ accion(s) }}</button> }
-            @if (p.clienteCelular) { <a class="btn" [href]="wa(p)" target="_blank" rel="noopener">WhatsApp</a> }
-            @if (p.estado !== 'CANCELADO' && p.estado !== 'ENTREGADO') {
-              @if (confirmar() === p.id) {
-                <button class="btn sure" (click)="estado(p, 'CANCELADO')">Sí, cancelar</button>
-                <button class="btn" (click)="confirmar.set(null)">No</button>
-              } @else {
-                <button class="btn bad" (click)="confirmar.set(p.id)">Cancelar</button>
-              }
-            }
-            @if (p.estado === 'CANCELADO') { <button class="btn" (click)="estado(p, 'NUEVO')">Reabrir</button> }
-          </div>
-        </article>
-      } @empty {
-        <div class="empty">{{ cargando() ? 'Cargando pedidos…' : 'No hay pedidos con este filtro.' }}</div>
-      }
+          </tbody>
+        } @empty {
+          <tbody><tr><td colspan="7" class="vacio">{{ cargando() ? 'Cargando pedidos…' : 'No hay pedidos con este filtro.' }}</td></tr></tbody>
+        }
+      </table>
     </div>
   `,
 })
 export class PedidosPage {
   private api = inject(AdminApi);
   protected estadoTienda = inject(EstadoTienda);
+  protected imp = inject(ImpresionCocina);
+  private emp = inject(EmpresaActual);
   protected readonly M = MODULOS;
   private avisos = inject(Avisos);
+  private avisosPortal = inject(AvisosPortal);
+
+  /** Llegan desde un aviso: ?q=P-ABC123&filtro=POR_PAGAR */
+  readonly q = input<string | undefined>();
+  readonly filtroInicial = input<string | undefined>(undefined, { alias: 'filtro' });
+
+  protected domiciliarios = signal<Domiciliario[]>([]);
+  /** Pedidos que acaban de cambiar (se resaltan unos segundos). */
+  protected recientes = signal<ReadonlySet<number>>(new Set());
+  private esperaRecarga: ReturnType<typeof setTimeout> | undefined;
 
   protected segmentos: { k: Filtro; t: string }[] = [
-    { k: 'ACTIVOS', t: 'Activos' }, { k: 'NUEVO', t: 'Nuevos' }, { k: 'CONFIRMADO', t: 'Confirmados' },
+    { k: 'ACTIVOS', t: 'Activos' }, { k: 'POR_PAGAR', t: 'Por pagar' }, { k: 'NUEVO', t: 'Nuevos' }, { k: 'CONFIRMADO', t: 'Confirmados' },
     { k: 'PREPARANDO', t: 'Preparando' }, { k: 'EN_CAMINO', t: 'En camino' }, { k: 'LISTO', t: 'Para recoger' },
     { k: 'ENTREGADO', t: 'Entregados' }, { k: 'CANCELADO', t: 'Cancelados' }, { k: 'TODOS', t: 'Todos' },
   ];
@@ -188,6 +263,15 @@ export class PedidosPage {
   protected cargando = signal(true);
   protected error = signal('');
   protected confirmar = signal<number | null>(null);
+  private desplegados = signal<ReadonlySet<number>>(new Set());
+
+  /** Un pedido se ve desplegado si se abrió a mano, o si llegó desde un aviso y es el único resultado. */
+  protected abierto(p: PedidoAdmin): boolean {
+    return this.desplegados().has(p.id) || (!!this.q() && this.visibles().length === 1);
+  }
+  protected alternar(id: number): void {
+    this.desplegados.update((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
+  }
 
   protected manualAbierto = signal(false);
   protected errorManual = signal('');
@@ -217,13 +301,15 @@ export class PedidosPage {
       c[p.estado] = (c[p.estado] ?? 0) + 1;
       if (p.estado !== 'ENTREGADO' && p.estado !== 'CANCELADO') c['ACTIVOS'] = (c['ACTIVOS'] ?? 0) + 1;
     }
+    // «Por pagar» cuenta todos los días, no solo el día escogido.
+    c['POR_PAGAR'] = this.avisosPortal.datos()?.porPagar ?? 0;
     return c;
   });
 
   protected visibles = computed(() => {
     const f = this.filtro();
     return this.filtrados().filter((p) =>
-      f === 'TODOS' ? true : f === 'ACTIVOS' ? p.estado !== 'ENTREGADO' && p.estado !== 'CANCELADO' : p.estado === f);
+      f === 'TODOS' || f === 'POR_PAGAR' ? true : f === 'ACTIVOS' ? p.estado !== 'ENTREGADO' && p.estado !== 'CANCELADO' : p.estado === f);
   });
 
   private idsVistos = new Set<number>();
@@ -231,14 +317,39 @@ export class PedidosPage {
 
   constructor() {
     this.api.fechas().subscribe((f) => this.fechasApi.set(f));
-    // Arranca apenas se conoce la tienda y luego revisa pedidos nuevos cada 30 segundos.
+    this.api.domiciliarios().subscribe({ next: (l) => this.domiciliarios.set(l), error: () => {} });
+    // Desde un aviso: busca el pedido y abre el filtro indicado.
+    effect(() => {
+      const q = this.q();
+      const f = this.filtroInicial();
+      untracked(() => {
+        if (q !== undefined) this.busqueda.set(q);
+        if (f && this.segmentos.some((s) => s.k === f) && f !== this.filtro()) this.elegir(f as Filtro);
+      });
+    });
+    // En vivo: cualquier cambio en un pedido (de este u otro administrador, o del cliente) recarga la lista
+    // y resalta el pedido que cambió.
+    effect(() => {
+      const c = this.avisosPortal.cambioPedido();
+      if (!c) return;
+      untracked(() => {
+        if (!this.iniciado) return;
+        clearTimeout(this.esperaRecarga);
+        this.esperaRecarga = setTimeout(() => this.cargar(true), 250);
+        if (c.id) this.resaltar(c.id);
+      });
+    });
+    effect(() => {
+      if (this.avisosPortal.cambioDomiciliarios()) untracked(() => this.api.domiciliarios().subscribe({ next: (l) => this.domiciliarios.set(l), error: () => {} }));
+    });
+    // Arranca apenas se conoce la tienda; los cambios llegan en vivo (y hay una revisión lenta de respaldo).
     effect(() => {
       if (this.tienda() && !this.iniciado) untracked(() => this.iniciar());
     });
     const t = setInterval(() => {
       if (this.iniciado && document.visibilityState === 'visible') this.cargar(true);
-    }, 30_000);
-    inject(DestroyRef).onDestroy(() => clearInterval(t));
+    }, 90_000); // respaldo: los cambios llegan en vivo
+    inject(DestroyRef).onDestroy(() => { clearInterval(t); clearTimeout(this.esperaRecarga); });
   }
 
   /** Arranca cuando ya se conoce la tienda (día de servicio, cuentas, franjas). */
@@ -261,10 +372,10 @@ export class PedidosPage {
 
   private cargar(silencioso = false): void {
     if (!silencioso) this.cargando.set(true);
-    this.api.pedidos({ fecha: this.fecha() || undefined }).subscribe({
+    const porPagar = this.filtro() === 'POR_PAGAR';
+    this.api.pedidos(porPagar ? { porPagar: true } : { fecha: this.fecha() || undefined }).subscribe({
       next: (lista) => {
-        const nuevos = lista.filter((p) => !this.idsVistos.has(p.id));
-        if (silencioso && this.idsVistos.size && nuevos.some((p) => p.estado === 'NUEVO')) this.avisos.mostrar('Llegó un pedido nuevo');
+        // Los avisos de pedidos nuevos y pagos los muestra el portal (ver core/avisos-portal.ts).
         lista.forEach((p) => this.idsVistos.add(p.id));
         this.pedidos.set(lista);
         this.error.set('');
@@ -274,8 +385,87 @@ export class PedidosPage {
     });
   }
 
+  private resaltar(id: number): void {
+    this.recientes.update((s) => new Set([...s, id]));
+    setTimeout(() => this.recientes.update((s) => { const n = new Set(s); n.delete(id); return n; }), 4000);
+  }
+
+  protected elegir(f: Filtro): void {
+    const recargar = (f === 'POR_PAGAR') !== (this.filtro() === 'POR_PAGAR');
+    this.filtro.set(f);
+    if (recargar && this.iniciado) this.cargar();
+  }
+
+  protected nombrePago(e: EstadoPago): string { return NOMBRE_PAGO[e]; }
+
+  /** Activos más el que ya tenga el pedido (aunque lo hayan desactivado). */
+  protected domiciliariosPara(p: PedidoAdmin): Domiciliario[] {
+    return this.domiciliarios().filter((d) => d.activo || d.id === p.domiciliarioId);
+  }
+
+  protected asignar(p: PedidoAdmin, domiciliarioId: number | null): void {
+    this.api.asignarDomiciliario(p.id, domiciliarioId).subscribe({
+      next: (n) => { this.reemplazar(n); this.avisos.mostrar(n.domiciliarioNombre ? `${n.codigo} lo lleva ${n.domiciliarioNombre}` : `${n.codigo} sin domiciliario`); },
+      error: (e) => { this.avisos.mostrar(mensajeError(e)); this.cargar(true); },
+    });
+  }
+
+  /** Mensaje para el domiciliario con lo que necesita para la entrega. */
+  protected waDomiciliario(p: PedidoAdmin): string {
+    const productos = p.items.map((i) => `• ${i.cantidad} x ${i.nombre}${i.detalle ? ' (' + i.detalle + ')' : ''}`).join('\n');
+    const cobro = p.estadoPago === 'RECIBIDO' ? 'Ya está pagado.' : p.metodoPago === 'EFECTIVO'
+      ? `Cobrar en efectivo: ${dinero(p.total)}`
+      : `Pago ${p.metodoPago === 'EN_LINEA' ? 'en línea' : 'por transferencia'} (${NOMBRE_PAGO[p.estadoPago].toLowerCase()}).`;
+    const texto = `Hola ${p.domiciliarioNombre}, te toca el pedido ${p.codigo}:\n${productos}\n`
+      + `Cliente: ${p.clienteNombre}${p.clienteCelular ? ' · ' + p.clienteCelular : ''}\n`
+      + `Dirección: ${p.direccion}${(p.zona || p.barrio) ? ', ' + (p.zona || p.barrio) : ''}${p.referencia ? ' (' + p.referencia + ')' : ''}\n${cobro}`
+      + (p.entregaLat != null ? `\nUbicación: ${this.mapaPedido(p)}` : '')
+      + (this.linkReparto(p) ? `\nTus pedidos y ubicación: ${this.linkReparto(p)}` : '');
+    return linkWhatsapp(p.domiciliarioCelular, texto);
+  }
+
+  /** Google Maps en el punto que marcó el cliente (el domiciliario lo abre con un toque). */
+  protected mapaPedido(p: PedidoAdmin): string {
+    return `https://www.google.com/maps/search/?api=1&query=${p.entregaLat},${p.entregaLng}`;
+  }
+
+  protected km(n: number): string { return n.toLocaleString('es-CO', { maximumFractionDigits: 1 }); }
+
+  /** Link de reparto del domiciliario asignado (si la empresa tiene mapas). */
+  private linkReparto(p: PedidoAdmin): string {
+    if (!this.estadoTienda.tieneModulo(MODULOS.mapas)) return '';
+    const d = this.domiciliarios().find((x) => x.id === p.domiciliarioId);
+    return d?.token ? location.origin + this.emp.url('/reparto/' + d.token) : '';
+  }
+
+  /** Abre el comprobante en otra pestaña (se descarga con el token del portal). */
+  protected verComprobante(p: PedidoAdmin): void {
+    const ventana = window.open('', '_blank');
+    this.api.comprobante(p.id).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        if (ventana) ventana.location.href = url; else window.location.href = url;
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      },
+      error: (e) => { ventana?.close(); this.avisos.mostrar(mensajeError(e)); },
+    });
+  }
+
   private reemplazar(p: PedidoAdmin): void {
     this.pedidos.update((l) => l.map((x) => (x.id === p.id ? p : x)));
+  }
+
+  protected medioCorto(p: PedidoAdmin): string {
+    if (p.metodoPago === 'EN_LINEA') return 'En línea · ' + p.cuentaTitular;
+    return p.metodoPago === 'CUENTA' ? p.cuentaEntidad : 'Efectivo';
+  }
+
+  protected medioLargo(p: PedidoAdmin): string {
+    if (p.metodoPago === 'EN_LINEA') {
+      return `Pago en línea con ${p.cuentaTitular}${p.cuentaNumero ? ' · ' + p.cuentaNumero : ''}`
+        + (p.estadoPago === 'RECIBIDO' ? ' · confirmado por la pasarela' : ' · esperando que el cliente pague');
+    }
+    return p.metodoPago === 'CUENTA' ? p.cuentaEntidad + ' · ' + p.cuentaTitular : 'Efectivo';
   }
 
   protected nombre(e: EstadoPedido): string { return NOMBRE_ESTADO[e]; }
@@ -303,7 +493,13 @@ export class PedidosPage {
 
   protected pago(p: PedidoAdmin, estadoPago: 'RECIBIDO' | 'PENDIENTE'): void {
     this.api.cambiarPago(p.id, estadoPago).subscribe({
-      next: (n) => { this.reemplazar(n); if (estadoPago === 'RECIBIDO') this.avisos.mostrar('Pago marcado como recibido'); },
+      next: (n) => {
+        // En «Por pagar», un pedido pagado sale de la lista.
+        if (this.filtro() === 'POR_PAGAR' && n.estadoPago === 'RECIBIDO') this.pedidos.update((l) => l.filter((x) => x.id !== n.id));
+        else this.reemplazar(n);
+        if (estadoPago === 'RECIBIDO') this.avisos.mostrar('Pago marcado como recibido');
+        this.avisosPortal.revisar();
+      },
       error: (e) => this.avisos.mostrar(mensajeError(e)),
     });
   }

@@ -15,18 +15,34 @@ spring:
           time_zone: UTC
   liquibase:
     enabled: false     # las migraciones las corre la plataforma al arrancar (ver ArranquePlataforma)
+  sql:
+    init:
+      mode: never      # sin schema.sql/data.sql: la estructura la manejan las migraciones de la plataforma
+  mail:
+    # El correo es opcional: solo se envía si defines MAIL_HOST (spring.mail.host). Ver README.
+    properties:
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 8000
+      mail.smtp.writetimeout: 8000
   servlet:
     multipart:
-      max-file-size: 3MB
-      max-request-size: 3MB
+      max-file-size: 6MB      # comprobantes de pago hasta 5 MB (imágenes del menú: 2 MB)
+      max-request-size: 6MB
 
 server:
   port: ${PORT:8080}
+  # Detrás de Nginx (imagen del frontend) o de un balanceador: usa X-Forwarded-Host/Proto para saber
+  # el origen real de la petición (CORS, direcciones absolutas).
+  forward-headers-strategy: framework
   error:
     include-message: always
 
 leinei:
   zona-horaria: America/Bogota
+  # Dirección pública de la plataforma (la que usa el navegador). Va en los correos de bienvenida.
+  url-publica: ${PUBLIC_URL:http://localhost:8080}
+  # Remitente de los correos. Si se deja vacío se usa el usuario SMTP.
+  correo-remitente: ${MAIL_FROM:}
   # Orígenes que pueden llamar la API cuando el frontend se sirve aparte. Separa varios con coma.
   cors-origenes: ${CORS_ORIGINS:http://localhost:4200}
   # Horas que dura una sesión (superadmin y portal de empresa).

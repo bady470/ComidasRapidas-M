@@ -1,0 +1,51 @@
+# Pantalla de cocina con impresión de comandas (opcional) y recuperar clientes por WhatsApp.
+databaseChangeLog:
+  - changeSet:
+      id: empresa-010-impresion
+      author: leinei
+      comment: >
+        Impresión de comandas. APAGADA: no se imprime. MANUAL: botón «Imprimir» en cada pedido. AUTOMATICA: el equipo
+        de la cocina (el que tenga activado «este equipo imprime») la imprime sola al llegar o al confirmar el pedido.
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE cliente.tbl_configuraciones
+                  ADD COLUMN impresion_modo       VARCHAR(10)  NOT NULL DEFAULT 'APAGADA'
+                      CHECK (impresion_modo IN ('APAGADA', 'MANUAL', 'AUTOMATICA')),
+                  ADD COLUMN impresion_momento    VARCHAR(10)  NOT NULL DEFAULT 'NUEVO'
+                      CHECK (impresion_momento IN ('NUEVO', 'CONFIRMADO')),
+                  ADD COLUMN impresion_espera_pago BOOLEAN     NOT NULL DEFAULT TRUE,
+                  ADD COLUMN impresion_papel      SMALLINT     NOT NULL DEFAULT 80 CHECK (impresion_papel IN (58, 80)),
+                  ADD COLUMN impresion_copias     SMALLINT     NOT NULL DEFAULT 1 CHECK (impresion_copias BETWEEN 1 AND 3),
+                  ADD COLUMN impresion_precios    BOOLEAN      NOT NULL DEFAULT TRUE,
+                  ADD COLUMN impresion_pie        VARCHAR(120) NOT NULL DEFAULT '',
+                  ADD COLUMN mensaje_recuperar    VARCHAR(600) NOT NULL DEFAULT '';
+      rollback:
+        - sql:
+            sql: |
+              ALTER TABLE cliente.tbl_configuraciones DROP COLUMN impresion_modo, DROP COLUMN impresion_momento,
+                  DROP COLUMN impresion_espera_pago, DROP COLUMN impresion_papel, DROP COLUMN impresion_copias,
+                  DROP COLUMN impresion_precios, DROP COLUMN impresion_pie, DROP COLUMN mensaje_recuperar;
+
+  - changeSet:
+      id: empresa-010-contactos-clientes
+      author: leinei
+      comment: Cada vez que el negocio le escribe a un cliente para que vuelva (sirve para saber cuántos regresan).
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE cliente.tbl_contactos_clientes (
+                  id            BIGSERIAL PRIMARY KEY,
+                  uuid          UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  celular       VARCHAR(10)  NOT NULL,
+                  nombre        VARCHAR(80)  NOT NULL DEFAULT '',
+                  mensaje       VARCHAR(600) NOT NULL DEFAULT '',
+                  contactado_por VARCHAR(120) NOT NULL DEFAULT '',
+                  creado_en     TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+              CREATE INDEX idx_contactos_clientes_celular ON cliente.tbl_contactos_clientes (celular, creado_en);
+              CREATE INDEX idx_pedidos_cliente_celular ON producto.tbl_pedidos (cliente_celular);
+              CREATE TRIGGER trg_auditar_contactos_clientes AFTER INSERT OR UPDATE OR DELETE ON cliente.tbl_contactos_clientes
+                  FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+      rollback:
+        - sql: { sql: DROP INDEX producto.idx_pedidos_cliente_celular; DROP TABLE cliente.tbl_contactos_clientes; }

@@ -2,9 +2,10 @@ import { Injectable, effect, inject, signal, untracked } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { TiendaApi, mensajeError } from './api';
 import { Carrito } from './carrito';
-import { EmpresaActual } from './empresa';
+import { EmpresaActual, apiEmpresa } from './empresa';
 import { Catalogo } from './modelos';
 import { Tema } from './tema';
+import { escucharCanal } from './tiempo-real';
 
 /**
  * Catálogo y marca de la empresa actual, compartidos entre páginas de la tienda y del portal.
@@ -24,6 +25,9 @@ export class EstadoTienda {
 
   /** Empresa de la que se pidió el catálogo por última vez. */
   private cargadaPara = '';
+  /** Canal en vivo de la tienda: precios, productos agotados, horario o marca cambian sin recargar. */
+  private canal: { slug: string; cerrar: () => void } | null = null;
+  private espera: ReturnType<typeof setTimeout> | undefined;
 
   constructor() {
     document.addEventListener('visibilitychange', () => {
@@ -38,6 +42,8 @@ export class EstadoTienda {
         this.catalogo.set(null);
         this.error.set('');
         this.carrito.recargar();
+        this.canal?.cerrar();
+        this.canal = null;
         if (habiaTienda && slug) this.cargar();
       });
     });
@@ -63,6 +69,7 @@ export class EstadoTienda {
         this.tema.aplicar(c.tienda);
         this.titular(this.pagina);
         this.carrito.limpiar(c.productos);
+        this.escuchar(slug);
       },
       error: (e) => {
         if (this.emp.slug() !== slug) return;
@@ -70,6 +77,23 @@ export class EstadoTienda {
         this.cargando.set(false);
       },
     });
+  }
+
+  /** Recarga el catálogo cuando el servidor avisa que cambió (con una pequeña espera para agrupar cambios seguidos). */
+  private escuchar(slug: string): void {
+    if (this.canal?.slug === slug) return;
+    this.canal?.cerrar();
+    this.canal = {
+      slug,
+      cerrar: escucharCanal(`${apiEmpresa()}/public/eventos`, {
+        alEvento: (e) => {
+          if (e.tipo !== 'catalogo') return;
+          clearTimeout(this.espera);
+          this.espera = setTimeout(() => { if (this.emp.slug() === slug) this.cargar(); }, 400);
+        },
+        alReconectar: () => { if (this.emp.slug() === slug) this.cargar(); },
+      }),
+    };
   }
 
   /** true si el plan de la empresa incluye el módulo. */

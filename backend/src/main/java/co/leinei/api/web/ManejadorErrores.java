@@ -27,6 +27,13 @@ public class ManejadorErrores {
         return ProblemDetail.forStatusAndDetail(e.getEstado(), e.getMessage());
     }
 
+    /** La pasarela de pagos no respondió o rechazó la solicitud: el mensaje ya es para el usuario. */
+    @ExceptionHandler(co.leinei.api.pagos.PasarelaException.class)
+    public ProblemDetail pasarela(co.leinei.api.pagos.PasarelaException e) {
+        log.warn("Pasarela de pagos: {}", e.getMessage(), e.getCause());
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, e.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail validacion(MethodArgumentNotValidException e) {
         Map<String, String> errores = new LinkedHashMap<>();
@@ -39,7 +46,7 @@ public class ManejadorErrores {
 
     @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
     public ProblemDetail archivoGrande(Exception e) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, "La imagen pesa más de 2 MB. Usa una más liviana.");
+        return ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, "El archivo es demasiado pesado. Las fotos del menú pueden pesar hasta 2 MB y los comprobantes hasta 5 MB.");
     }
 
     @ExceptionHandler(HandlerMethodValidationException.class)

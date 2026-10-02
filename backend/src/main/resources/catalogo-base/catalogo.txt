@@ -1,0 +1,535 @@
+# Biblioteca de productos precargados. Generado por herramientas/generar-biblioteca.py; no editar a mano.
+C|Hamburguesas|0
+C|Salchipapas|1
+C|Perros calientes|2
+C|Pizzas|3
+C|Pollo y alitas|4
+C|Combos|5
+C|Acompañantes|6
+C|Bebidas|7
+C|Postres|8
+P|hamburguesa-clasica|Hamburguesas|Hamburguesa clásica|Carne de res 120 g, lechuga, tomate, cebolla y salsa de la casa en pan artesanal.|14000|5900|hamburguesa-clasica|Clásica|popular,carne
+G|Adiciones|0|4
+O|Queso extra|2000
+O|Tocineta|3000
+O|Huevo|2000
+O|Carne extra|6000
+O|Papas a la francesa|5000
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|hamburguesa-con-queso|Hamburguesas|Hamburguesa con queso|Carne de res, doble queso derretido, lechuga y tomate.|16000|6700|hamburguesa-queso||carne,queso
+G|Adiciones|0|4
+O|Queso extra|2000
+O|Tocineta|3000
+O|Huevo|2000
+O|Carne extra|6000
+O|Papas a la francesa|5000
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|hamburguesa-doble-carne|Hamburguesas|Hamburguesa doble carne|Dos carnes de 120 g, queso cheddar, lechuga y tomate.|22000|9200|hamburguesa-doble|Más vendida|popular,carne,para-hambrientos
+G|Adiciones|0|4
+O|Queso extra|2000
+O|Tocineta|3000
+O|Huevo|2000
+O|Carne extra|6000
+O|Papas a la francesa|5000
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|hamburguesa-con-tocineta|Hamburguesas|Hamburguesa con tocineta|Carne, queso, tocineta crocante, lechuga y tomate.|20000|8400|hamburguesa-tocineta||carne,queso,tocineta
+G|Adiciones|0|4
+O|Queso extra|2000
+O|Tocineta|3000
+O|Huevo|2000
+O|Carne extra|6000
+O|Papas a la francesa|5000
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|hamburguesa-bbq|Hamburguesas|Hamburguesa BBQ|Carne, tocineta, aros de cebolla, queso y salsa BBQ ahumada.|21000|8800|hamburguesa-bbq|Nueva|carne,tocineta,dulce-ahumado
+G|Adiciones|0|4
+O|Queso extra|2000
+O|Tocineta|3000
+O|Huevo|2000
+O|Carne extra|6000
+O|Papas a la francesa|5000
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|hamburguesa-de-pollo|Hamburguesas|Hamburguesa de pollo|Pechuga apanada crocante, queso, lechuga y salsa tártara.|17000|7100|hamburguesa-pollo||pollo
+G|Adiciones|0|4
+O|Queso extra|2000
+O|Tocineta|3000
+O|Huevo|2000
+O|Carne extra|6000
+O|Papas a la francesa|5000
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|hamburguesa-con-huevo|Hamburguesas|Hamburguesa con huevo|Carne, huevo frito, queso, lechuga y tomate.|19000|8000|hamburguesa-huevo||carne,huevo
+G|Adiciones|0|4
+O|Queso extra|2000
+O|Tocineta|3000
+O|Huevo|2000
+O|Carne extra|6000
+O|Papas a la francesa|5000
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|hamburguesa-hawaiana|Hamburguesas|Hamburguesa hawaiana|Carne, jamón, piña calada, queso y salsa de piña.|20000|8400|hamburguesa-hawaiana||carne,dulce-ahumado
+G|Adiciones|0|4
+O|Queso extra|2000
+O|Tocineta|3000
+O|Huevo|2000
+O|Carne extra|6000
+O|Papas a la francesa|5000
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|hamburguesa-triple|Hamburguesas|Hamburguesa triple|Tres carnes, triple queso, tocineta y salsa de la casa. Solo para valientes.|30000|12600|hamburguesa-triple|Brutal|carne,tocineta,para-hambrientos
+G|Adiciones|0|4
+O|Queso extra|2000
+O|Tocineta|3000
+O|Huevo|2000
+O|Carne extra|6000
+O|Papas a la francesa|5000
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|hamburguesa-vegetariana|Hamburguesas|Hamburguesa vegetariana|Medallón de lentejas y vegetales, queso, lechuga y tomate.|16000|6700|hamburguesa-veggie|Vegetariana|vegetariano
+G|Adiciones|0|4
+O|Queso extra|2000
+O|Tocineta|3000
+O|Huevo|2000
+O|Carne extra|6000
+O|Papas a la francesa|5000
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|hamburguesa-infantil|Hamburguesas|Hamburguesa infantil|Carne pequeña con queso y papas. Ideal para los niños.|11000|4600|hamburguesa-clasica|Kids|infantil
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|salchipapa-sencilla|Salchipapas|Salchipapa sencilla|Papas a la francesa con salchicha, salsas y queso rallado.|10000|4200|salchipapa-simple|Económica|economico
+G|Adiciones|0|4
+O|Queso extra|2500
+O|Huevo de codorniz|2000
+O|Tocineta|3000
+O|Chorizo extra|3500
+O|Maíz tierno|1500
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|salchipapa-clasica|Salchipapas|Salchipapa clásica|Papas, salchicha, queso gratinado y salsas de la casa.|14000|5900|salchipapa-clasica|Clásica|popular,queso
+G|Adiciones|0|4
+O|Queso extra|2500
+O|Huevo de codorniz|2000
+O|Tocineta|3000
+O|Chorizo extra|3500
+O|Maíz tierno|1500
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|salchipapa-mixta|Salchipapas|Salchipapa mixta|Papas, salchicha, pollo desmechado, queso gratinado y maíz.|18000|7600|salchipapa-mixta|Más vendida|popular,pollo,queso
+G|Adiciones|0|4
+O|Queso extra|2500
+O|Huevo de codorniz|2000
+O|Tocineta|3000
+O|Chorizo extra|3500
+O|Maíz tierno|1500
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|salchipapa-criolla|Salchipapas|Salchipapa criolla|Papas, salchicha, chorizo, huevo de codorniz, queso y ají.|20000|8400|salchipapa-criolla||queso,huevo
+G|Adiciones|0|4
+O|Queso extra|2500
+O|Huevo de codorniz|2000
+O|Tocineta|3000
+O|Chorizo extra|3500
+O|Maíz tierno|1500
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|salchipapa-picante|Salchipapas|Salchipapa picante|Papas, salchicha, jalapeños, queso y salsa picante.|16000|6700|salchipapa-picante|Picante|picante,queso
+G|Adiciones|0|4
+O|Queso extra|2500
+O|Huevo de codorniz|2000
+O|Tocineta|3000
+O|Chorizo extra|3500
+O|Maíz tierno|1500
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|salchipapa-doble-queso|Salchipapas|Salchipapa doble queso|Doble capa de queso fundido sobre papas y salchicha.|17000|7100|salchipapa-clasica||queso
+G|Adiciones|0|4
+O|Queso extra|2500
+O|Huevo de codorniz|2000
+O|Tocineta|3000
+O|Chorizo extra|3500
+O|Maíz tierno|1500
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|salchipapa-para-compartir|Salchipapas|Salchipapa para compartir|Papas XL, 3 salchichas, pollo, queso y salsas. Para 3 personas.|34000|14300|salchipapa-mixta|Para compartir|para-compartir,pollo,queso
+G|Adiciones|0|4
+O|Queso extra|2500
+O|Huevo de codorniz|2000
+O|Tocineta|3000
+O|Chorizo extra|3500
+O|Maíz tierno|1500
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|salchipapa-con-tocineta|Salchipapas|Salchipapa con tocineta|Papas, salchicha, tocineta crocante, queso y salsa BBQ.|19000|8000|salchipapa-clasica||tocineta,queso
+G|Adiciones|0|4
+O|Queso extra|2500
+O|Huevo de codorniz|2000
+O|Tocineta|3000
+O|Chorizo extra|3500
+O|Maíz tierno|1500
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|perro-clasico|Perros calientes|Perro clásico|Salchicha, papa ripio, queso rallado y salsas.|9000|3800|perro-clasico|Clásico|economico
+G|Adiciones|0|3
+O|Queso extra|2000
+O|Tocineta|3000
+O|Papa ripio extra|1000
+O|Salchicha extra|3500
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|perro-suizo|Perros calientes|Perro suizo|Salchicha suiza gratinada con queso, papa ripio y salsas.|12000|5000|perro-suizo||queso,popular
+G|Adiciones|0|3
+O|Queso extra|2000
+O|Tocineta|3000
+O|Papa ripio extra|1000
+O|Salchicha extra|3500
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|perro-americano|Perros calientes|Perro americano|Salchicha, tocineta, queso, cebolla crocante y salsa de mostaza.|13000|5500|perro-americano||tocineta
+G|Adiciones|0|3
+O|Queso extra|2000
+O|Tocineta|3000
+O|Papa ripio extra|1000
+O|Salchicha extra|3500
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|perro-tropical|Perros calientes|Perro tropical|Salchicha, piña, queso gratinado, tocineta y salsa de piña.|13500|5700|perro-tropical||dulce-ahumado,queso
+G|Adiciones|0|3
+O|Queso extra|2000
+O|Tocineta|3000
+O|Papa ripio extra|1000
+O|Salchicha extra|3500
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|perro-mexicano|Perros calientes|Perro mexicano|Salchicha, jalapeños, queso gratinado, guacamole y ají.|14000|5900|perro-picante|Picante|picante,queso
+G|Adiciones|0|3
+O|Queso extra|2000
+O|Tocineta|3000
+O|Papa ripio extra|1000
+O|Salchicha extra|3500
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|perro-con-pollo|Perros calientes|Perro con pollo|Salchicha y pollo desmechado con queso gratinado y papa ripio.|14500|6100|perro-suizo||pollo,queso
+G|Adiciones|0|3
+O|Queso extra|2000
+O|Tocineta|3000
+O|Papa ripio extra|1000
+O|Salchicha extra|3500
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|perro-gigante|Perros calientes|Perro gigante|Salchicha jumbo de 25 cm con todos los toppings.|16000|6700|perro-americano|Jumbo|para-hambrientos
+G|Adiciones|0|3
+O|Queso extra|2000
+O|Tocineta|3000
+O|Papa ripio extra|1000
+O|Salchicha extra|3500
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|pizza-pepperoni|Pizzas|Pizza Pepperoni|Mozzarella y abundante pepperoni.|32000|12200|pizza-pepperoni|Más vendida|popular,carne
+G|Tamaño|1|1
+O|Personal (4 porciones)|0
+O|Mediana (6 porciones)|14000
+O|Grande (8 porciones)|26000
+O|Familiar (12 porciones)|42000
+G|Borde|0|1
+O|Borde de queso|5000
+O|Borde de bocadillo|4000
+P|pizza-hawaiana|Pizzas|Pizza Hawaiana|Jamón, piña calada y mozzarella.|30000|11400|pizza-hawaiana||dulce-ahumado
+G|Tamaño|1|1
+O|Personal (4 porciones)|0
+O|Mediana (6 porciones)|14000
+O|Grande (8 porciones)|26000
+O|Familiar (12 porciones)|42000
+G|Borde|0|1
+O|Borde de queso|5000
+O|Borde de bocadillo|4000
+P|pizza-champinones|Pizzas|Pizza Champiñones|Champiñones frescos, mozzarella y orégano.|30000|11400|pizza-champinones||vegetariano
+G|Tamaño|1|1
+O|Personal (4 porciones)|0
+O|Mediana (6 porciones)|14000
+O|Grande (8 porciones)|26000
+O|Familiar (12 porciones)|42000
+G|Borde|0|1
+O|Borde de queso|5000
+O|Borde de bocadillo|4000
+P|pizza-vegetariana|Pizzas|Pizza Vegetariana|Pimentón, cebolla, maíz, aceitunas y champiñones.|29000|11000|pizza-vegetariana|Vegetariana|vegetariano
+G|Tamaño|1|1
+O|Personal (4 porciones)|0
+O|Mediana (6 porciones)|14000
+O|Grande (8 porciones)|26000
+O|Familiar (12 porciones)|42000
+G|Borde|0|1
+O|Borde de queso|5000
+O|Borde de bocadillo|4000
+P|pizza-cuatro-quesos|Pizzas|Pizza Cuatro quesos|Mozzarella, cheddar, parmesano y queso azul.|35000|13300|pizza-cuatro-quesos|Gourmet|queso
+G|Tamaño|1|1
+O|Personal (4 porciones)|0
+O|Mediana (6 porciones)|14000
+O|Grande (8 porciones)|26000
+O|Familiar (12 porciones)|42000
+G|Borde|0|1
+O|Borde de queso|5000
+O|Borde de bocadillo|4000
+P|pizza-carnes|Pizzas|Pizza Carnes|Jamón, pepperoni, salchicha, tocineta y carne molida.|36000|13700|pizza-carnes|Contundente|carne,para-hambrientos
+G|Tamaño|1|1
+O|Personal (4 porciones)|0
+O|Mediana (6 porciones)|14000
+O|Grande (8 porciones)|26000
+O|Familiar (12 porciones)|42000
+G|Borde|0|1
+O|Borde de queso|5000
+O|Borde de bocadillo|4000
+P|pizza-pollo-bbq|Pizzas|Pizza Pollo BBQ|Pollo desmechado, cebolla y salsa BBQ.|33000|12500|pizza-pollo-bbq||pollo,dulce-ahumado
+G|Tamaño|1|1
+O|Personal (4 porciones)|0
+O|Mediana (6 porciones)|14000
+O|Grande (8 porciones)|26000
+O|Familiar (12 porciones)|42000
+G|Borde|0|1
+O|Borde de queso|5000
+O|Borde de bocadillo|4000
+P|pizza-margarita|Pizzas|Pizza Margarita|Salsa de tomate, mozzarella fresca y albahaca.|27000|10300|pizza-margarita|Clásica|vegetariano,economico
+G|Tamaño|1|1
+O|Personal (4 porciones)|0
+O|Mediana (6 porciones)|14000
+O|Grande (8 porciones)|26000
+O|Familiar (12 porciones)|42000
+G|Borde|0|1
+O|Borde de queso|5000
+O|Borde de bocadillo|4000
+P|pizza-criolla|Pizzas|Pizza Criolla|Chorizo, cebolla, pimentón y queso costeño.|34000|12900|pizza-criolla||picante
+G|Tamaño|1|1
+O|Personal (4 porciones)|0
+O|Mediana (6 porciones)|14000
+O|Grande (8 porciones)|26000
+O|Familiar (12 porciones)|42000
+G|Borde|0|1
+O|Borde de queso|5000
+O|Borde de bocadillo|4000
+P|pizza-mixta|Pizzas|Pizza Mixta|Jamón, pollo, champiñones y mozzarella.|34000|12900|pizza-carnes||pollo,popular
+G|Tamaño|1|1
+O|Personal (4 porciones)|0
+O|Mediana (6 porciones)|14000
+O|Grande (8 porciones)|26000
+O|Familiar (12 porciones)|42000
+G|Borde|0|1
+O|Borde de queso|5000
+O|Borde de bocadillo|4000
+P|alitas-bbq-x8|Pollo y alitas|Alitas BBQ x8|Ocho alitas bañadas en salsa BBQ ahumada con papas.|24000|10100|alitas-bbq|Popular|popular,dulce-ahumado,para-compartir
+G|Tamaño|1|1
+O|8 unidades|0
+O|12 unidades|8000
+O|16 unidades|15000
+P|alitas-picantes-x8|Pollo y alitas|Alitas picantes x8|Ocho alitas con salsa búfalo extra picante.|24000|10100|alitas-picantes|Picante|picante
+G|Tamaño|1|1
+O|8 unidades|0
+O|12 unidades|8000
+O|16 unidades|15000
+P|alitas-miel-mostaza-x8|Pollo y alitas|Alitas miel mostaza x8|Ocho alitas glaseadas en miel y mostaza.|24000|10100|alitas-miel||dulce-ahumado
+G|Tamaño|1|1
+O|8 unidades|0
+O|12 unidades|8000
+O|16 unidades|15000
+P|pollo-broaster-2-presas|Pollo y alitas|Pollo broaster 2 presas|Dos presas crocantes con papas y ensalada.|20000|8400|pollo-presas||pollo,popular
+P|pollo-broaster-4-presas|Pollo y alitas|Pollo broaster 4 presas|Cuatro presas crocantes con papas y ensalada.|36000|15100|pollo-presas|Para compartir|pollo,para-compartir
+P|nuggets-x10|Pollo y alitas|Nuggets x10|Diez nuggets de pollo con salsa a elección.|16000|6700|pollo-presas||infantil,pollo
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|papas-a-la-francesa|Acompañantes|Papas a la francesa|Porción de papas crocantes.|7000|2900|papas-fritas||vegetariano,economico
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|papas-en-gajos|Acompañantes|Papas en gajos|Gajos de papa sazonados con especias.|9000|3800|papas-gajo||vegetariano
+G|Salsas|0|3
+O|Rosada|0
+O|Piña|0
+O|Tártara|0
+O|BBQ|0
+O|Ají|0
+O|Mayonesa|0
+P|papas-con-queso-y-tocineta|Acompañantes|Papas con queso y tocineta|Papas gratinadas con queso cheddar y tocineta.|15000|6300|papas-fritas||queso,tocineta
+P|aros-de-cebolla|Acompañantes|Aros de cebolla|Aros apanados y dorados con salsa tártara.|9000|3800|papas-gajo||vegetariano
+P|maiz-desgranado-gratinado|Acompañantes|Maíz desgranado gratinado|Maíz tierno con queso fundido.|12000|5000|papas-gajo||queso,vegetariano
+P|combo-hamburguesa|Combos|Combo hamburguesa|Hamburguesa con queso + papas + gaseosa.|25000|11200|combo-hamburguesa|Ahorra|combo,popular
+P|combo-perro|Combos|Combo perro|Perro suizo + papas + gaseosa.|20000|9000|combo-hamburguesa|Ahorra|combo,economico
+P|combo-pizza-personal|Combos|Combo pizza personal|Pizza personal a elección + gaseosa.|28000|11800|pizza-pepperoni|Ahorra|combo
+P|combo-pareja|Combos|Combo pareja|2 hamburguesas, 1 papas grandes y 2 gaseosas.|52000|23400|combo-hamburguesa|Pareja|combo,para-compartir
+P|combo-familiar|Combos|Combo familiar|Pizza familiar, 8 alitas y gaseosa de 1.5 L.|89000|37400|pizza-pepperoni|Familiar|combo,para-compartir
+P|gaseosa-400-ml|Bebidas|Gaseosa 400 ml|Cola, naranja o lima limón.|4000|2200|gaseosa-cola||economico
+G|Sabor|1|1
+O|Cola|0
+O|Naranja|0
+O|Lima limón|0
+P|gaseosa-1-5-l|Bebidas|Gaseosa 1.5 L|Para compartir en casa.|8500|4700|botella-gaseosa||para-compartir
+G|Sabor|1|1
+O|Cola|0
+O|Naranja|0
+O|Lima limón|0
+P|limonada-natural|Bebidas|Limonada natural|Limón exprimido al momento.|5500|1600|limonada||natural,popular
+P|limonada-cerezada|Bebidas|Limonada cerezada|Limonada con granadina y cereza.|7000|2100|limonada-cerezada||natural
+P|jugo-de-fresa|Bebidas|Jugo de fresa|En agua o en leche.|7000|2400|jugo-fresa||natural
+G|Preparado en|1|1
+O|Agua|0
+O|Leche|1500
+P|jugo-de-mora|Bebidas|Jugo de mora|En agua o en leche.|7000|2400|jugo-mora||natural
+G|Preparado en|1|1
+O|Agua|0
+O|Leche|1500
+P|malteada-de-chocolate|Bebidas|Malteada de chocolate|Helado de vainilla, chocolate y crema chantilly.|11000|4400|malteada||dulce,popular
+P|malteada-de-fresa|Bebidas|Malteada de fresa|Helado de vainilla, fresa y crema chantilly.|11000|4400|malteada-fresa||dulce
+P|cafe-helado|Bebidas|Café helado|Café frío con leche y hielo.|7500|2200|cafe-helado||dulce
+P|te-frio|Bebidas|Té frío|Té de durazno o limón.|5000|2000|botella-te||economico
+P|agua-600-ml|Bebidas|Agua 600 ml|Agua mineral.|3000|1500|botella-agua||economico
+P|brownie-con-helado|Postres|Brownie con helado|Brownie tibio con bola de helado y salsa de chocolate.|12000|4200|postre-brownie||dulce,popular
+P|cheesecake-de-fresa|Postres|Cheesecake de fresa|Porción de cheesecake con salsa de fresa.|11000|3800|postre-cheesecake||dulce
+P|copa-de-fresas-con-crema|Postres|Copa de fresas con crema|Fresas frescas con crema chantilly.|10000|3500|postre-copa-fresa||dulce
+P|copa-oreo|Postres|Copa oreo|Helado, galleta oreo triturada y chocolate.|11000|3800|postre-copa-oreo||dulce
+P|helado-de-vainilla|Postres|Helado de vainilla|Tres bolas con topping a elección.|9000|3200|helado-vainilla||dulce,economico
+G|Topping|0|2
+O|Salsa de chocolate|0
+O|Salsa de fresa|0
+O|Chispas de colores|500
+O|Galleta triturada|1000

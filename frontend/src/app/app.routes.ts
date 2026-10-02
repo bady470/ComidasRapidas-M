@@ -9,6 +9,8 @@ import { soloAdmin, soloSuperadmin } from './core/sesion';
  */
 function rutasEmpresa(): Routes {
   return [
+    // Página del domiciliario (su link personal de reparto): sin sesión, el link es la clave.
+    { path: 'reparto/:token', title: 'Reparto', loadComponent: () => import('./tienda/reparto').then((m) => m.RepartoPage) },
     { path: 'admin/entrar', title: 'Entrar al portal', loadComponent: () => import('./admin/login').then((m) => m.LoginPage) },
     {
       path: 'admin',
@@ -17,11 +19,18 @@ function rutasEmpresa(): Routes {
       children: [
         { path: '', pathMatch: 'full', redirectTo: 'pedidos' },
         { path: 'pedidos', title: 'Pedidos', loadComponent: () => import('./admin/pedidos').then((m) => m.PedidosPage) },
+        { path: 'estadisticas', title: 'Estadísticas', loadComponent: () => import('./admin/estadisticas').then((m) => m.EstadisticasPage) },
+        { path: 'caja', title: 'Cierre de caja', loadComponent: () => import('./admin/caja').then((m) => m.CajaPage) },
+        { path: 'cocina', title: 'Cocina', loadComponent: () => import('./admin/cocina').then((m) => m.CocinaPage) },
+        { path: 'clientes', title: 'Clientes', loadComponent: () => import('./admin/clientes').then((m) => m.ClientesPage) },
         { path: 'ventas', title: 'Ventas', loadComponent: () => import('./admin/produccion').then((m) => m.ProduccionPage) },
         { path: 'productos', title: 'Productos', loadComponent: () => import('./admin/productos').then((m) => m.ProductosPage) },
         { path: 'categorias', title: 'Categorías', loadComponent: () => import('./admin/categorias').then((m) => m.CategoriasPage) },
         { path: 'promociones', title: 'Promociones', loadComponent: () => import('./admin/promociones').then((m) => m.PromocionesPage) },
+        { path: 'domiciliarios', title: 'Domiciliarios', loadComponent: () => import('./admin/domiciliarios').then((m) => m.DomiciliariosPage) },
         { path: 'tienda', title: 'Mi tienda', loadComponent: () => import('./admin/config').then((m) => m.ConfigPage) },
+        { path: 'mapa', title: 'Domicilios y mapa', loadComponent: () => import('./admin/mapa-config').then((m) => m.MapaConfigPage) },
+        { path: 'pagos-en-linea', title: 'Pagos en línea', loadComponent: () => import('./admin/pagos-en-linea').then((m) => m.PagosEnLineaPage) },
       ],
     },
     {
@@ -50,6 +59,10 @@ export const routes: Routes = [
       { path: 'empresas', title: 'Empresas', loadComponent: () => import('./superadmin/empresas').then((m) => m.EmpresasPage) },
       { path: 'empresas/nueva', title: 'Nueva empresa', loadComponent: () => import('./superadmin/nueva').then((m) => m.NuevaEmpresaPage) },
       { path: 'empresas/:uuid', title: 'Empresa', loadComponent: () => import('./superadmin/detalle').then((m) => m.DetalleEmpresaPage) },
+      { path: 'correo', title: 'Correo de envío', loadComponent: () => import('./superadmin/correo').then((m) => m.CorreoPage) },
+      { path: 'pagos', title: 'Pagos en línea', loadComponent: () => import('./superadmin/pagos').then((m) => m.PagosPage) },
+      { path: 'planes', title: 'Planes', loadComponent: () => import('./superadmin/planes').then((m) => m.PlanesPage) },
+      { path: 'biblioteca', title: 'Productos precargados', loadComponent: () => import('./superadmin/biblioteca').then((m) => m.BibliotecaPage) },
       { path: 'cuenta', title: 'Mi cuenta', loadComponent: () => import('./superadmin/cuenta').then((m) => m.CuentaPage) },
     ],
   },

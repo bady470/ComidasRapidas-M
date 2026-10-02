@@ -1,0 +1,16 @@
+# Categorías típicas de un negocio de comidas: toda empresa nueva las trae listas y puede editarlas, ocultarlas o borrarlas.
+# Solo se cargan si la empresa todavía no tiene ninguna categoría (no toca el catálogo de las que ya trabajan).
+databaseChangeLog:
+  - changeSet:
+      id: empresa-007-categorias-tipicas
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO producto.tbl_categorias (nombre, orden)
+              SELECT v.nombre, v.orden
+              FROM (VALUES ('Hamburguesas', 0), ('Salchipapas', 1), ('Perros calientes', 2), ('Pizzas', 3),
+                           ('Pollo y alitas', 4), ('Combos', 5), ('Acompañantes', 6), ('Bebidas', 7), ('Postres', 8)) AS v(nombre, orden)
+              WHERE NOT EXISTS (SELECT 1 FROM producto.tbl_categorias);
+      rollback:
+        - sql: { sql: "SELECT 1" }

@@ -2,7 +2,7 @@
 --
 -- 1. Crea la empresa desde el superadmin (/superadmin → Nueva empresa) con el identificador
 --    «leinei-postres» («leinei» solo está reservado para la plataforma), nombre comercial «Leinei»,
---    colores #E9A23B / #3A2620 y entrega programada.
+--    colores #1D4ED8 / #0F172A y entrega programada.
 -- 2. Cuando la empresa quede «Activa», carga este archivo en SU base:
 --      psql -h localhost -U leinei -d db_cliente_leinei_postres -f ejemplos/leinei-postres.sql
 -- Todo se puede cambiar después desde el portal (/leinei-postres/admin).

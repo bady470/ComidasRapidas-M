@@ -1,0 +1,22 @@
+databaseChangeLog:
+  - changeSet:
+      id: control-007-configuracion-correo
+      author: leinei
+      comment: Cuenta de correo con la que la plataforma envía los datos de acceso a las empresas. Una sola fila; la clave va cifrada con la llave maestra.
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE plataforma.tbl_configuracion_correo (
+                  id             SMALLINT PRIMARY KEY CHECK (id = 1),
+                  host           VARCHAR(200) NOT NULL DEFAULT '',
+                  puerto         INTEGER      NOT NULL DEFAULT 587 CHECK (puerto BETWEEN 1 AND 65535),
+                  seguridad      VARCHAR(10)  NOT NULL DEFAULT 'STARTTLS' CHECK (seguridad IN ('STARTTLS', 'SSL', 'NINGUNA')),
+                  usuario        VARCHAR(200) NOT NULL DEFAULT '',
+                  clave_cifrada  TEXT         NOT NULL DEFAULT '',
+                  remitente      VARCHAR(200) NOT NULL DEFAULT '',
+                  url_publica    VARCHAR(200) NOT NULL DEFAULT '',
+                  actualizado_en TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+              INSERT INTO plataforma.tbl_configuracion_correo (id) VALUES (1);
+      rollback:
+        - sql: { sql: DROP TABLE plataforma.tbl_configuracion_correo; }

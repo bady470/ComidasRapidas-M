@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterOutlet } from '@angular/router';
+import { GrupoMenu, Shell } from '../compartido/shell';
 import { PlataformaApi } from '../core/api';
 import { EmpresaActual } from '../core/empresa';
 import { SesionSuperadmin } from '../core/sesion';
@@ -7,30 +8,33 @@ import { Tema } from '../core/tema';
 
 @Component({
   selector: 'app-super-layout',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, Shell],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <header class="top">
-      <div class="wrap">
-        <a class="brand" routerLink="/superadmin"><b>Leinei <span class="muted" style="font-family:var(--body);font-weight:600">· superadmin</span></b></a>
-        <span class="muted">{{ sesion.actual()?.nombre }}</span>
-        <button class="btn" (click)="salir()">Salir</button>
-      </div>
-    </header>
-    <main class="wrap">
-      <nav class="tabs" aria-label="Secciones del superadmin" style="margin-top:14px">
-        <a routerLink="empresas" routerLinkActive="activo" [routerLinkActiveOptions]="{ exact: true }">Empresas</a>
-        <a routerLink="empresas/nueva" routerLinkActive="activo">Nueva empresa</a>
-        <a routerLink="cuenta" routerLinkActive="activo">Mi cuenta</a>
-      </nav>
+    <app-shell marca="Leinei" subtitulo="Superadministración" [grupos]="menu" [usuario]="sesion.actual()?.nombre ?? ''"
+               rol="Superadmin" inicio="/superadmin" (salir)="salir()">
       <router-outlet />
-    </main>
+    </app-shell>
   `,
 })
 export class SuperLayout {
   protected sesion = inject(SesionSuperadmin);
   private api = inject(PlataformaApi);
   private router = inject(Router);
+
+  protected readonly menu: GrupoMenu[] = [
+    { titulo: 'Plataforma', items: [
+      { ruta: 'empresas', texto: 'Empresas', icono: 'empresas', exacto: true },
+      { ruta: 'empresas/nueva', texto: 'Nueva empresa', icono: 'nueva' },
+      { ruta: 'planes', texto: 'Planes y precios', icono: 'planes' },
+      { ruta: 'biblioteca', texto: 'Productos precargados', icono: 'biblioteca' },
+      { ruta: 'pagos', texto: 'Pagos en línea', icono: 'pagos' },
+    ] },
+    { titulo: 'Ajustes', items: [
+      { ruta: 'correo', texto: 'Correo de envío', icono: 'correo' },
+      { ruta: 'cuenta', texto: 'Mi cuenta', icono: 'cuenta' },
+    ] },
+  ];
 
   constructor() {
     const emp = inject(EmpresaActual);

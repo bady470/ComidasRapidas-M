@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: control-010-modulos-cocina-clientes
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO plataforma.tbl_modulos (codigo, nombre, descripcion, es_base, orden) VALUES
+                ('cocina',   'Cocina y comandas',  'Pantalla de cocina con tiempos y comandas impresas (manual o automática) en impresora térmica.', FALSE, 9),
+                ('clientes', 'Recuperar clientes', 'Clientes frecuentes y los que dejaron de pedir, con mensaje de WhatsApp listo para que vuelvan.', FALSE, 10);
+              UPDATE plataforma.tbl_planes SET modulos = modulos || ',cocina', actualizado_en = now()
+                  WHERE codigo IN ('pro', 'empresarial') AND modulos NOT LIKE '%cocina%';
+              UPDATE plataforma.tbl_planes SET modulos = modulos || ',clientes', actualizado_en = now()
+                  WHERE codigo = 'empresarial' AND modulos NOT LIKE '%clientes%';
+      rollback:
+        - sql:
+            sql: |
+              UPDATE plataforma.tbl_planes SET modulos = replace(replace(modulos, ',cocina', ''), ',clientes', '');
+              DELETE FROM plataforma.tbl_modulos WHERE codigo IN ('cocina', 'clientes');

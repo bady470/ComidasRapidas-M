@@ -1,0 +1,25 @@
+# Pago en línea (pasarela con confirmación automática). Los intentos de pago viven en la base de control
+# (plataforma.tbl_transacciones_pago); aquí solo cambia lo que el pedido acepta.
+databaseChangeLog:
+  - changeSet:
+      id: empresa-008-pago-en-linea
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE producto.tbl_pedidos DROP CONSTRAINT tbl_pedidos_metodo_pago_check;
+              ALTER TABLE producto.tbl_pedidos ADD CONSTRAINT tbl_pedidos_metodo_pago_check
+                  CHECK (metodo_pago IN ('CUENTA', 'EFECTIVO', 'EN_LINEA'));
+              -- Aviso nuevo: la pasarela confirmó (o reversó) un pago.
+              ALTER TABLE cliente.tbl_notificaciones DROP CONSTRAINT tbl_notificaciones_tipo_check;
+              ALTER TABLE cliente.tbl_notificaciones ADD CONSTRAINT tbl_notificaciones_tipo_check
+                  CHECK (tipo IN ('PEDIDO_NUEVO', 'PAGO_REPORTADO', 'PAGO_RECIBIDO', 'PAGO_REVERSADO'));
+      rollback:
+        - sql:
+            sql: |
+              ALTER TABLE cliente.tbl_notificaciones DROP CONSTRAINT tbl_notificaciones_tipo_check;
+              ALTER TABLE cliente.tbl_notificaciones ADD CONSTRAINT tbl_notificaciones_tipo_check
+                  CHECK (tipo IN ('PEDIDO_NUEVO', 'PAGO_REPORTADO'));
+              ALTER TABLE producto.tbl_pedidos DROP CONSTRAINT tbl_pedidos_metodo_pago_check;
+              ALTER TABLE producto.tbl_pedidos ADD CONSTRAINT tbl_pedidos_metodo_pago_check
+                  CHECK (metodo_pago IN ('CUENTA', 'EFECTIVO'));

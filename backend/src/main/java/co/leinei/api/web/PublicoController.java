@@ -11,6 +11,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 import java.time.Duration;
 
@@ -51,6 +54,13 @@ public class PublicoController {
     @GetMapping("/pedidos/{codigo}")
     public PublicoDto.Seguimiento seguimiento(@PathVariable String codigo, @RequestParam String celular) {
         return pedidos.seguimiento(codigo, celular);
+    }
+
+    /** El cliente adjunta el comprobante de su transferencia (imagen o PDF, campo «archivo»). */
+    @PostMapping(value = "/pedidos/{codigo}/comprobante", consumes = "multipart/form-data")
+    public PublicoDto.Seguimiento comprobante(@PathVariable String codigo, @RequestParam String celular,
+                                              @RequestParam("archivo") MultipartFile archivo) throws IOException {
+        return pedidos.subirComprobante(codigo, celular, archivo.getBytes());
     }
 
     /** Logo y fotos de productos. Una imagen nunca cambia (al reemplazarla se crea otra), así que se guarda en caché. */

@@ -5,3 +5,11 @@ databaseChangeLog:
   - include: { file: 001-plataforma.yaml, relativeToChangelogFile: true }
   - include: { file: 002-auditoria.yaml, relativeToChangelogFile: true }
   - include: { file: 003-modulos.yaml, relativeToChangelogFile: true }
+  - include: { file: 004-colores-por-defecto.yaml, relativeToChangelogFile: true }
+  - include: { file: 005-colores-empresariales.yaml, relativeToChangelogFile: true }
+  - include: { file: 006-planes.yaml, relativeToChangelogFile: true }
+  - include: { file: 007-configuracion-correo.yaml, relativeToChangelogFile: true }
+  - include: { file: 008-pagos-en-linea.yaml, relativeToChangelogFile: true }
+  - include: { file: 009-modulo-caja.yaml, relativeToChangelogFile: true }
+  - include: { file: 010-modulos-cocina-clientes.yaml, relativeToChangelogFile: true }
+  - include: { file: 011-modulo-mapas.yaml, relativeToChangelogFile: true }

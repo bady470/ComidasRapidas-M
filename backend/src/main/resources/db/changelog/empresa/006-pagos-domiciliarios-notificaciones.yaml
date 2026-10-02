@@ -1,0 +1,90 @@
+# Pago por transferencia con comprobante, domiciliarios y notificaciones del portal.
+databaseChangeLog:
+  - changeSet:
+      id: empresa-006-domiciliarios
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              -- Personas que llevan los domicilios. No se borran: se desactivan (los pedidos viejos las siguen mostrando).
+              CREATE TABLE cliente.tbl_domiciliarios (
+                  id        BIGSERIAL PRIMARY KEY,
+                  uuid      UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  nombre    VARCHAR(80) NOT NULL,
+                  celular   VARCHAR(10) NOT NULL DEFAULT '',
+                  es_activo BOOLEAN     NOT NULL DEFAULT TRUE,
+                  orden     INTEGER     NOT NULL DEFAULT 0,
+                  creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+              );
+              CREATE TRIGGER trg_auditar_domiciliarios AFTER INSERT OR UPDATE OR DELETE ON cliente.tbl_domiciliarios
+                  FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+      rollback:
+        - sql: { sql: DROP TABLE cliente.tbl_domiciliarios; }
+
+  - changeSet:
+      id: empresa-006-pedidos-pago-y-domiciliario
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              -- Nuevo estado de pago: el cliente adjuntó el comprobante y falta que la tienda lo confirme.
+              ALTER TABLE producto.tbl_pedidos DROP CONSTRAINT tbl_pedidos_estado_pago_check;
+              ALTER TABLE producto.tbl_pedidos ALTER COLUMN estado_pago TYPE VARCHAR(15);
+              ALTER TABLE producto.tbl_pedidos ADD CONSTRAINT tbl_pedidos_estado_pago_check
+                  CHECK (estado_pago IN ('PENDIENTE','POR_CONFIRMAR','RECIBIDO'));
+              ALTER TABLE producto.tbl_pedidos
+                  ADD COLUMN pago_reportado_en TIMESTAMPTZ,
+                  ADD COLUMN domiciliario_id   BIGINT REFERENCES cliente.tbl_domiciliarios(id) ON DELETE SET NULL;
+              CREATE INDEX idx_pedidos_domiciliario_id ON producto.tbl_pedidos (domiciliario_id);
+              CREATE INDEX idx_pedidos_estado_pago ON producto.tbl_pedidos (estado_pago);
+      rollback:
+        - sql:
+            sql: |
+              DROP INDEX producto.idx_pedidos_estado_pago;
+              DROP INDEX producto.idx_pedidos_domiciliario_id;
+              ALTER TABLE producto.tbl_pedidos DROP COLUMN domiciliario_id, DROP COLUMN pago_reportado_en;
+              ALTER TABLE producto.tbl_pedidos DROP CONSTRAINT tbl_pedidos_estado_pago_check;
+              ALTER TABLE producto.tbl_pedidos ADD CONSTRAINT tbl_pedidos_estado_pago_check CHECK (estado_pago IN ('PENDIENTE','RECIBIDO'));
+
+  - changeSet:
+      id: empresa-006-comprobantes-pago
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              -- Comprobantes de transferencia. Tabla aparte de tbl_archivos: esos son públicos (fotos del menú),
+              -- los comprobantes solo los ve la tienda. No se auditan (datos binarios).
+              CREATE TABLE producto.tbl_comprobantes_pago (
+                  id             BIGSERIAL PRIMARY KEY,
+                  uuid           UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  pedido_id      BIGINT      NOT NULL REFERENCES producto.tbl_pedidos(id) ON DELETE CASCADE,
+                  tipo_contenido VARCHAR(40) NOT NULL,
+                  datos          BYTEA       NOT NULL,
+                  tamano         INTEGER     NOT NULL,
+                  creado_en      TIMESTAMPTZ NOT NULL DEFAULT now()
+              );
+              CREATE INDEX idx_comprobantes_pago_pedido_id ON producto.tbl_comprobantes_pago (pedido_id);
+      rollback:
+        - sql: { sql: DROP TABLE producto.tbl_comprobantes_pago; }
+
+  - changeSet:
+      id: empresa-006-notificaciones
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              -- Avisos del portal: pedido nuevo, comprobante de pago recibido.
+              CREATE TABLE cliente.tbl_notificaciones (
+                  id        BIGSERIAL PRIMARY KEY,
+                  uuid      UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  tipo      VARCHAR(20)  NOT NULL CHECK (tipo IN ('PEDIDO_NUEVO','PAGO_REPORTADO')),
+                  pedido_id BIGINT       REFERENCES producto.tbl_pedidos(id) ON DELETE CASCADE,
+                  titulo    VARCHAR(120) NOT NULL,
+                  mensaje   VARCHAR(300) NOT NULL DEFAULT '',
+                  es_leida  BOOLEAN      NOT NULL DEFAULT FALSE,
+                  creado_en TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+              CREATE INDEX idx_notificaciones_pedido_id ON cliente.tbl_notificaciones (pedido_id);
+              CREATE INDEX idx_notificaciones_es_leida_creado_en ON cliente.tbl_notificaciones (es_leida, creado_en);
+      rollback:
+        - sql: { sql: DROP TABLE cliente.tbl_notificaciones; }
