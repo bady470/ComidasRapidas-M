@@ -76,6 +76,38 @@ export interface Tienda {
   /** Varias sedes: las que puede escoger el cliente (vacío si la empresa tiene una sola) y la de esta consulta. */
   sedes: SedePublica[];
   sedeId: number | null;
+  /** Presentación del menú que escogió el negocio (si la API es anterior, no llega y se usa la clásica). */
+  plantilla?: Plantilla;
+}
+
+// ---------- Plantillas de la tienda ----------
+export type Plantilla = 'CLASICA' | 'VITRINA' | 'EXPRESS' | 'ELEGANTE';
+
+export interface InfoPlantilla {
+  clave: Plantilla; nombre: string; descripcion: string; idealPara: string;
+  /** Colores de la miniatura: fondo, tarjetas y texto (la marca se pinta encima). */
+  muestra: { fondo: string; tarjeta: string; texto: string };
+}
+
+export const PLANTILLAS: InfoPlantilla[] = [
+  { clave: 'CLASICA', nombre: 'Clásica', idealPara: 'Casi cualquier negocio',
+    descripcion: 'Portada con tus mejores fotos, círculos de categorías y lista con la foto al lado.',
+    muestra: { fondo: '#F4F5F9', tarjeta: '#FFFFFF', texto: '#161A23' } },
+  { clave: 'VITRINA', nombre: 'Vitrina', idealPara: 'Postres, panadería, tortas, regalos',
+    descripcion: 'Tarjetas grandes con la foto arriba, como una vitrina. Ideal cuando tus productos entran por los ojos.',
+    muestra: { fondo: '#FBF7F2', tarjeta: '#FFFFFF', texto: '#2A1F17' } },
+  { clave: 'EXPRESS', nombre: 'Express', idealPara: 'Comidas rápidas y menús largos',
+    descripcion: 'Sin portada grande: el menú aparece de una, compacto y fácil de recorrer con el dedo.',
+    muestra: { fondo: '#F2F4F7', tarjeta: '#FFFFFF', texto: '#101828' } },
+  { clave: 'ELEGANTE', nombre: 'Elegante', idealPara: 'Restaurantes, cafés y bares',
+    descripcion: 'Fondo oscuro, letras con serifa y la carta como en un restaurante de manteles.',
+    muestra: { fondo: '#121212', tarjeta: '#1C1C1C', texto: '#F2EDE4' } },
+];
+
+/** Plantilla válida a partir de cualquier texto (de la API o de ?plantilla= en la vista previa). */
+export function plantillaDe(v: string | null | undefined): Plantilla {
+  const k = (v ?? '').toUpperCase();
+  return PLANTILLAS.some((p) => p.clave === k) ? (k as Plantilla) : 'CLASICA';
 }
 
 // ---------- Varias sedes ----------

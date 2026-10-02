@@ -17,6 +17,7 @@ import { CelularPipe, soloHora } from '../core/formato';
   selector: 'app-tienda-layout',
   imports: [Icono, BotonModo, RouterOutlet, RouterLink, RouterLinkActive, CelularPipe, Logo, CarritoFlotante, SelectorSede, AvisoCerrado],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[class]': "'tienda pl-' + estado.plantilla().toLowerCase()" },
   template: `
     <header class="top">
       <div class="wrap">

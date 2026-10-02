@@ -72,6 +72,7 @@ export class AdminLayout implements OnInit {
   protected tienda = computed(() => this.estado.catalogo()?.tienda ?? null);
 
   protected menu = computed<GrupoMenu[]>(() => [
+    { items: [{ ruta: 'inicio', texto: 'Inicio', icono: 'casa' }] },
     { titulo: 'Operación', items: [
       { ruta: 'pedidos', texto: 'Pedidos', icono: 'pedidos', insignia: this.porPagar() ? `${this.porPagar()} por pagar` : null },
       ...(this.estado.tieneModulo(MODULOS.reportes) ? [
@@ -94,6 +95,7 @@ export class AdminLayout implements OnInit {
     { titulo: 'Configuración', items: [
       { ruta: 'tienda', texto: 'Mi tienda', icono: 'tienda' },
       ...(this.estado.tieneModulo(MODULOS.sedes) ? [{ ruta: 'sedes', texto: 'Sedes', icono: 'sedes' }] : []),
+      { ruta: 'plantillas', texto: 'Plantillas', icono: 'plantilla' },
       ...(this.estado.tieneModulo(MODULOS.mapas) ? [{ ruta: 'mapa', texto: 'Domicilios y mapa', icono: 'mapa' }] : []),
       ...(this.estado.tieneModulo(MODULOS.pagosEnLinea) ? [{ ruta: 'pagos-en-linea', texto: 'Pagos en línea', icono: 'pagos' }] : []),
     ] },

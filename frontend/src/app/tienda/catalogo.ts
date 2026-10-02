@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, signal, untracked } from '@angular/core';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { FormsModule } from '@angular/forms';
@@ -8,6 +8,7 @@ import { Icono } from '../compartido/icono';
 import { Slider } from './slider';
 import { SelectorProducto, Seleccion } from '../compartido/selector-producto';
 import { revelarAlDesplazar, sinMovimiento } from '../core/animar';
+import { montarEscenas, palabras } from '../core/escenas';
 import { Avisos } from '../core/avisos';
 import { Carrito } from '../core/carrito';
 import { EmpresaActual } from '../core/empresa';
@@ -33,6 +34,27 @@ interface Seccion { id: string; nombre: string; productos: Producto[]; }
       }
 
       @if (estado.catalogo(); as c) {
+        @if (estado.plantilla() === 'EXPRESS') {
+          <section class="ex-cab" aria-label="Presentación">
+            <div class="wrap ex-grid">
+              <div class="ex-texto">
+                <h1>{{ c.tienda.tituloPortada || c.tienda.nombre }}</h1>
+                @if (c.tienda.mensaje) { <p>{{ c.tienda.mensaje }}</p> }
+              </div>
+              <ul class="ex-datos">
+                @if (c.tienda.modoPedido === 'PROGRAMADO') {
+                  <li class="ex-estado"><i></i> Entrega {{ c.tienda.fechaServicio | diaLargo }}</li>
+                } @else if (c.tienda.enHorario) {
+                  <li class="ex-estado abierta"><i></i> Abierto</li>
+                } @else {
+                  <li class="ex-estado cerrada"><i></i> Cerrado{{ c.tienda.proximaApertura ? ' · abre ' + texto(c.tienda.proximaApertura) : '' }}</li>
+                }
+                @if (c.tienda.modoPedido !== 'PROGRAMADO') { <li><app-icono nombre="reloj" [tam]="16" /> {{ c.tienda.tiempoMin }}–{{ c.tienda.tiempoMax }} min</li> }
+                @if (entrega()) { <li><app-icono nombre="domiciliarios" [tam]="16" /> {{ entrega() }}</li> }
+              </ul>
+            </div>
+          </section>
+        } @else {
         <section class="lp" aria-label="Presentación">
           <span class="lp-blob b1" aria-hidden="true"></span><span class="lp-blob b2" aria-hidden="true"></span>
           <div class="wrap lp-grid">
@@ -66,11 +88,44 @@ interface Seccion { id: string; nombre: string; productos: Producto[]; }
           </div>
         </section>
 
-        <section class="pasos wrap" aria-label="Cómo pedir">
-          <div class="paso"><span class="n">1</span><div><b>Escoge</b><span>Mira el menú y agrega lo que se te antoje.</span></div></div>
-          <div class="paso"><span class="n">2</span><div><b>Dinos dónde</b><span>Domicilio a tu puerta o recoges en el local.</span></div></div>
-          <div class="paso"><span class="n">3</span><div><b>Paga y sigue tu pedido</b><span>Elige cómo pagar y míralo avanzar en vivo.</span></div></div>
+        <section class="pasos pasos-escena" aria-label="Cómo pedir">
+          <div class="wrap pasos-int">
+            <h2 class="palabras">@for (w of palabras('Pedir es así de fácil'); track $index) {<span class="pal"><i>{{ w }}</i></span> }</h2>
+            <div class="pasos-linea" aria-hidden="true"><i></i></div>
+            <div class="pasos-lista">
+              <div class="paso"><span class="n">1</span><div><b>Escoge</b><span>Mira el menú y agrega lo que se te antoje.</span></div></div>
+              <div class="paso"><span class="n">2</span><div><b>Dinos dónde</b><span>Domicilio a tu puerta o recoges en el local.</span></div></div>
+              <div class="paso"><span class="n">3</span><div><b>Paga y sigue tu pedido</b><span>Elige cómo pagar y míralo avanzar en vivo.</span></div></div>
+            </div>
+          </div>
         </section>
+        }
+
+        @if (favoritos().length >= 4 && estado.plantilla() !== 'EXPRESS') {
+          <section class="fav" aria-label="Los favoritos de la casa">
+            <div class="fav-pista">
+              <div class="fav-fila">
+                <div class="fav-intro">
+                  <span class="fav-kicker">Lo más pedido</span>
+                  <h2 class="palabras">@for (w of palabras('Los favoritos de la casa'); track $index) {<span class="pal"><i>{{ w }}</i></span> }</h2>
+                  <p>Los que todos piden. Toca uno para agregarlo.</p>
+                </div>
+                @for (p of favoritos(); track p.id) {
+                  <button type="button" class="fav-card" (click)="c.tienda.abierto ? abrir(p) : irAlMenu()" [attr.aria-label]="(c.tienda.abierto ? 'Agregar ' : 'Ver ') + p.nombre">
+                    <span class="fav-foto"><app-foto [imagenId]="p.imagenId" [nombre]="p.nombre" /></span>
+                    @if (p.etiqueta) { <span class="fav-etq">{{ p.etiqueta }}</span> }
+                    <span class="fav-info">
+                      <b>{{ p.nombre }}</b>
+                      <span class="num">@if (p.grupos.length) {<small>desde </small>}{{ p.precioHoy | dinero }}</span>
+                    </span>
+                    @if (c.tienda.abierto) { <span class="fav-mas" aria-hidden="true">@if (carrito.cantidadDe(p.id); as q) {<span class="num">{{ q }}</span>} @else {+}</span> }
+                  </button>
+                }
+              </div>
+            </div>
+            <div class="fav-progreso" aria-hidden="true"><i></i></div>
+          </section>
+        }
 
         <div class="wrap" id="menu">
         @if (!c.tienda.abierto) {
@@ -194,7 +249,21 @@ export class CatalogoPage {
       this.animado = true;
       requestAnimationFrame(() => this.animarPortada());
     });
-    const limpiar = revelarAlDesplazar(this.raiz, '.paso, .sec-h, .item, .promo, .rp-slider');
+    // Escenas de scroll (portada fija, favoritos de lado, pasos): se arman cuando el menú ya está pintado y se
+    // rearman si el negocio cambia de plantilla, porque cambian las secciones.
+    effect(() => {
+      const plantilla = this.estado.plantilla();
+      if (!this.estado.catalogo()) return;
+      untracked(() => {
+        if (plantilla === this.plantillaEscenas) return;
+        this.plantillaEscenas = plantilla;
+        this.desmontarEscenas();
+        setTimeout(() => { if (this.destruido) return; this.desmontarEscenas(); this.desmontarEscenas = montarEscenas(this.raiz); }, 80);
+      });
+    });
+    // Los pasos de escritorio los anima su escena (fija); en el celular entran al aparecer como lo demás.
+    const pasos = matchMedia('(min-width: 900px)').matches ? '' : '.paso, ';
+    const limpiar = revelarAlDesplazar(this.raiz, pasos + '.sec-h, .item, .promo, .rp-slider');
     // La categoría marcada sigue al scroll, y su círculo se centra en la barra.
     let espera = false;
     const alDesplazar = () => {
@@ -203,23 +272,43 @@ export class CatalogoPage {
       requestAnimationFrame(() => {
         espera = false;
         let id = '';
-        for (const sec of Array.from(this.raiz.querySelectorAll<HTMLElement>('.seccion'))) if (sec.getBoundingClientRect().top <= 190) id = sec.id.replace('cat-', '');
+        // La barra se encoge al pegarse: la línea de corte es su borde de abajo, con un margen (y nunca más abajo
+        // que eso, para que una categoría no se marque mientras la barra todavía no ha llegado arriba).
+        const corte = Math.min(this.raiz.querySelector('.rp-barra')?.getBoundingClientRect().bottom ?? 170, 230) + 60;
+        for (const sec of Array.from(this.raiz.querySelectorAll<HTMLElement>('.seccion'))) if (sec.getBoundingClientRect().top <= corte) id = sec.id.replace('cat-', '');
         this.raiz.querySelector('.rp-barra')?.classList.toggle('pegada', (this.raiz.querySelector('.rp-barra')?.getBoundingClientRect().top ?? 99) <= 60);
         if (id && id !== this.activa()) {
           this.activa.set(id);
-          requestAnimationFrame(() => this.raiz.querySelector('.rp-cats button[aria-pressed=true]')?.scrollIntoView({ inline: 'center', block: 'nearest' }));
+          // Solo se corre la barra de categorías de lado: scrollIntoView movería toda la página.
+          requestAnimationFrame(() => {
+            const barra = this.raiz.querySelector<HTMLElement>('.rp-cats');
+            const boton = barra?.querySelector<HTMLElement>('button[aria-pressed=true]');
+            if (barra && boton) barra.scrollTo({ left: boton.offsetLeft - (barra.clientWidth - boton.offsetWidth) / 2, behavior: 'smooth' });
+          });
         }
       });
     };
     addEventListener('scroll', alDesplazar, { passive: true });
-    inject(DestroyRef).onDestroy(() => { limpiar(); removeEventListener('scroll', alDesplazar); this.flotando?.kill?.(); ScrollTrigger.getAll().forEach((t) => t.kill()); });
+    inject(DestroyRef).onDestroy(() => { this.destruido = true; limpiar(); this.desmontarEscenas(); removeEventListener('scroll', alDesplazar); this.flotando?.kill?.(); ScrollTrigger.getAll().forEach((t) => t.kill()); });
   }
+
+  private plantillaEscenas = '';
+  private destruido = false;
+  private desmontarEscenas: () => void = () => undefined;
+  protected readonly palabras = palabras;
+
+  /** Para la galería: primero los que tienen etiqueta («Más vendida», «Nuevo»…), siempre con foto. Hasta 8. */
+  protected favoritos = computed(() => {
+    const ps = (this.estado.catalogo()?.productos ?? []).filter((p) => p.imagenId && p.disponible);
+    return [...ps.filter((p) => p.etiqueta), ...ps.filter((p) => !p.etiqueta)].slice(0, 8);
+  });
 
   private flotando: { kill?: () => void } | null = null;
 
   private animarPortada(): void {
-    if (sinMovimiento()) return;
     const r = this.raiz;
+    // La plantilla Express no tiene portada grande que animar.
+    if (sinMovimiento() || !r.querySelector('.lp')) return;
     gsap.registerPlugin(ScrollTrigger);
     const t = gsap.timeline({ defaults: { ease: 'power3.out' } });
     t.fromTo(r.querySelector('.lp-estado'), { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.4, clearProps: 'all' })
@@ -229,11 +318,7 @@ export class CatalogoPage {
     // Las fotos y los círculos de fondo flotan despacio.
     this.flotando = gsap.to(r.querySelectorAll('.lp-foto'), { y: -10, duration: 2.6, ease: 'sine.inOut', yoyo: true, repeat: -1, stagger: { each: 0.5, from: 'start' } });
     gsap.to(r.querySelectorAll('.lp-blob'), { x: 30, y: -20, duration: 7, ease: 'sine.inOut', yoyo: true, repeat: -1, stagger: 1.5 });
-    // Efecto de profundidad al bajar: las fotos suben más rápido que el texto y los círculos de fondo se alejan.
-    const alBajar = { trigger: r.querySelector('.lp'), start: 'top top', end: 'bottom top', scrub: true };
-    gsap.to(r.querySelector('.lp-fotos'), { yPercent: -14, ease: 'none', scrollTrigger: alBajar });
-    gsap.to(r.querySelector('.lp-texto'), { yPercent: 10, opacity: 0.35, ease: 'none', scrollTrigger: alBajar });
-    gsap.to(r.querySelectorAll('.lp-blob'), { yPercent: 40, ease: 'none', scrollTrigger: alBajar });
+    // Lo que pasa al bajar (portada fija en escritorio, profundidad en el celular) está en core/escenas.ts.
   }
 
   /** Agrega un producto y hace «saltar» el botón para que se note. */

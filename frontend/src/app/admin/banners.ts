@@ -66,8 +66,15 @@ const COLORES = ['', '#DC2626', '#EA580C', '#CA8A04', '#15803D', '#0D9488', '#1D
       @for (b of banners(); track b.id; let i = $index) {
         <div class="ban-fila" [class.apagado]="!b.activo">
           <div class="ban-mini"><app-slide [titulo]="b.titulo" [subtitulo]="b.subtitulo" [boton]="b.boton" [imagenId]="b.imagenId" [color]="b.color" /></div>
+          <div class="ban-info">
+            <div class="ban-meta">
+              <span class="ban-orden">Banner {{ i + 1 }}</span>
+              <span class="chip" [class.hot]="b.activo">{{ b.activo ? 'Visible en la tienda' : 'Oculto' }}</span>
+            </div>
+            <h4>{{ b.titulo }}</h4>
+            @if (b.subtitulo) { <p class="muted">{{ b.subtitulo }}</p> }
+          </div>
           <div class="ban-acciones">
-            <span class="chip" [class.hot]="b.activo">{{ b.activo ? 'Visible' : 'Oculto' }}</span>
             <div class="row">
               <button class="btn" type="button" (click)="mover(i, -1)" [disabled]="i === 0" aria-label="Subir">↑</button>
               <button class="btn" type="button" (click)="mover(i, 1)" [disabled]="i === banners().length - 1" aria-label="Bajar">↓</button>
@@ -85,16 +92,24 @@ const COLORES = ['', '#DC2626', '#EA580C', '#CA8A04', '#15803D', '#0D9488', '#1D
     .ban-editor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 24px; align-items: start; }
     .ban-form { display: grid; gap: 14px; }
     .ban-prev { display: grid; gap: 8px; position: sticky; top: 76px; }
-    .ban-marco { height: 230px; }
+    .ban-marco { aspect-ratio: 16 / 6; border-radius: 14px; overflow: hidden; box-shadow: 0 0 0 1px var(--line); }
     .ban-colores { display: flex; flex-wrap: wrap; gap: 8px; }
     .ban-color { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
     .ban-color.on { box-shadow: 0 0 0 2px var(--brand); }
     .ban-lista { display: grid; gap: 12px; }
-    .ban-fila { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 16px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+    .ban-fila { display: grid; grid-template-columns: minmax(200px, 320px) minmax(0, 1fr) auto; gap: 20px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; }
+    .ban-info { display: grid; gap: 6px; align-content: center; min-width: 0; }
+    .ban-info h4 { font-size: 16px; font-weight: 700; margin: 0; overflow-wrap: anywhere; }
+    .ban-info p { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+    .ban-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .ban-orden { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); }
     .ban-fila.apagado .ban-mini { opacity: .45; filter: grayscale(.6); }
-    .ban-mini { height: 130px; }
-    .ban-acciones { display: grid; gap: 10px; justify-items: start; }
-    @media (max-width: 900px) { .ban-editor { grid-template-columns: minmax(0, 1fr); } .ban-prev { position: static; } .ban-fila { grid-template-columns: minmax(0, 1fr); } }
+    .ban-mini { aspect-ratio: 16 / 7; border-radius: 12px; overflow: hidden; box-shadow: 0 0 0 1px var(--line); }
+    .ban-acciones { display: grid; justify-items: end; }
+    .ban-acciones .btn { min-width: 38px; text-align: center; }
+    @media (max-width: 1100px) { .ban-fila { grid-template-columns: minmax(200px, 280px) minmax(0, 1fr); } .ban-acciones { grid-column: 1 / -1; justify-items: start; } }
+    @media (max-width: 900px) { .ban-editor { grid-template-columns: minmax(0, 1fr); } .ban-prev { position: static; } }
+    @media (max-width: 600px) { .ban-fila { grid-template-columns: minmax(0, 1fr); } }
   `,
 })
 export class BannersPage {

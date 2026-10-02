@@ -42,7 +42,9 @@ public final class PublicoDto {
             // Cómo se cobra el domicilio (valor fijo, por zona o por distancia en el mapa).
             MapaDto.EntregaPublica entrega,
             // Varias sedes: las que puede escoger el cliente y la sede de esta consulta (vacío y null sin el módulo).
-            List<SedesDto.SedePublica> sedes, Long sedeId) {}
+            List<SedesDto.SedePublica> sedes, Long sedeId,
+            // Presentación del menú que escogió el negocio.
+            PlantillaTienda plantilla) {}
 
     /**
      * minutosExtra: cuánto se sumó al tiempo de entrega (0 = normal), hasta demoraHasta.

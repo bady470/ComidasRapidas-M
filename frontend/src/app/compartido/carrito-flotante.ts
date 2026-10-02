@@ -1,9 +1,11 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, effect, inject, input, untracked, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, input, untracked, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { gsap } from 'gsap';
 import { sinMovimiento } from '../core/animar';
 import { Carrito } from '../core/carrito';
 import { EmpresaActual } from '../core/empresa';
+import { EstadoTienda } from '../core/estado-tienda';
+import { DineroPipe } from '../core/formato';
 
 /** Último toque en la página: de ahí sale el cometa cuando ese toque agrega algo al carrito. */
 interface Toque { x: number; y: number; foto: string | null; cuando: number; }
@@ -17,11 +19,18 @@ const CHISPAS = 12;
  */
 @Component({
   selector: 'app-carrito-flotante',
-  imports: [RouterLink],
+  imports: [RouterLink, DineroPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (visible()) {
-      <div class="cf-ancla">
+      <div class="cf-ancla" [class.con-barra]="carrito.totalUnidades() > 0">
+        @if (carrito.totalUnidades(); as n) {
+          <!-- En el celular, con algo en el carrito, el botón se vuelve una barra abajo con cuánto llevas. -->
+          <a class="cf-barra" [routerLink]="emp.url('/carrito')">
+            <span class="cf-barra-txt"><b>Ver carrito</b><small>{{ n }} {{ n === 1 ? 'producto' : 'productos' }}</small></span>
+            <b class="cf-barra-total num">{{ subtotal() | dinero }}</b>
+          </a>
+        }
         <a #boton class="cf" [class.lleno]="carrito.totalUnidades() > 0" [routerLink]="emp.url('/carrito')"
            [attr.aria-label]="'Ver carrito: ' + carrito.totalUnidades() + (carrito.totalUnidades() === 1 ? ' producto' : ' productos')">
           <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -38,8 +47,20 @@ const CHISPAS = 12;
 export class CarritoFlotante {
   protected carrito = inject(Carrito);
   protected emp = inject(EmpresaActual);
+  private estado = inject(EstadoTienda);
   /** El layout lo oculta en la página del carrito. */
   readonly visible = input(true);
+
+  /** Lo que llevas a precio de hoy con sus adiciones (las promociones y el domicilio se calculan en el carrito). */
+  protected subtotal = computed(() => {
+    const productos = this.estado.catalogo()?.productos ?? [];
+    return this.carrito.lineas().reduce((suma, l) => {
+      const p = productos.find((x) => x.id === l.productoId);
+      if (!p) return suma;
+      const extras = p.grupos.flatMap((g) => g.opciones).filter((o) => l.opcionIds.includes(o.id)).reduce((a, o) => a + o.precioExtra, 0);
+      return suma + (p.precioHoy + extras) * l.cantidad;
+    }, 0);
+  });
 
   private boton = viewChild<ElementRef<HTMLElement>>('boton');
   private insignia = viewChild<ElementRef<HTMLElement>>('insignia');
@@ -49,7 +70,7 @@ export class CarritoFlotante {
   constructor() {
     const alTocar = (e: PointerEvent) => {
       const el = e.target instanceof Element ? e.target : null;
-      const foto = el?.closest('.card, .hoja')?.querySelector<HTMLImageElement>('app-foto img')?.currentSrc ?? null;
+      const foto = el?.closest('.card, .item, .hoja')?.querySelector<HTMLImageElement>('app-foto img')?.currentSrc ?? null;
       this.toque = { x: e.clientX, y: e.clientY, foto, cuando: performance.now() };
     };
     document.addEventListener('pointerdown', alTocar, { capture: true, passive: true });

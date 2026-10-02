@@ -66,12 +66,14 @@ export class Slider {
       else gsap.to(pista, { xPercent: -100 * i, duration: 0.6, ease: 'power3.inOut' });
     });
     // Avanza sola cada 5 segundos, salvo que el cliente esté encima, la pestaña esté oculta o pida «reducir movimiento».
+    // DestroyRef se toma aquí: dentro de afterNextRender ya no hay contexto de inyección.
+    const destruir = inject(DestroyRef);
     afterNextRender(() => {
       const t = setInterval(() => {
         if (this.pausa() || document.hidden || sinMovimiento() || this.banners().length < 2) return;
         this.ir(this.actual() + 1);
       }, 5000);
-      inject(DestroyRef).onDestroy(() => clearInterval(t));
+      destruir.onDestroy(() => clearInterval(t));
     });
   }
 

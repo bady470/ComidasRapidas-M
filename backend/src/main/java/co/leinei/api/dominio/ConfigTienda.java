@@ -104,6 +104,9 @@ public class ConfigTienda implements Saturable {
     /** Mensaje para escribirle a un cliente que dejó de pedir ({nombre}, {tienda}, {link}, {dias}). */
     @Column(name = "mensaje_recuperar")
     private String mensajeRecuperar = "";
+    /** Presentación del menú para los clientes. */
+    @Enumerated(EnumType.STRING)
+    private PlantillaTienda plantilla = PlantillaTienda.CLASICA;
 
     /** Minutos que se suman al tiempo de entrega mientras dure la demora. */
     public int minutosExtraVigentes(Instant ahora) {
@@ -206,6 +209,8 @@ public class ConfigTienda implements Saturable {
     public void setImpresionPie(String v) { impresionPie = v == null ? "" : v; }
     public String getMensajeRecuperar() { return mensajeRecuperar; }
     public void setMensajeRecuperar(String v) { mensajeRecuperar = v == null ? "" : v; }
+    public PlantillaTienda getPlantilla() { return plantilla; }
+    public void setPlantilla(PlantillaTienda v) { plantilla = v == null ? PlantillaTienda.CLASICA : v; }
     public int getMinutosExtra() { return minutosExtra; }
     public void setMinutosExtra(int v) { minutosExtra = (short) v; }
     public Instant getDemoraHasta() { return demoraHasta; }

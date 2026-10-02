@@ -261,6 +261,7 @@ Los errores llegan como `{ "status": 400, "detail": "Mensaje para mostrar" }` y 
 | POST | `/archivos` | Subir foto de producto |
 | POST/DELETE | `/marca/logo` | Logo de la empresa |
 | GET/PUT | `/config` | Configuración de la tienda (el nombre y los colores se guardan en la plataforma) |
+| PUT | `/plantilla` | Plantilla visual de la tienda: `CLASICA`, `VITRINA`, `EXPRESS` o `ELEGANTE` (llega a los clientes en `tienda.plantilla` del catálogo; vista previa con `?plantilla=` en la dirección de la tienda) |
 
 **Superadmin (token)** — `/api/plataforma`
 

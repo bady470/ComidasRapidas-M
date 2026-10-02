@@ -1,9 +1,9 @@
-import { Injectable, effect, inject, signal, untracked } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { TiendaApi, mensajeError } from './api';
 import { Carrito } from './carrito';
 import { EmpresaActual, apiEmpresa } from './empresa';
-import { Catalogo } from './modelos';
+import { Catalogo, plantillaDe } from './modelos';
 import { Tema } from './tema';
 import { escucharCanal } from './tiempo-real';
 
@@ -20,6 +20,12 @@ export class EstadoTienda {
   private emp = inject(EmpresaActual);
 
   readonly catalogo = signal<Catalogo | null>(null);
+  /**
+   * Plantilla con que se pinta la tienda. El portal la muestra en vista previa con ?plantilla=VITRINA antes de
+   * aplicarla (se mantiene al navegar dentro de esa vista); sin el parámetro manda la que escogió el negocio.
+   */
+  readonly plantilla = computed(() => plantillaDe(this.vistaPrevia ?? this.catalogo()?.tienda.plantilla));
+  private readonly vistaPrevia = new URLSearchParams(location.search).get('plantilla');
   readonly cargando = signal(false);
   readonly error = signal('');
 

@@ -16,3 +16,4 @@ databaseChangeLog:
   - include: { file: 012-banners.yaml, relativeToChangelogFile: true }
   - include: { file: 013-pedidos-publicados.yaml, relativeToChangelogFile: true }
   - include: { file: 014-sedes.yaml, relativeToChangelogFile: true }
+  - include: { file: 015-plantilla-tienda.yaml, relativeToChangelogFile: true }

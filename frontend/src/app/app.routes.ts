@@ -17,7 +17,8 @@ function rutasEmpresa(): Routes {
       canActivate: [soloAdmin],
       loadComponent: () => import('./admin/admin-layout').then((m) => m.AdminLayout),
       children: [
-        { path: '', pathMatch: 'full', redirectTo: 'pedidos' },
+        { path: '', pathMatch: 'full', redirectTo: 'inicio' },
+        { path: 'inicio', title: 'Inicio', loadComponent: () => import('./admin/inicio').then((m) => m.InicioAdminPage) },
         { path: 'pedidos', title: 'Pedidos', loadComponent: () => import('./admin/pedidos').then((m) => m.PedidosPage) },
         { path: 'estadisticas', title: 'Estadísticas', loadComponent: () => import('./admin/estadisticas').then((m) => m.EstadisticasPage) },
         { path: 'caja', title: 'Cierre de caja', loadComponent: () => import('./admin/caja').then((m) => m.CajaPage) },
@@ -29,6 +30,7 @@ function rutasEmpresa(): Routes {
         { path: 'banners', title: 'Banners', loadComponent: () => import('./admin/banners').then((m) => m.BannersPage) },
         { path: 'promociones', title: 'Promociones', loadComponent: () => import('./admin/promociones').then((m) => m.PromocionesPage) },
         { path: 'domiciliarios', title: 'Domiciliarios', loadComponent: () => import('./admin/domiciliarios').then((m) => m.DomiciliariosPage) },
+        { path: 'plantillas', title: 'Plantillas', loadComponent: () => import('./admin/plantillas').then((m) => m.PlantillasPage) },
         { path: 'tienda', title: 'Mi tienda', loadComponent: () => import('./admin/config').then((m) => m.ConfigPage) },
         { path: 'sedes', title: 'Sedes', loadComponent: () => import('./admin/sedes').then((m) => m.SedesPage) },
         { path: 'mapa', title: 'Domicilios y mapa', loadComponent: () => import('./admin/mapa-config').then((m) => m.MapaConfigPage) },

@@ -43,7 +43,7 @@ export class LoginPage {
     this.cargando.set(true);
     this.error.set('');
     this.api.login(this.usuario().trim(), this.clave()).subscribe({
-      next: (s) => { this.sesion.iniciar(s); this.router.navigateByUrl(this.emp.url('/admin/pedidos')); },
+      next: (s) => { this.sesion.iniciar(s); this.router.navigateByUrl(this.emp.url('/admin')); },
       error: (e) => { this.error.set(mensajeError(e)); this.cargando.set(false); },
     });
   }

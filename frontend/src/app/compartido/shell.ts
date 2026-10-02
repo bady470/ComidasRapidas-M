@@ -57,7 +57,10 @@ export interface GrupoMenu { titulo?: string; items: ItemMenu[]; }
       <div class="mt-main">
         <header class="mt-top">
           <button class="mt-menu" type="button" (click)="abierto.set(!abierto())" aria-label="Abrir el menú"><app-icono nombre="menu" /></button>
-          <h1 class="mt-titulo">{{ titulo() }}</h1>
+          <div class="mt-encabezado">
+            @if (seccion().grupo) { <span class="mt-miga">{{ seccion().grupo }}</span> }
+            <h1 class="mt-titulo">{{ seccion().texto }}</h1>
+          </div>
           <span class="spacer"></span>
           <app-modo />
           <div class="mt-acciones"><ng-content select="[acciones]" /></div>
@@ -86,13 +89,14 @@ export class Shell {
   protected inicial = computed(() => (this.usuario().trim()[0] ?? '?').toUpperCase());
 
   /** El nombre de la sección activa se toma del menú: la ruta actual termina en la ruta del ítem. */
-  protected titulo = computed(() => {
+  protected seccion = computed(() => {
     const u = this.url().split('?')[0].replace(/\/+$/, '');
     let mejor: ItemMenu | null = null;
+    let grupo = '';
     for (const g of this.grupos()) for (const i of g.items) {
-      if ((u.endsWith('/' + i.ruta) || u.includes('/' + i.ruta + '/')) && (!mejor || i.ruta.length > mejor.ruta.length)) mejor = i;
+      if ((u.endsWith('/' + i.ruta) || u.includes('/' + i.ruta + '/')) && (!mejor || i.ruta.length > mejor.ruta.length)) { mejor = i; grupo = g.titulo ?? ''; }
     }
-    return mejor?.texto ?? this.grupos()[0]?.items[0]?.texto ?? '';
+    return { texto: mejor?.texto ?? this.grupos()[0]?.items[0]?.texto ?? '', grupo };
   });
 
   constructor() {

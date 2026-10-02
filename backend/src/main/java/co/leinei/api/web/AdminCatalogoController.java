@@ -186,6 +186,11 @@ public class AdminCatalogoController {
         return config.actualizar(req);
     }
 
+    @PutMapping("/plantilla")
+    public AdminDto.Plantilla cambiarPlantilla(@Valid @RequestBody AdminDto.Plantilla req) {
+        return new AdminDto.Plantilla(config.cambiarPlantilla(req.plantilla()));
+    }
+
     private static void exigirPromociones() {
         EmpresaContexto.exigirModulo(Modulos.PROMOCIONES, "Promociones");
     }

@@ -1,0 +1,21 @@
+# Plantilla visual de la tienda (cómo ven los clientes el menú). La escoge el administrador desde su portal.
+# La precondición evita fallar en bases donde la columna ya se creó (se probó antes como 014 en desarrollo).
+databaseChangeLog:
+  - changeSet:
+      id: empresa-015-plantilla-tienda
+      author: leinei
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                schemaName: cliente
+                tableName: tbl_configuraciones
+                columnName: plantilla
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE cliente.tbl_configuraciones
+                  ADD COLUMN plantilla VARCHAR(20) NOT NULL DEFAULT 'CLASICA'
+                  CHECK (plantilla IN ('CLASICA', 'VITRINA', 'EXPRESS', 'ELEGANTE'));
+      rollback:
+        - sql: { sql: "ALTER TABLE cliente.tbl_configuraciones DROP COLUMN plantilla" }

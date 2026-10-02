@@ -209,4 +209,7 @@ public final class AdminDto {
                              int costoProductos, int costoOperativo, int ganancia, int cobrado, int porCobrar,
                              int domicilio, int recoger, List<LineaProduccion> productos, List<LineaDetalle> detalle,
                              List<PagoPorCuenta> pagos) {}
+
+    /** Plantilla visual de la tienda (ver PlantillaTienda). */
+    public record Plantilla(@NotNull(message = "Escoge una plantilla") PlantillaTienda plantilla) {}
 }

@@ -9,7 +9,7 @@ import {
   Avisos, Domiciliario, ActualizarEmpresa, CrearEmpresa, EmpresaDetalle, EmpresaResumen, ModuloPlataforma, ResumenPlataforma, Superadmin, Biblioteca, ResultadoBiblioteca, Plan, EmpresaCreada, ConfigCorreo, ConfigCorreoForm, ResultadoPrueba,
   AccionSaturacion, Caja, CierreCajaForm, Estadisticas, Saturacion, Clientes, ConfigCocina,
   ConfigMapa, Reparto, UbicacionDomiciliario, MenuSedes, PanelSedes, ProductoEnSede, SedeForm,
-  ConfigPagosEmpresa, ConfigPagosEmpresaForm, Liquidacion, Llaves, MetodoPago, PasarelaPlataforma, PortalPagos, Proveedor, Recaudos,
+  ConfigPagosEmpresa, ConfigPagosEmpresaForm, Liquidacion, Llaves, MetodoPago, PasarelaPlataforma, Plantilla, PortalPagos, Proveedor, Recaudos,
 } from './modelos';
 
 import { apiEmpresa } from './empresa';
@@ -298,6 +298,10 @@ export class AdminApi {
   }
 
   // ---- Pagos en línea
+  cambiarPlantilla(plantilla: Plantilla): Observable<{ plantilla: Plantilla }> {
+    return this.http.put<{ plantilla: Plantilla }>(`${this.base}/plantilla`, { plantilla });
+  }
+
   pagosEnLinea(): Observable<PortalPagos> {
     return this.http.get<PortalPagos>(`${this.base}/pagos-en-linea`);
   }

@@ -128,7 +128,8 @@ public class ConfigService {
                 c.isEfectivo(), cuentas, e.modulos().stream().sorted().toList(),
                 pagosEnLinea.activa(e).map(a -> new PagosDto.PagoPublico(a.proveedor().name(), a.proveedor().nombre(),
                         a.proveedor().medios())).orElse(null),
-                saturacion(c, ahora), entrega, sedesPublicas(), sedes.activas() ? sedes.actual().getId() : null);
+                saturacion(c, ahora), entrega, sedesPublicas(), sedes.activas() ? sedes.actual().getId() : null,
+                c.getPlantilla());
     }
 
     /** Las sedes para que el cliente escoja (vacío si la empresa no tiene varias sedes). */
@@ -152,6 +153,18 @@ public class ConfigService {
         String modo = zonasActivas().isEmpty() ? "FIJO" : "ZONAS";
         // La ubicación del local igual sirve para mostrarlo en el mapa del seguimiento.
         return new MapaDto.EntregaPublica(modo, mapas ? c.getLocalLat() : null, mapas ? c.getLocalLng() : null, List.of(), null);
+    }
+
+    // ------------------------------------------------------------------ plantilla
+
+    /** Cambia la presentación del menú; las tiendas abiertas se actualizan solas. */
+    @Transactional
+    public PlantillaTienda cambiarPlantilla(PlantillaTienda plantilla) {
+        if (plantilla == null) throw ReglaNegocioException.invalido("Escoge una plantilla.");
+        tienda().setPlantilla(plantilla);
+        long empresa = EmpresaContexto.requerida().id();
+        tiempoReal.publicar("catalogo", Map.of(), TiempoReal.tienda(empresa), TiempoReal.admin(empresa));
+        return plantilla;
     }
 
     // ------------------------------------------------------------------ mapas

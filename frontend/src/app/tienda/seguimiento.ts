@@ -24,6 +24,10 @@ const PASOS: Record<string, { titulo: string; detalle: string }> = {
   ENTREGADO: { titulo: 'Entregado', detalle: '¡Que lo disfrutes!' },
 };
 
+const ICONOS: Partial<Record<EstadoPedido, string>> = {
+  NUEVO: 'nota', CONFIRMADO: 'ok', PREPARANDO: 'cocina', EN_CAMINO: 'domiciliarios', LISTO: 'local', ENTREGADO: 'chispa',
+};
+
 @Component({
   selector: 'app-seguimiento',
   imports: [Icono, FormsModule, RouterLink, DineroPipe, DiaLargoPipe, HoraPipe, PagarPedido, PagarEnLinea, Mapa],
@@ -32,6 +36,20 @@ const PASOS: Record<string, { titulo: string; detalle: string }> = {
     <main class="wrap">
       <section class="centro">
         @if (pedido(); as p) {
+          @if (p.enviado && p.estado !== 'CANCELADO') {
+            <div class="sg-hero" [class.listo]="p.estado === 'ENTREGADO'">
+              <span class="sg-ico"><app-icono [nombre]="icono(p.estado)" [tam]="30" /></span>
+              <div class="sg-txt">
+                <span class="sg-paso">Paso {{ indice() + 1 }} de {{ p.flujo.length }}</span>
+                <b>{{ paso(p.estado).titulo }}</b>
+                <span>{{ paso(p.estado).detalle }}</span>
+              </div>
+              <div class="sg-barra" role="progressbar" [attr.aria-valuenow]="avance()" aria-valuemin="0" aria-valuemax="100"
+                   [attr.aria-label]="'Avance del pedido: ' + avance() + '%'">
+                <span [style.width.%]="avance()"></span>
+              </div>
+            </div>
+          }
           <div class="row">
             <div class="stack" style="gap:2px">
               <span class="muted">Pedido de {{ p.nombre }}</span>
@@ -324,6 +342,17 @@ export class SeguimientoPage implements OnInit {
     this.codigoForm = codigo;
     const conocido = this.recientes.find((r) => r.codigo === codigo);
     if (conocido) this.consultar(conocido.codigo, conocido.celular);
+  }
+
+  /** Porcentaje del camino recorrido (el primer paso ya cuenta como avance). */
+  protected avance = computed(() => {
+    const p = this.pedido();
+    if (!p || !p.flujo.length) return 0;
+    return Math.round(((this.indice() + 1) / p.flujo.length) * 100);
+  });
+
+  protected icono(e: EstadoPedido): string {
+    return ICONOS[e] ?? 'pedidos';
   }
 
   protected paso(e: EstadoPedido): { titulo: string; detalle: string } {
