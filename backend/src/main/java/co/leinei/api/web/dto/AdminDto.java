@@ -42,11 +42,13 @@ public final class AdminDto {
                          String cuentaEntidad, String cuentaTitular, String cuentaNumero, EstadoPago estadoPago,
                          EstadoPedido estado, OrigenPedido origen, List<Evento> eventos,
                          boolean tieneComprobante, Instant pagoReportado,
-                         Long domiciliarioId, String domiciliarioNombre, String domiciliarioCelular) {}
+                         Long domiciliarioId, String domiciliarioNombre, String domiciliarioCelular,
+                         Double entregaLat, Double entregaLng, Double distanciaKm) {}
 
     public record AsignarDomiciliarioRequest(Long domiciliarioId) {}
 
-    public record Domiciliario(Long id, String nombre, String celular, boolean activo) {}
+    /** token: el de su link de reparto (/reparto/{token}). */
+    public record Domiciliario(Long id, String nombre, String celular, boolean activo, String token) {}
 
     public record DomiciliarioRequest(
             @NotBlank(message = "Escribe el nombre del domiciliario") @Size(max = 80) String nombre,

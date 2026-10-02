@@ -1,0 +1,159 @@
+# Pagos en línea (Wompi, Bold…) con confirmación automática por webhook.
+# Cada empresa escoge una modalidad:
+#   APAGADO     → sigue como siempre: transferencia con comprobante o efectivo.
+#   PROPIA      → cobra con SU cuenta de la pasarela (la plata le llega directo).
+#   PLATAFORMA  → cobra la cuenta de la plataforma; se le liquida después descontando la comisión.
+# Aquí solo viven credenciales (cifradas) y el registro financiero mínimo de cada intento de pago
+# (referencia, valor, estado). Los datos del cliente siguen solo en la base de cada empresa.
+databaseChangeLog:
+  - changeSet:
+      id: control-008-modulo-pagos-en-linea
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO plataforma.tbl_modulos (codigo, nombre, descripcion, es_base, orden) VALUES
+                ('pagos_en_linea', 'Pagos en línea', 'Cobrar con Nequi, PSE o tarjeta (Wompi, Bold) y confirmar el pago solo, al instante.', FALSE, 7);
+              UPDATE plataforma.tbl_planes SET modulos = modulos || ',pagos_en_linea', actualizado_en = now()
+                  WHERE codigo = 'empresarial' AND modulos NOT LIKE '%pagos_en_linea%';
+      rollback:
+        - sql:
+            sql: |
+              UPDATE plataforma.tbl_planes SET modulos = replace(modulos, ',pagos_en_linea', '');
+              DELETE FROM plataforma.tbl_modulos WHERE codigo = 'pagos_en_linea';
+
+  - changeSet:
+      id: control-008-pasarelas
+      author: leinei
+      comment: Cuentas de pasarela de la plataforma y configuración de pagos en línea de cada empresa.
+      changes:
+        - sql:
+            sql: |
+              -- Cuentas de la plataforma (una por proveedor). Se usan con la modalidad PLATAFORMA.
+              CREATE TABLE plataforma.tbl_pasarelas_plataforma (
+                  id                         BIGSERIAL PRIMARY KEY,
+                  uuid                       UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  proveedor                  VARCHAR(10)  NOT NULL UNIQUE CHECK (proveedor IN ('WOMPI', 'BOLD')),
+                  ambiente                   VARCHAR(10)  NOT NULL DEFAULT 'PRUEBAS' CHECK (ambiente IN ('PRUEBAS', 'PRODUCCION')),
+                  llave_publica              VARCHAR(200) NOT NULL DEFAULT '',
+                  llave_privada_cifrada      TEXT         NOT NULL DEFAULT '',
+                  secreto_integridad_cifrado TEXT         NOT NULL DEFAULT '',
+                  secreto_eventos_cifrado    TEXT         NOT NULL DEFAULT '',
+                  es_activa                  BOOLEAN      NOT NULL DEFAULT FALSE,
+                  actualizado_en             TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+              INSERT INTO plataforma.tbl_pasarelas_plataforma (proveedor) VALUES ('WOMPI'), ('BOLD');
+
+              -- Pagos en línea de cada empresa (una fila por empresa; si no hay fila, está apagado).
+              CREATE TABLE plataforma.tbl_empresa_pagos (
+                  id                         BIGSERIAL PRIMARY KEY,
+                  uuid                       UUID          NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  empresa_id                 BIGINT        NOT NULL UNIQUE REFERENCES plataforma.tbl_empresas(id) ON DELETE CASCADE,
+                  modalidad                  VARCHAR(10)   NOT NULL DEFAULT 'APAGADO' CHECK (modalidad IN ('APAGADO', 'PROPIA', 'PLATAFORMA')),
+                  proveedor                  VARCHAR(10)   NOT NULL DEFAULT 'WOMPI' CHECK (proveedor IN ('WOMPI', 'BOLD')),
+                  -- Credenciales propias de la empresa (solo para la modalidad PROPIA).
+                  ambiente                   VARCHAR(10)   NOT NULL DEFAULT 'PRUEBAS' CHECK (ambiente IN ('PRUEBAS', 'PRODUCCION')),
+                  llave_publica              VARCHAR(200)  NOT NULL DEFAULT '',
+                  llave_privada_cifrada      TEXT          NOT NULL DEFAULT '',
+                  secreto_integridad_cifrado TEXT          NOT NULL DEFAULT '',
+                  secreto_eventos_cifrado    TEXT          NOT NULL DEFAULT '',
+                  -- Si la empresa puede escribir sus llaves desde su portal (si no, solo el superadmin).
+                  es_editable_por_empresa    BOOLEAN       NOT NULL DEFAULT TRUE,
+                  -- La empresa puede dejar de ofrecer el pago en línea por un rato sin perder la configuración.
+                  es_pausado                 BOOLEAN       NOT NULL DEFAULT FALSE,
+                  -- Comisión de la plataforma (modalidad PLATAFORMA): porcentaje del pago + valor fijo por pago.
+                  comision_porcentaje        NUMERIC(5, 2) NOT NULL DEFAULT 0 CHECK (comision_porcentaje BETWEEN 0 AND 50),
+                  comision_fija              INTEGER       NOT NULL DEFAULT 0 CHECK (comision_fija >= 0),
+                  actualizado_en             TIMESTAMPTZ   NOT NULL DEFAULT now()
+              );
+      rollback:
+        - sql: { sql: DROP TABLE plataforma.tbl_empresa_pagos; DROP TABLE plataforma.tbl_pasarelas_plataforma; }
+
+  - changeSet:
+      id: control-008-transacciones-pago
+      author: leinei
+      comment: >
+        Cada intento de pago en línea. La referencia es única y es lo que la pasarela devuelve en sus avisos,
+        así se sabe de qué empresa y de qué pedido es. En la modalidad PLATAFORMA también sirve para liquidar.
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE plataforma.tbl_transacciones_pago (
+                  id                BIGSERIAL PRIMARY KEY,
+                  uuid              UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  empresa_id        BIGINT       NOT NULL REFERENCES plataforma.tbl_empresas(id) ON DELETE CASCADE,
+                  referencia        VARCHAR(60)  NOT NULL UNIQUE,
+                  codigo_pedido     VARCHAR(20)  NOT NULL,
+                  proveedor         VARCHAR(10)  NOT NULL CHECK (proveedor IN ('WOMPI', 'BOLD')),
+                  modalidad         VARCHAR(10)  NOT NULL CHECK (modalidad IN ('PROPIA', 'PLATAFORMA')),
+                  ambiente          VARCHAR(10)  NOT NULL CHECK (ambiente IN ('PRUEBAS', 'PRODUCCION')),
+                  monto             INTEGER      NOT NULL CHECK (monto > 0),
+                  estado            VARCHAR(10)  NOT NULL DEFAULT 'PENDIENTE'
+                                    CHECK (estado IN ('PENDIENTE', 'APROBADO', 'RECHAZADO', 'ANULADO', 'ERROR', 'VENCIDO')),
+                  -- Id del link de pago (Bold) y de la transacción en la pasarela.
+                  id_externo        VARCHAR(80)  NOT NULL DEFAULT '',
+                  id_transaccion    VARCHAR(80)  NOT NULL DEFAULT '',
+                  medio             VARCHAR(40)  NOT NULL DEFAULT '',
+                  detalle           VARCHAR(300) NOT NULL DEFAULT '',
+                  -- Liquidación (modalidad PLATAFORMA): lo que se queda la plataforma y lo que se le debe a la empresa.
+                  comision          INTEGER      NOT NULL DEFAULT 0 CHECK (comision >= 0),
+                  neto              INTEGER      NOT NULL DEFAULT 0,
+                  liquidacion       VARCHAR(12)  NOT NULL DEFAULT 'NO_APLICA' CHECK (liquidacion IN ('NO_APLICA', 'POR_LIQUIDAR', 'LIQUIDADO')),
+                  liquidado_en      TIMESTAMPTZ,
+                  liquidado_por     VARCHAR(120),
+                  nota_liquidacion  VARCHAR(200) NOT NULL DEFAULT '',
+                  aprobado_en       TIMESTAMPTZ,
+                  -- Cuándo se reflejó el resultado en el pedido (base de la empresa). NULL = falta aplicarlo.
+                  aplicado_en       TIMESTAMPTZ,
+                  consultado_en     TIMESTAMPTZ,
+                  creado_en         TIMESTAMPTZ  NOT NULL DEFAULT now(),
+                  actualizado_en    TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+              CREATE INDEX idx_transacciones_pago_empresa_id ON plataforma.tbl_transacciones_pago (empresa_id, creado_en);
+              CREATE INDEX idx_transacciones_pago_pedido ON plataforma.tbl_transacciones_pago (empresa_id, codigo_pedido);
+              CREATE INDEX idx_transacciones_pago_pendientes ON plataforma.tbl_transacciones_pago (creado_en)
+                  WHERE estado = 'PENDIENTE' OR (estado IN ('APROBADO', 'ANULADO') AND aplicado_en IS NULL);
+              CREATE INDEX idx_transacciones_pago_liquidacion ON plataforma.tbl_transacciones_pago (liquidacion, empresa_id);
+      rollback:
+        - sql: { sql: DROP TABLE plataforma.tbl_transacciones_pago; }
+
+  - changeSet:
+      id: control-008-auditoria-pagos
+      author: leinei
+      comment: La auditoría tampoco copia las llaves de las pasarelas.
+      changes:
+        - sql:
+            splitStatements: false
+            sql: |
+              CREATE OR REPLACE FUNCTION plataforma.fn_auditar() RETURNS trigger
+              LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, plataforma AS $$
+              DECLARE
+                  v_nuevo JSONB;
+                  v_viejo JSONB;
+                  v_ocultas TEXT[] := ARRAY['clave_owner_cifrada', 'clave_app_cifrada', 'clave_lectura_cifrada', 'clave_hash',
+                                            'logo_datos', 'clave_cifrada', 'llave_privada_cifrada',
+                                            'secreto_integridad_cifrado', 'secreto_eventos_cifrado'];
+              BEGIN
+                  IF TG_OP IN ('INSERT', 'UPDATE') THEN
+                      v_nuevo := to_jsonb(NEW) - v_ocultas;
+                  END IF;
+                  IF TG_OP IN ('UPDATE', 'DELETE') THEN
+                      v_viejo := to_jsonb(OLD) - v_ocultas;
+                  END IF;
+                  INSERT INTO plataforma.tbl_auditoria (esquema, tabla, operacion, registro_id, dato_anterior, dato_nuevo, usuario_bd, usuario_app)
+                  VALUES (TG_TABLE_SCHEMA, TG_TABLE_NAME, TG_OP, COALESCE(v_nuevo, v_viejo) ->> 'id', v_viejo, v_nuevo,
+                          session_user, NULLIF(current_setting('leinei.usuario', true), ''));
+                  RETURN NULL;
+              END;
+              $$;
+        - sql:
+            sql: |
+              CREATE TRIGGER trg_auditar_pasarelas_plataforma AFTER INSERT OR UPDATE OR DELETE ON plataforma.tbl_pasarelas_plataforma FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_empresa_pagos AFTER INSERT OR UPDATE OR DELETE ON plataforma.tbl_empresa_pagos FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+              CREATE TRIGGER trg_auditar_transacciones_pago AFTER INSERT OR UPDATE OR DELETE ON plataforma.tbl_transacciones_pago FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+      rollback:
+        - sql:
+            sql: |
+              DROP TRIGGER trg_auditar_transacciones_pago ON plataforma.tbl_transacciones_pago;
+              DROP TRIGGER trg_auditar_empresa_pagos ON plataforma.tbl_empresa_pagos;
+              DROP TRIGGER trg_auditar_pasarelas_plataforma ON plataforma.tbl_pasarelas_plataforma;

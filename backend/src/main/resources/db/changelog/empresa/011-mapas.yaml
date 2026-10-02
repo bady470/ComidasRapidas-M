@@ -1,0 +1,48 @@
+# Mapas: ubicación del local, domicilio por distancia y domiciliario en vivo.
+databaseChangeLog:
+  - changeSet:
+      id: empresa-011-mapas-config
+      author: leinei
+      comment: >
+        domicilio_modo FIJO: valor único (o por zona si tiene ese módulo). DISTANCIA: según los km en línea recta desde
+        el local, por tramos «km:valor» separados por «;» (ej. 2:3000;4:5000;7:8000). El último tramo es hasta dónde se llega.
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE cliente.tbl_configuraciones
+                  ADD COLUMN local_lat               NUMERIC(9, 6) CHECK (local_lat BETWEEN -90 AND 90),
+                  ADD COLUMN local_lng               NUMERIC(9, 6) CHECK (local_lng BETWEEN -180 AND 180),
+                  ADD COLUMN domicilio_modo          VARCHAR(10)   NOT NULL DEFAULT 'FIJO' CHECK (domicilio_modo IN ('FIJO', 'DISTANCIA')),
+                  ADD COLUMN domicilio_tramos        VARCHAR(300)  NOT NULL DEFAULT '',
+                  ADD COLUMN tiene_seguimiento_vivo  BOOLEAN       NOT NULL DEFAULT TRUE;
+              ALTER TABLE producto.tbl_pedidos
+                  ADD COLUMN entrega_lat  NUMERIC(9, 6),
+                  ADD COLUMN entrega_lng  NUMERIC(9, 6),
+                  ADD COLUMN distancia_km NUMERIC(6, 2);
+      rollback:
+        - sql:
+            sql: |
+              ALTER TABLE producto.tbl_pedidos DROP COLUMN entrega_lat, DROP COLUMN entrega_lng, DROP COLUMN distancia_km;
+              ALTER TABLE cliente.tbl_configuraciones DROP COLUMN local_lat, DROP COLUMN local_lng, DROP COLUMN domicilio_modo,
+                  DROP COLUMN domicilio_tramos, DROP COLUMN tiene_seguimiento_vivo;
+
+  - changeSet:
+      id: empresa-011-domiciliario-en-vivo
+      author: leinei
+      comment: >
+        Link personal de cada domiciliario (token) para su página de reparto, y su última ubicación (la manda su
+        celular mientras tiene la página abierta).
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE cliente.tbl_domiciliarios
+                  ADD COLUMN token               VARCHAR(40) UNIQUE,
+                  ADD COLUMN ubicacion_lat       NUMERIC(9, 6),
+                  ADD COLUMN ubicacion_lng       NUMERIC(9, 6),
+                  ADD COLUMN ubicacion_precision INTEGER,
+                  ADD COLUMN ubicacion_en        TIMESTAMPTZ;
+      rollback:
+        - sql:
+            sql: |
+              ALTER TABLE cliente.tbl_domiciliarios DROP COLUMN token, DROP COLUMN ubicacion_lat, DROP COLUMN ubicacion_lng,
+                  DROP COLUMN ubicacion_precision, DROP COLUMN ubicacion_en;

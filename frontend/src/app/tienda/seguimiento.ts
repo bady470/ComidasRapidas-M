@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TiendaApi, mensajeError } from '../core/api';
 import { EmpresaActual, apiEmpresa } from '../core/empresa';
 import { escucharCanal } from '../core/tiempo-real';
@@ -8,6 +8,8 @@ import { DiaLargoPipe, DineroPipe, HoraPipe } from '../core/formato';
 import { EstadoPedido, NOMBRE_ESTADO, Seguimiento } from '../core/modelos';
 import { guardarPedidoReciente, pedidosRecientes } from './recientes';
 import { PagarPedido } from '../compartido/pagar-pedido';
+import { PagarEnLinea } from '../compartido/pagar-en-linea';
+import { Mapa, Marcador } from '../compartido/mapa';
 
 const PASOS: Record<string, { titulo: string; detalle: string }> = {
   NUEVO: { titulo: 'Recibimos tu pedido', detalle: 'Lo vamos a revisar y confirmar.' },
@@ -20,7 +22,7 @@ const PASOS: Record<string, { titulo: string; detalle: string }> = {
 
 @Component({
   selector: 'app-seguimiento',
-  imports: [FormsModule, RouterLink, DineroPipe, DiaLargoPipe, HoraPipe, PagarPedido],
+  imports: [FormsModule, RouterLink, DineroPipe, DiaLargoPipe, HoraPipe, PagarPedido, PagarEnLinea, Mapa],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="wrap">
@@ -68,6 +70,18 @@ const PASOS: Record<string, { titulo: string; detalle: string }> = {
             </div>
           }
 
+          @if (marcadores().length && p.estado !== 'CANCELADO' && p.estado !== 'ENTREGADO') {
+            <div class="panel">
+              <h3>{{ p.mapa?.repartidor ? '🛵 ' + (p.domiciliarioNombre || 'Tu domiciliario') + ' va en camino' : 'En el mapa' }}</h3>
+              <app-mapa [marcadores]="marcadores()" [alto]="280" etiqueta="Mapa de tu pedido" />
+              @if (p.mapa?.repartidor; as r) {
+                <span class="hint">Se mueve en vivo · última ubicación {{ haceCuanto(r.actualizado) }}.</span>
+              } @else if (p.estado === 'EN_CAMINO') {
+                <span class="hint">Cuando el domiciliario comparta su ubicación, lo verás acercarse aquí.</span>
+              }
+            </div>
+          }
+
           <div class="panel">
             <h3>Resumen</h3>
             @for (i of p.items; track $index) {
@@ -80,10 +94,15 @@ const PASOS: Record<string, { titulo: string; detalle: string }> = {
             </div>
             <div class="row">
               <span class="st pay-{{ p.estadoPago }}">{{ p.estadoPago === 'RECIBIDO' ? 'Pago recibido' : p.estadoPago === 'POR_CONFIRMAR' ? 'Comprobante en revisión' : 'Pago pendiente' }}</span>
-              <span class="muted">{{ p.metodoPago === 'CUENTA' ? 'Transferencia a ' + p.cuentaEntidad : 'Efectivo' }}</span>
+              <span class="muted">{{ comoPaga(p) }}</span>
             </div>
           </div>
 
+          @if (verificando()) { <div class="alerta aviso">Revisando tu pago con la pasarela…</div> }
+          @if (p.metodoPago === 'EN_LINEA' && p.estado !== 'CANCELADO') {
+            <app-pagar-en-linea [codigo]="p.codigo" [celular]="celularActual" [total]="p.total" [estadoPago]="p.estadoPago"
+              [intento]="p.pagoEnLinea" [tipoEntrega]="p.tipoEntrega" (cambiado)="pedido.set($event)" />
+          }
           @if (p.metodoPago === 'CUENTA' && p.estadoPago !== 'RECIBIDO' && p.estado !== 'CANCELADO') {
             <app-pagar-pedido [codigo]="p.codigo" [celular]="celularActual" [total]="p.total"
               [entidad]="p.cuentaEntidad" [titular]="p.cuentaTitular" [numero]="p.cuentaNumero"
@@ -132,6 +151,10 @@ export class SeguimientoPage implements OnInit {
   protected codigoForm = '';
   protected celularForm = '';
   protected celularActual = '';
+  protected verificando = signal(false);
+  private ruta = inject(ActivatedRoute);
+  /** Revisar el pago en línea apenas cargue el pedido (al volver del checkout). */
+  private verificarAlCargar: { transaccion: string | null } | null = null;
 
   protected indice = computed(() => {
     const p = this.pedido();
@@ -162,7 +185,14 @@ export class SeguimientoPage implements OnInit {
     this.canal = {
       codigo,
       cerrar: escucharCanal(url, {
-        alEvento: (e) => { if (e.tipo === 'pedido') this.refrescar(); },
+        alEvento: (e) => {
+          if (e.tipo === 'pedido') this.refrescar();
+          // El domiciliario se movió: se actualiza solo su punto en el mapa, sin recargar todo.
+          if (e.tipo === 'ubicacion') {
+            const d = e.datos as { lat: number; lng: number; t: string };
+            this.pedido.update((p) => p && p.mapa ? { ...p, mapa: { ...p.mapa, repartidor: { lat: Number(d.lat), lng: Number(d.lng), actualizado: String(d.t) } } } : p);
+          }
+        },
         alReconectar: () => this.refrescar(),
       }, (v) => this.enVivo.set(v)),
     };
@@ -171,6 +201,9 @@ export class SeguimientoPage implements OnInit {
   ngOnInit(): void {
     const codigo = this.codigo();
     if (!codigo) return;
+    // Vuelve del checkout de la pasarela (?pago=retorno; Wompi agrega &id=<transacción>): se revisa el pago de una vez.
+    const q = this.ruta.snapshot.queryParamMap;
+    if (q.get('pago') === 'retorno') this.verificarAlCargar = { transaccion: q.get('id') };
     this.codigoForm = codigo;
     const conocido = this.recientes.find((r) => r.codigo === codigo);
     if (conocido) this.consultar(conocido.codigo, conocido.celular);
@@ -203,10 +236,45 @@ export class SeguimientoPage implements OnInit {
         this.pedido.set(s);
         this.escuchar(s.codigo, cel);
         this.cargando.set(false);
-        if (this.codigo() !== s.codigo) this.router.navigateByUrl(this.emp.url('/pedido/' + encodeURIComponent(s.codigo)), { replaceUrl: true });
+        const verificar = this.verificarAlCargar;
+        this.verificarAlCargar = null;
+        if (verificar && s.metodoPago === 'EN_LINEA' && s.estadoPago !== 'RECIBIDO') this.verificar(s.codigo, cel, verificar.transaccion);
+        if (this.codigo() !== s.codigo || verificar) {
+          this.router.navigateByUrl(this.emp.url('/pedido/' + encodeURIComponent(s.codigo)), { replaceUrl: true });
+        }
       },
       error: (e) => { this.error.set(mensajeError(e)); this.cargando.set(false); },
     });
+  }
+
+  private verificar(codigo: string, celular: string, transaccion: string | null): void {
+    this.verificando.set(true);
+    this.api.verificarPago(codigo, celular, transaccion).subscribe({
+      next: (s) => { this.pedido.set(s); this.verificando.set(false); },
+      error: () => this.verificando.set(false), // el aviso de la pasarela lo confirmará igual
+    });
+  }
+
+  protected comoPaga(p: Seguimiento): string {
+    if (p.metodoPago === 'CUENTA') return 'Transferencia a ' + p.cuentaEntidad;
+    if (p.metodoPago === 'EN_LINEA') return 'En línea · ' + p.cuentaTitular + (p.pagoEnLinea?.medio ? ' · ' + p.pagoEnLinea.medio : '');
+    return 'Efectivo';
+  }
+
+  /** El local, el punto de entrega y el domiciliario (si está en camino y compartiendo su ubicación). */
+  protected marcadores = computed<Marcador[]>(() => {
+    const m = this.pedido()?.mapa;
+    if (!m) return [];
+    const lista: Marcador[] = [];
+    if (m.localLat != null && m.localLng != null) lista.push({ id: 'local', lat: m.localLat, lng: m.localLng, tipo: 'local', texto: 'El local' });
+    if (m.entregaLat != null && m.entregaLng != null) lista.push({ id: 'destino', lat: m.entregaLat, lng: m.entregaLng, tipo: 'destino', texto: 'Tu entrega' });
+    if (m.repartidor) lista.push({ id: 'moto', lat: m.repartidor.lat, lng: m.repartidor.lng, tipo: 'moto', texto: 'Tu domiciliario' });
+    return lista.length > 1 || m.repartidor ? lista : [];
+  });
+
+  protected haceCuanto(iso: string): string {
+    const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+    return s < 60 ? 'hace unos segundos' : `hace ${Math.round(s / 60)} min`;
   }
 
   protected otro(): void {

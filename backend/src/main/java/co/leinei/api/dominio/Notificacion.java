@@ -4,12 +4,12 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 
-/** Aviso para el portal de la empresa: pedido nuevo o comprobante de pago recibido. */
+/** Aviso para el portal de la empresa: pedido nuevo, comprobante recibido o pago en línea confirmado o reversado. */
 @Entity
 @Table(schema = "cliente", name = "tbl_notificaciones")
 public class Notificacion {
 
-    public enum Tipo { PEDIDO_NUEVO, PAGO_REPORTADO }
+    public enum Tipo { PEDIDO_NUEVO, PAGO_REPORTADO, PAGO_RECIBIDO, PAGO_REVERSADO }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

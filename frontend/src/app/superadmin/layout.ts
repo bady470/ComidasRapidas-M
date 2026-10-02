@@ -28,6 +28,7 @@ export class SuperLayout {
       { ruta: 'empresas/nueva', texto: 'Nueva empresa', icono: 'nueva' },
       { ruta: 'planes', texto: 'Planes y precios', icono: 'planes' },
       { ruta: 'biblioteca', texto: 'Productos precargados', icono: 'biblioteca' },
+      { ruta: 'pagos', texto: 'Pagos en línea', icono: 'pagos' },
     ] },
     { titulo: 'Ajustes', items: [
       { ruta: 'correo', texto: 'Correo de envío', icono: 'correo' },

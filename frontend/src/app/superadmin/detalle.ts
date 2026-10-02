@@ -7,6 +7,7 @@ import { SelectorModulos } from '../compartido/selector-modulos';
 import { SelectorPlan } from '../compartido/selector-plan';
 import { PlataformaApi, mensajeError } from '../core/api';
 import { enVivoPlataforma } from './en-vivo';
+import { PagosEmpresa } from './pagos-empresa';
 import { Avisos } from '../core/avisos';
 import { DineroPipe, HoraPipe } from '../core/formato';
 import { ActualizarEmpresa, EmpresaDetalle, EstadoEmpresa, ModuloPlataforma, NOMBRE_ESTADO_EMPRESA, Plan } from '../core/modelos';
@@ -16,7 +17,7 @@ const EN_PREPARACION: EstadoEmpresa[] = ['pendiente_aprovisionamiento', 'aprovis
 /** Detalle de una empresa: estado del aprovisionamiento, datos, marca, módulos y acciones. */
 @Component({
   selector: 'app-detalle-empresa',
-  imports: [FormsModule, RouterLink, Logo, HoraPipe, DineroPipe, SelectorPlan, SelectorModulos],
+  imports: [FormsModule, RouterLink, Logo, HoraPipe, DineroPipe, SelectorPlan, SelectorModulos, PagosEmpresa],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <p style="margin-bottom:10px"><a class="linkbtn" routerLink="/superadmin/empresas">← Empresas</a></p>
@@ -132,6 +133,10 @@ const EN_PREPARACION: EstadoEmpresa[] = ['pendiente_aprovisionamiento', 'aprovis
           }
         </div>
       </div>
+
+      @if (e.estado === 'activa' || e.estado === 'suspendida') {
+        <div style="margin-top:16px"><app-pagos-empresa [uuid]="e.uuid" /></div>
+      }
 
       <div class="two" style="margin-block:16px 40px">
         <div class="panel">

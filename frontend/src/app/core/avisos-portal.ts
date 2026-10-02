@@ -27,6 +27,10 @@ export class AvisosPortal {
   /** Cambió el catálogo o la configuración (desde otra pestaña, otro administrador o el superadmin). */
   readonly cambioCatalogo = signal(0);
   readonly cambioDomiciliarios = signal(0);
+  /** Un domiciliario mandó su ubicación (mapa de domiciliarios). */
+  readonly ubicacion = signal<{ id: number; lat: number; lng: number; t: string } | null>(null);
+  /** Cambió la configuración de la cocina (impresión de comandas). */
+  readonly cambioCocina = signal(0);
   private cerrarCanal: (() => void) | null = null;
   private contador = 0;
 
@@ -61,6 +65,11 @@ export class AvisosPortal {
           this.cambioCatalogo.update((v) => v + 1);
         } else if (e.tipo === 'domiciliarios') {
           this.cambioDomiciliarios.update((v) => v + 1);
+        } else if (e.tipo === 'ubicacion') {
+          const d = e.datos as { id: number; lat: number; lng: number; t: string };
+          this.ubicacion.set({ id: Number(d.id), lat: Number(d.lat), lng: Number(d.lng), t: String(d.t) });
+        } else if (e.tipo === 'cocina') {
+          this.cambioCocina.update((v) => v + 1);
         }
       },
       // Tras un corte se recarga todo por si se perdió algún aviso.
@@ -106,7 +115,7 @@ export class AvisosPortal {
     this.version.update((v) => v + 1);
     // Al abrir el portal no se repiten en ráfaga los avisos viejos: solo se resume.
     if (primeraVez && ultimoVisto === 0) return;
-    const principal = nuevas.find((n) => n.tipo === 'PAGO_REPORTADO') ?? nuevas[0]!;
+    const principal = nuevas.find((n) => n.tipo !== 'PEDIDO_NUEVO') ?? nuevas[0]!;
     this.toast.mostrar(nuevas.length > 1 ? `${principal.titulo} (+${nuevas.length - 1} más)` : principal.titulo);
     sonar();
     this.notificarNavegador(nuevas);

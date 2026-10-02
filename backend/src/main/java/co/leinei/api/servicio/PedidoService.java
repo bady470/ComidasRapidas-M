@@ -6,8 +6,13 @@ import co.leinei.api.repositorio.DomiciliarioRepositorio;
 import co.leinei.api.repositorio.NotificacionRepositorio;
 import co.leinei.api.repositorio.PedidoRepositorio;
 import co.leinei.api.empresa.EmpresaContexto;
+import co.leinei.api.pagos.ConfigPagosService;
+import co.leinei.api.pagos.PagosDto;
+import co.leinei.api.pagos.Transaccion;
+import co.leinei.api.pagos.TransaccionesPago;
 import co.leinei.api.tiemporeal.TiempoReal;
 import co.leinei.api.web.dto.AdminDto;
+import co.leinei.api.web.dto.MapaDto;
 import co.leinei.api.web.dto.PublicoDto;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -38,6 +43,8 @@ public class PedidoService {
     private final NotificacionRepositorio notificaciones;
     private final DomiciliarioRepositorio domiciliarios;
     private final TiempoReal tiempoReal;
+    private final ConfigPagosService pagosEnLinea;
+    private final TransaccionesPago transacciones;
 
     /** Estados de pago que cuentan como "sin pagar". */
     static final List<EstadoPago> SIN_PAGAR = List.of(EstadoPago.PENDIENTE, EstadoPago.POR_CONFIRMAR);
@@ -47,8 +54,11 @@ public class PedidoService {
     public PedidoService(PedidoRepositorio pedidoRepo, CatalogoService catalogo, ConfigService configService,
                          PrecioService precios, co.leinei.api.config.LeineiProperties props,
                          ComprobantePagoRepositorio comprobantes, NotificacionRepositorio notificaciones,
-                         DomiciliarioRepositorio domiciliarios, TiempoReal tiempoReal) {
+                         DomiciliarioRepositorio domiciliarios, TiempoReal tiempoReal, ConfigPagosService pagosEnLinea,
+                         TransaccionesPago transacciones) {
         this.tiempoReal = tiempoReal;
+        this.pagosEnLinea = pagosEnLinea;
+        this.transacciones = transacciones;
         this.zona = ZoneId.of(props.zonaHoraria());
         this.comprobantes = comprobantes;
         this.notificaciones = notificaciones;
@@ -67,7 +77,7 @@ public class PedidoService {
         ConfigTienda c = configService.tienda();
         TipoEntrega tipo = tipoPorDefecto(c, r.tipoEntrega());
         LocalDate fecha = configService.disponibilidad().fechaServicio();
-        int domicilio = domicilio(c, tipo, r.zonaId(), false).valor();
+        int domicilio = domicilio(c, tipo, r.zonaId(), r.lat(), r.lng(), false, false).valor();
         return precios.calcular(lineas(r.items(), true), catalogo.promocionesActivas(), domicilio, fecha);
     }
 
@@ -78,12 +88,17 @@ public class PedidoService {
         if (!c.isAbierto()) {
             throw ReglaNegocioException.conflicto("En este momento no estamos recibiendo pedidos. Escríbenos por WhatsApp.");
         }
+        if (c.pedidosPausados(Instant.now())) {
+            // «h:mm a» en español ya termina en punto («10:45 a. m.»): no se agrega otro.
+            throw ReglaNegocioException.conflicto("Estamos a tope de pedidos. Volvemos a recibir a las "
+                    + DateTimeFormatter.ofPattern("h:mm a", ES_CO).format(c.getPedidosPausadosHasta().atZone(zona)));
+        }
         if (!d.recibePedidos()) {
             String cuando = d.proximaApertura() == null ? "" : " Abrimos " + DateTimeFormatter.ofPattern("EEEE 'a las' h:mm a",
                     ES_CO).format(d.proximaApertura().atZone(zona)) + ".";
             throw ReglaNegocioException.conflicto("Estamos cerrados en este momento." + cuando);
         }
-        Entrega entrega = domicilio(c, r.tipoEntrega(), r.zonaId(), true);
+        Entrega entrega = domicilio(c, r.tipoEntrega(), r.zonaId(), r.lat(), r.lng(), true, false);
         if (r.tipoEntrega() == TipoEntrega.DOMICILIO) {
             if (blanco(r.direccion())) throw ReglaNegocioException.invalido("Escribe la dirección de entrega.");
             if (entrega.zona().isEmpty() && blanco(r.barrio())) throw ReglaNegocioException.invalido("Escribe el barrio.");
@@ -101,17 +116,21 @@ public class PedidoService {
                 r.tipoEntrega() == TipoEntrega.DOMICILIO ? r.direccion() : "",
                 r.tipoEntrega() == TipoEntrega.DOMICILIO ? r.referencia() : "", r.notas());
         asignarPago(p, c, r.metodoPago(), r.cuentaId(), false);
+        p.setEntregaLat(entrega.lat());
+        p.setEntregaLng(entrega.lng());
+        p.setDistanciaKm(entrega.km());
         p.setOrigen(OrigenPedido.WEB);
         p.registrarEvento(EstadoPedido.NUEVO, "", "cliente");
         pedidoRepo.save(p);
         notificaciones.save(Notificacion.de(Notificacion.Tipo.PEDIDO_NUEVO, p.getId(),
                 "Pedido nuevo " + p.getCodigo() + " · " + pesos(p.getTotal()),
                 p.getClienteNombre() + (p.getTipoEntrega() == TipoEntrega.RECOGER ? " · recoge en el local" : " · " + lugar(p))
-                        + " · " + (p.getMetodoPago() == MetodoPago.CUENTA ? "paga por " + p.getCuentaEntidad() : "paga en efectivo")));
+                        + " · " + comoPaga(p)));
         avisarCambio(p, "nuevo");
 
+        int extra = c.minutosExtraVigentes(Instant.now());
         return new PublicoDto.PedidoCreado(p.getCodigo(), p.getFechaEntrega(), p.getFranja(), p.getTipoEntrega(),
-                c.getModoPedido(), c.getTiempoMin(), c.getTiempoMax(), p.getTotal(), p.getMetodoPago(),
+                c.getModoPedido(), c.getTiempoMin() + extra, c.getTiempoMax() + extra, p.getTotal(), p.getMetodoPago(),
                 p.getCuentaEntidad(), p.getCuentaTitular(), p.getCuentaNumero(), c.getWhatsapp(),
                 p.getTipoEntrega() == TipoEntrega.RECOGER ? c.getDireccion() : "");
     }
@@ -129,7 +148,11 @@ public class PedidoService {
     @Transactional
     public PublicoDto.Seguimiento subirComprobante(String codigo, String celular, byte[] datos) {
         Pedido p = delCliente(codigo, celular);
-        if (p.getMetodoPago() != MetodoPago.CUENTA) throw ReglaNegocioException.invalido("Este pedido se paga en efectivo.");
+        if (p.getMetodoPago() != MetodoPago.CUENTA) {
+            throw ReglaNegocioException.invalido(p.getMetodoPago() == MetodoPago.EN_LINEA
+                    ? "Este pedido se paga en línea. Si prefieres transferir, cambia la forma de pago primero."
+                    : "Este pedido se paga en efectivo.");
+        }
         if (p.getEstado() == EstadoPedido.CANCELADO) throw ReglaNegocioException.conflicto("Este pedido fue cancelado.");
         if (p.getEstadoPago() == EstadoPago.RECIBIDO) throw ReglaNegocioException.conflicto("Este pedido ya aparece como pagado.");
         if (datos == null || datos.length == 0) throw ReglaNegocioException.invalido("El archivo está vacío.");
@@ -152,6 +175,79 @@ public class PedidoService {
                         + ". Revísalo y confirma el pago."));
         avisarCambio(p, "pago");
         return aSeguimiento(p);
+    }
+
+    /** Pedido del cliente (código y celular deben coincidir), para cobrarlo en línea. */
+    @Transactional(readOnly = true)
+    public Pedido delClienteParaPago(String codigo, String celular) {
+        return delCliente(codigo, celular);
+    }
+
+    /**
+     * El cliente no pudo (o no quiso) pagar en línea y escoge otra forma: transferencia con comprobante o efectivo.
+     * Solo mientras el pedido siga sin pagar.
+     */
+    @Transactional
+    public PublicoDto.Seguimiento cambiarMetodoPago(String codigo, String celular, MetodoPago metodo, Long cuentaId) {
+        Pedido p = delCliente(codigo, celular);
+        if (p.getEstado() == EstadoPedido.CANCELADO) throw ReglaNegocioException.conflicto("Este pedido fue cancelado.");
+        if (p.getEstadoPago() == EstadoPago.RECIBIDO) throw ReglaNegocioException.conflicto("Este pedido ya aparece como pagado.");
+        if (p.getMetodoPago() != MetodoPago.EN_LINEA) {
+            throw ReglaNegocioException.conflicto("La forma de pago de este pedido solo se puede cambiar si era pago en línea.");
+        }
+        if (metodo == MetodoPago.EN_LINEA) throw ReglaNegocioException.invalido("Escoge transferencia o efectivo.");
+        asignarPago(p, configService.tienda(), metodo, cuentaId, false);
+        avisarCambio(p, "pago");
+        return aSeguimiento(p);
+    }
+
+    /**
+     * Resultado de un pago en línea que confirmó (o reversó) la pasarela. Se puede llamar varias veces con el mismo
+     * resultado: solo cambia el pedido y avisa la primera vez.
+     *
+     * @param otroYaAprobado otro intento de este mismo pedido ya estaba aprobado (pago repetido).
+     */
+    @Transactional
+    public void registrarPagoEnLinea(String codigo, co.leinei.api.pagos.EstadoTransaccion estado, String proveedor,
+                                     String medio, int monto, boolean otroYaAprobado) {
+        Pedido p = pedidoRepo.findByCodigo(codigo).orElse(null);
+        if (p == null) return;
+        String como = medio == null || medio.isBlank() ? proveedor : medio + " (" + proveedor + ")";
+        switch (estado) {
+            case APROBADO -> {
+                if (p.getEstadoPago() == EstadoPago.RECIBIDO) {
+                    if (otroYaAprobado) {
+                        notificaciones.save(Notificacion.de(Notificacion.Tipo.PAGO_RECIBIDO, p.getId(),
+                                "Pago repetido " + p.getCodigo() + " · " + pesos(monto),
+                                p.getClienteNombre() + " pagó dos veces este pedido en línea (" + como
+                                        + "). Revisa la devolución del pago repetido."));
+                        avisarCambio(p, "pago");
+                    }
+                    return;
+                }
+                p.setMetodoPago(MetodoPago.EN_LINEA);
+                p.setCuentaEntidad("Pago en línea");
+                p.setCuentaTitular(proveedor);
+                p.setCuentaNumero(medio == null ? "" : medio);
+                p.setEstadoPago(EstadoPago.RECIBIDO);
+                p.setPagoReportado(Instant.now());
+                String cancelado = p.getEstado() == EstadoPedido.CANCELADO ? " Ojo: el pedido estaba cancelado, revisa la devolución." : "";
+                notificaciones.save(Notificacion.de(Notificacion.Tipo.PAGO_RECIBIDO, p.getId(),
+                        "Pago recibido " + p.getCodigo() + " · " + pesos(monto),
+                        p.getClienteNombre() + " pagó en línea con " + como + ". El pago ya quedó confirmado." + cancelado));
+                avisarCambio(p, "pago");
+            }
+            case ANULADO -> {
+                if (p.getMetodoPago() != MetodoPago.EN_LINEA || p.getEstadoPago() != EstadoPago.RECIBIDO) return;
+                p.setEstadoPago(EstadoPago.PENDIENTE);
+                notificaciones.save(Notificacion.de(Notificacion.Tipo.PAGO_REVERSADO, p.getId(),
+                        "Pago reversado " + p.getCodigo() + " · " + pesos(monto),
+                        proveedor + " reversó el pago en línea de " + p.getClienteNombre() + ". El pedido quedó sin pagar."));
+                avisarCambio(p, "pago");
+            }
+            // Rechazado, vencido o con error: el pedido sigue sin pagar; solo se avisa para que el seguimiento se actualice.
+            default -> avisarCambio(p, "pago");
+        }
     }
 
     private Pedido delCliente(String codigo, String celular) {
@@ -178,7 +274,37 @@ public class PedidoService {
                 p.getMetodoPago(), p.getCuentaEntidad(), p.getCuentaTitular(), p.getCuentaNumero(), eventos,
                 p.getCreado(), direccionTienda, p.getPagoReportado() != null, p.getPagoReportado(),
                 p.getDomiciliario() == null ? "" : p.getDomiciliario().getNombre(),
-                p.getDomiciliario() == null ? "" : p.getDomiciliario().getCelular());
+                p.getDomiciliario() == null ? "" : p.getDomiciliario().getCelular(),
+                estadoEnLinea(p), mapa(p));
+    }
+
+    /** Ubicación del domiciliario: se muestra si la mandó en los últimos minutos. */
+    static final java.time.Duration UBICACION_VIGENTE = java.time.Duration.ofMinutes(5);
+
+    /** Mapa del seguimiento: el local, el punto de entrega y el domiciliario (solo en camino y si es reciente). */
+    private MapaDto.MapaSeguimiento mapa(Pedido p) {
+        if (!EmpresaContexto.tieneModulo(co.leinei.api.empresa.Modulos.MAPAS)) return null;
+        ConfigTienda c = configService.tienda();
+        Domiciliario d = p.getDomiciliario();
+        MapaDto.Repartidor rep = null;
+        if (c.isSeguimientoVivo() && d != null && p.getEstado() == EstadoPedido.EN_CAMINO
+                && d.ubicacionVigente(Instant.now(), UBICACION_VIGENTE)) {
+            rep = new MapaDto.Repartidor(d.getUbicacionLat(), d.getUbicacionLng(), d.getUbicacionEn());
+        }
+        if (!c.tieneUbicacion() && p.getEntregaLat() == null && rep == null) return null;
+        return new MapaDto.MapaSeguimiento(c.getLocalLat(), c.getLocalLng(), p.getEntregaLat(), p.getEntregaLng(), rep);
+    }
+
+    /** Último intento de pago en línea del pedido (null si nunca intentó pagar en línea). */
+    private PagosDto.EstadoPublico estadoEnLinea(Pedido p) {
+        List<Transaccion> intentos = transacciones.dePedido(EmpresaContexto.requerida().id(), p.getCodigo());
+        if (intentos.isEmpty()) return null;
+        // Si alguno quedó aprobado, ese es el que cuenta; si no, el más reciente.
+        Transaccion t = intentos.stream().filter(x -> x.estado() == co.leinei.api.pagos.EstadoTransaccion.APROBADO)
+                .findFirst().orElse(intentos.getFirst());
+        return new PagosDto.EstadoPublico(t.proveedor().name(), t.proveedor().nombre(), t.estado(),
+                co.leinei.api.pagos.PagosEnLineaService.medio(t.medio()), t.detalle(),
+                intentos.size(), t.actualizadoEn());
     }
 
     // ------------------------------------------------------------------ administrador
@@ -237,7 +363,7 @@ public class PedidoService {
     public AdminDto.Pedido crearManual(AdminDto.PedidoManualRequest r, String autor) {
         ConfigTienda c = configService.tienda();
         LocalDate fecha = r.fechaEntrega() != null ? r.fechaEntrega() : configService.disponibilidad().fechaServicio();
-        Entrega entrega = domicilio(c, r.tipoEntrega(), r.zonaId(), false);
+        Entrega entrega = domicilio(c, r.tipoEntrega(), r.zonaId(), null, null, false, true);
         PrecioService.Cotizacion cot = precios.calcular(lineas(r.items(), false), catalogo.promocionesActivas(),
                 entrega.valor(), fecha);
         Pedido p = nuevoPedido(cot, fecha, franja(c, r.franja()), r.tipoEntrega(), entrega.zona(), r.nombre(),
@@ -275,7 +401,16 @@ public class PedidoService {
 
     // ------------------------------------------------------------------ apoyo
 
-    private record Entrega(int valor, String zona) {}
+    /** lat/lng/km: solo con domicilio por distancia. */
+    private record Entrega(int valor, String zona, Double lat, Double lng, Double km) {
+        Entrega(int valor, String zona) { this(valor, zona, null, null, null); }
+    }
+
+    /** Domicilio por distancia: la empresa tiene mapas, lo escogió, marcó su local y tiene tramos. */
+    boolean domicilioPorDistancia(ConfigTienda c) {
+        return EmpresaContexto.tieneModulo(co.leinei.api.empresa.Modulos.MAPAS) && "DISTANCIA".equals(c.getDomicilioModo())
+                && c.tieneUbicacion() && !Distancia.tramos(c.getDomicilioTramos()).isEmpty();
+    }
 
     private static TipoEntrega tipoPorDefecto(ConfigTienda c, TipoEntrega pedido) {
         if (pedido != null) return pedido;
@@ -283,12 +418,36 @@ public class PedidoService {
     }
 
     /** Valor del domicilio según el tipo de entrega y la zona. estricto = exigir zona cuando hay zonas. */
-    private Entrega domicilio(ConfigTienda c, TipoEntrega tipo, Long zonaId, boolean estricto) {
+    /**
+     * @param estricto validar todo (al crear el pedido); sin estricto solo se calcula (cotizar).
+     * @param admin pedido que registra el negocio a mano: sin punto en el mapa se cobra el valor fijo.
+     */
+    private Entrega domicilio(ConfigTienda c, TipoEntrega tipo, Long zonaId, Double lat, Double lng, boolean estricto, boolean admin) {
         if (tipo == TipoEntrega.RECOGER) {
             if (!c.isRecogerActivo() && estricto) throw ReglaNegocioException.invalido("Por ahora no tenemos recogida en el local.");
             return new Entrega(0, "");
         }
         if (!c.isDomicilioActivo() && estricto) throw ReglaNegocioException.invalido("Por ahora no tenemos domicilios.");
+        if (estricto && c.domiciliosPausados(Instant.now())) {
+            throw ReglaNegocioException.conflicto("Pausamos los domicilios un momento porque estamos a tope. Vuelven a las "
+                    + DateTimeFormatter.ofPattern("h:mm a", ES_CO).format(c.getDomiciliosPausadosHasta().atZone(zona))
+                    + (c.isRecogerActivo() ? " Mientras tanto puedes recogerlo en el local." : ""));
+        }
+        if (domicilioPorDistancia(c)) {
+            if (lat == null || lng == null) {
+                if (estricto) throw ReglaNegocioException.invalido("Marca en el mapa dónde te llevamos el pedido.");
+                return new Entrega(admin ? c.getDomicilioValor() : 0, "");
+            }
+            List<Distancia.Tramo> tramos = Distancia.tramos(c.getDomicilioTramos());
+            double km = Math.round(Distancia.km(c.getLocalLat(), c.getLocalLng(), lat, lng) * 100) / 100.0;
+            Integer valor = Distancia.valor(tramos, km);
+            if (valor == null) {
+                throw ReglaNegocioException.invalido(String.format(ES_CO, "Tu dirección queda a %.1f km y llevamos domicilios hasta %s km.",
+                        km, String.format(ES_CO, "%.1f", tramos.getLast().hastaKm()).replace(",0", ""))
+                        + (c.isRecogerActivo() ? " Puedes pedir para recoger en el local." : ""));
+            }
+            return new Entrega(valor, String.format(ES_CO, "A %.1f km", km), lat, lng, km);
+        }
         List<ZonaEnvio> zonas = configService.zonasActivas();
         if (zonas.isEmpty()) return new Entrega(c.getDomicilioValor(), "");
         Optional<ZonaEnvio> zona = zonas.stream().filter(z -> z.getId().equals(zonaId)).findFirst();
@@ -389,6 +548,18 @@ public class PedidoService {
         p.setMetodoPago(metodo);
         if (metodo == MetodoPago.EFECTIVO) {
             if (!c.isEfectivo() && !admin) throw ReglaNegocioException.invalido("Por ahora no recibimos pagos en efectivo.");
+            p.setCuentaEntidad("");
+            p.setCuentaTitular("");
+            p.setCuentaNumero("");
+            return;
+        }
+        if (metodo == MetodoPago.EN_LINEA) {
+            if (admin) throw ReglaNegocioException.invalido("El pago en línea lo hace el cliente desde la tienda. Escoge otra forma de pago.");
+            ConfigPagosService.Activa activa = pagosEnLinea.activa(EmpresaContexto.requerida())
+                    .orElseThrow(() -> ReglaNegocioException.invalido("Por ahora no recibimos pagos en línea. Escoge otra forma de pago."));
+            p.setCuentaEntidad("Pago en línea");
+            p.setCuentaTitular(activa.proveedor().nombre());
+            p.setCuentaNumero("");
             return;
         }
         List<CuentaPago> cuentas = configService.cuentasActivas();
@@ -436,7 +607,8 @@ public class PedidoService {
                 p.getTotal(), p.getCostoTotal(), p.getMetodoPago(), p.getCuentaEntidad(), p.getCuentaTitular(),
                 p.getCuentaNumero(), p.getEstadoPago(), p.getEstado(), p.getOrigen(), eventos,
                 tieneComprobante, p.getPagoReportado(),
-                d == null ? null : d.getId(), d == null ? "" : d.getNombre(), d == null ? "" : d.getCelular());
+                d == null ? null : d.getId(), d == null ? "" : d.getNombre(), d == null ? "" : d.getCelular(),
+                p.getEntregaLat(), p.getEntregaLng(), p.getDistanciaKm());
     }
 
     /** Avisa al portal de la empresa y al cliente que sigue ese pedido (después de guardar). */
@@ -448,6 +620,14 @@ public class PedidoService {
 
     private static String pesos(int valor) {
         return "$" + String.format(ES_CO, "%,d", valor);
+    }
+
+    private static String comoPaga(Pedido p) {
+        return switch (p.getMetodoPago()) {
+            case CUENTA -> "paga por " + p.getCuentaEntidad();
+            case EN_LINEA -> "paga en línea (" + p.getCuentaTitular() + ")";
+            case EFECTIVO -> "paga en efectivo";
+        };
     }
 
     private static String lugar(Pedido p) {

@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: control-009-modulo-caja
+      author: leinei
+      comment: Módulo de cierre de caja (efectivo, transferencias, pagos en línea y lo que debe entregar cada domiciliario).
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO plataforma.tbl_modulos (codigo, nombre, descripcion, es_base, orden) VALUES
+                ('caja', 'Cierre de caja', 'Cuadre del día: efectivo, transferencias, pagos en línea y lo que entrega cada domiciliario.', FALSE, 8);
+              UPDATE plataforma.tbl_planes SET modulos = modulos || ',caja', actualizado_en = now()
+                  WHERE codigo IN ('pro', 'empresarial') AND modulos NOT LIKE '%caja%';
+      rollback:
+        - sql:
+            sql: |
+              UPDATE plataforma.tbl_planes SET modulos = replace(modulos, ',caja', '');
+              DELETE FROM plataforma.tbl_modulos WHERE codigo = 'caja';

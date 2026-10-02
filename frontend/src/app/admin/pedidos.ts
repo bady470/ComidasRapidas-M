@@ -7,6 +7,8 @@ import { claveLinea } from '../core/carrito';
 import { EstadoTienda } from '../core/estado-tienda';
 import { CelularPipe, DiaCortoPipe, DineroPipe, HoraPipe, dinero, linkWhatsapp } from '../core/formato';
 import { ACCION_HACIA, Domiciliario, EstadoPago, EstadoPedido, MODULOS, MetodoPago, NOMBRE_ESTADO, NOMBRE_PAGO, PedidoAdmin, Producto, TipoEntrega } from '../core/modelos';
+import { ImpresionCocina } from '../core/impresion-cocina';
+import { EmpresaActual } from '../core/empresa';
 import { AvisosPortal } from '../core/avisos-portal';
 
 type Filtro = 'ACTIVOS' | 'POR_PAGAR' | 'TODOS' | EstadoPedido;
@@ -141,7 +143,7 @@ interface LineaManual { clave: string; producto: Producto; opcionIds: number[]; 
               <td class="r num"><b>{{ p.total | dinero }}</b><div class="muted">{{ p.items.length }} {{ p.items.length === 1 ? 'producto' : 'productos' }}</div></td>
               <td>
                 <span class="st pay-{{ p.estadoPago }}">{{ nombrePago(p.estadoPago) }}</span>
-                <div class="muted">{{ p.metodoPago === 'CUENTA' ? p.cuentaEntidad : 'Efectivo' }}</div>
+                <div class="muted">{{ medioCorto(p) }}</div>
               </td>
               <td>
                 <span class="st st-{{ p.estado }}">{{ nombre(p.estado) }}</span>
@@ -169,6 +171,9 @@ interface LineaManual { clave: string; producto: Producto; opcionIds: number[]; 
                       @if (p.tipoEntrega === 'DOMICILIO') {
                         <p>{{ p.direccion }}{{ (p.zona || p.barrio) ? ', ' + (p.zona || p.barrio) : '' }}</p>
                         @if (p.referencia) { <p class="muted">{{ p.referencia }}</p> }
+                        @if (p.entregaLat != null) {
+                          <p><a class="linkbtn" [href]="mapaPedido(p)" target="_blank" rel="noopener">📍 Ver en el mapa{{ p.distanciaKm != null ? ' · a ' + km(p.distanciaKm) + ' km' : '' }}</a></p>
+                        }
                         @if (p.estado !== 'CANCELADO') {
                           <div class="row" style="margin-top:8px">
                             <label class="meta" [for]="'dom' + p.id"><b>Domiciliario</b></label>
@@ -184,14 +189,14 @@ interface LineaManual { clave: string; producto: Producto; opcionIds: number[]; 
                     </section>
                     <section>
                       <h4>Pago</h4>
-                      <p>{{ p.metodoPago === 'CUENTA' ? p.cuentaEntidad + ' · ' + p.cuentaTitular : 'Efectivo' }}</p>
+                      <p>{{ medioLargo(p) }}</p>
                       <div class="row" style="margin-top:8px">
                         @if (p.tieneComprobante) { <button class="btn" (click)="verComprobante(p)">Ver comprobante</button> }
                         @if (p.estadoPago === 'POR_CONFIRMAR') {
                           <button class="btn okb" (click)="pago(p, 'RECIBIDO')">Confirmar pago</button>
                           <button class="btn bad" (click)="pago(p, 'PENDIENTE')">No llegó el pago</button>
                         } @else if (p.estadoPago === 'PENDIENTE') {
-                          <button class="btn okb" (click)="pago(p, 'RECIBIDO')">Marcar pagado</button>
+                          <button class="btn okb" (click)="pago(p, 'RECIBIDO')">{{ p.metodoPago === 'EN_LINEA' ? 'Marcar pagado a mano' : 'Marcar pagado' }}</button>
                         } @else {
                           <button class="btn" (click)="pago(p, 'PENDIENTE')">Deshacer pago</button>
                         }
@@ -200,6 +205,9 @@ interface LineaManual { clave: string; producto: Producto; opcionIds: number[]; 
                   </div>
                   <div class="row detalle-acciones">
                     @if (p.clienteCelular) { <a class="btn" [href]="wa(p)" target="_blank" rel="noopener">WhatsApp al cliente</a> }
+                    @if (imp.config().modo !== 'APAGADA' && estadoTienda.tieneModulo(M.cocina)) {
+                      <button class="btn" type="button" (click)="imp.imprimir(p)">🖨 Imprimir comanda{{ imp.yaImpreso(p.id) ? ' (otra vez)' : '' }}</button>
+                    }
                     @if (p.estado !== 'CANCELADO' && p.estado !== 'ENTREGADO') {
                       @if (confirmar() === p.id) {
                         <button class="btn sure" (click)="estado(p, 'CANCELADO')">Sí, cancelar pedido</button>
@@ -224,6 +232,8 @@ interface LineaManual { clave: string; producto: Producto; opcionIds: number[]; 
 export class PedidosPage {
   private api = inject(AdminApi);
   protected estadoTienda = inject(EstadoTienda);
+  protected imp = inject(ImpresionCocina);
+  private emp = inject(EmpresaActual);
   protected readonly M = MODULOS;
   private avisos = inject(Avisos);
   private avisosPortal = inject(AvisosPortal);
@@ -404,11 +414,28 @@ export class PedidosPage {
   protected waDomiciliario(p: PedidoAdmin): string {
     const productos = p.items.map((i) => `• ${i.cantidad} x ${i.nombre}${i.detalle ? ' (' + i.detalle + ')' : ''}`).join('\n');
     const cobro = p.estadoPago === 'RECIBIDO' ? 'Ya está pagado.' : p.metodoPago === 'EFECTIVO'
-      ? `Cobrar en efectivo: ${dinero(p.total)}` : `Pago por transferencia (${NOMBRE_PAGO[p.estadoPago].toLowerCase()}).`;
+      ? `Cobrar en efectivo: ${dinero(p.total)}`
+      : `Pago ${p.metodoPago === 'EN_LINEA' ? 'en línea' : 'por transferencia'} (${NOMBRE_PAGO[p.estadoPago].toLowerCase()}).`;
     const texto = `Hola ${p.domiciliarioNombre}, te toca el pedido ${p.codigo}:\n${productos}\n`
       + `Cliente: ${p.clienteNombre}${p.clienteCelular ? ' · ' + p.clienteCelular : ''}\n`
-      + `Dirección: ${p.direccion}${(p.zona || p.barrio) ? ', ' + (p.zona || p.barrio) : ''}${p.referencia ? ' (' + p.referencia + ')' : ''}\n${cobro}`;
+      + `Dirección: ${p.direccion}${(p.zona || p.barrio) ? ', ' + (p.zona || p.barrio) : ''}${p.referencia ? ' (' + p.referencia + ')' : ''}\n${cobro}`
+      + (p.entregaLat != null ? `\nUbicación: ${this.mapaPedido(p)}` : '')
+      + (this.linkReparto(p) ? `\nTus pedidos y ubicación: ${this.linkReparto(p)}` : '');
     return linkWhatsapp(p.domiciliarioCelular, texto);
+  }
+
+  /** Google Maps en el punto que marcó el cliente (el domiciliario lo abre con un toque). */
+  protected mapaPedido(p: PedidoAdmin): string {
+    return `https://www.google.com/maps/search/?api=1&query=${p.entregaLat},${p.entregaLng}`;
+  }
+
+  protected km(n: number): string { return n.toLocaleString('es-CO', { maximumFractionDigits: 1 }); }
+
+  /** Link de reparto del domiciliario asignado (si la empresa tiene mapas). */
+  private linkReparto(p: PedidoAdmin): string {
+    if (!this.estadoTienda.tieneModulo(MODULOS.mapas)) return '';
+    const d = this.domiciliarios().find((x) => x.id === p.domiciliarioId);
+    return d?.token ? location.origin + this.emp.url('/reparto/' + d.token) : '';
   }
 
   /** Abre el comprobante en otra pestaña (se descarga con el token del portal). */
@@ -426,6 +453,19 @@ export class PedidosPage {
 
   private reemplazar(p: PedidoAdmin): void {
     this.pedidos.update((l) => l.map((x) => (x.id === p.id ? p : x)));
+  }
+
+  protected medioCorto(p: PedidoAdmin): string {
+    if (p.metodoPago === 'EN_LINEA') return 'En línea · ' + p.cuentaTitular;
+    return p.metodoPago === 'CUENTA' ? p.cuentaEntidad : 'Efectivo';
+  }
+
+  protected medioLargo(p: PedidoAdmin): string {
+    if (p.metodoPago === 'EN_LINEA') {
+      return `Pago en línea con ${p.cuentaTitular}${p.cuentaNumero ? ' · ' + p.cuentaNumero : ''}`
+        + (p.estadoPago === 'RECIBIDO' ? ' · confirmado por la pasarela' : ' · esperando que el cliente pague');
+    }
+    return p.metodoPago === 'CUENTA' ? p.cuentaEntidad + ' · ' + p.cuentaTitular : 'Efectivo';
   }
 
   protected nombre(e: EstadoPedido): string { return NOMBRE_ESTADO[e]; }

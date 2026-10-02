@@ -1,0 +1,54 @@
+# Cierre de caja del día y modo «estamos llenos».
+databaseChangeLog:
+  - changeSet:
+      id: empresa-009-saturacion
+      author: leinei
+      comment: >
+        Modo «estamos llenos»: minutos extra en el tiempo de entrega y pausas temporales de domicilios o de todos
+        los pedidos. Cada uno vence solo (se compara con la hora actual); no hace falta un proceso que lo apague.
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE cliente.tbl_configuraciones
+                  ADD COLUMN minutos_extra             SMALLINT    NOT NULL DEFAULT 0 CHECK (minutos_extra BETWEEN 0 AND 180),
+                  ADD COLUMN demora_hasta              TIMESTAMPTZ,
+                  ADD COLUMN domicilios_pausados_hasta TIMESTAMPTZ,
+                  ADD COLUMN pedidos_pausados_hasta    TIMESTAMPTZ;
+      rollback:
+        - sql:
+            sql: |
+              ALTER TABLE cliente.tbl_configuraciones DROP COLUMN minutos_extra, DROP COLUMN demora_hasta,
+                  DROP COLUMN domicilios_pausados_hasta, DROP COLUMN pedidos_pausados_hasta;
+
+  - changeSet:
+      id: empresa-009-cierres-caja
+      author: leinei
+      comment: Cierre de caja de cada día de servicio. Guarda lo que se contó y una foto de los totales de ese momento.
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE cliente.tbl_cierres_caja (
+                  id                 BIGSERIAL PRIMARY KEY,
+                  uuid               UUID         NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+                  fecha              DATE         NOT NULL UNIQUE,
+                  base_inicial       INTEGER      NOT NULL DEFAULT 0 CHECK (base_inicial >= 0),
+                  gastos             INTEGER      NOT NULL DEFAULT 0 CHECK (gastos >= 0),
+                  nota_gastos        VARCHAR(200) NOT NULL DEFAULT '',
+                  efectivo_recibido  INTEGER      NOT NULL DEFAULT 0,
+                  efectivo_esperado  INTEGER      NOT NULL DEFAULT 0,
+                  efectivo_contado   INTEGER      NOT NULL DEFAULT 0 CHECK (efectivo_contado >= 0),
+                  diferencia         INTEGER      NOT NULL DEFAULT 0,
+                  transferencias     INTEGER      NOT NULL DEFAULT 0,
+                  en_linea           INTEGER      NOT NULL DEFAULT 0,
+                  por_cobrar         INTEGER      NOT NULL DEFAULT 0,
+                  ventas             INTEGER      NOT NULL DEFAULT 0,
+                  pedidos            INTEGER      NOT NULL DEFAULT 0,
+                  nota               VARCHAR(300) NOT NULL DEFAULT '',
+                  cerrado_por        VARCHAR(120) NOT NULL DEFAULT '',
+                  cerrado_en         TIMESTAMPTZ  NOT NULL DEFAULT now(),
+                  actualizado_en     TIMESTAMPTZ  NOT NULL DEFAULT now()
+              );
+              CREATE TRIGGER trg_auditar_cierres_caja AFTER INSERT OR UPDATE OR DELETE ON cliente.tbl_cierres_caja
+                  FOR EACH ROW EXECUTE FUNCTION plataforma.fn_auditar();
+      rollback:
+        - sql: { sql: DROP TABLE cliente.tbl_cierres_caja; }

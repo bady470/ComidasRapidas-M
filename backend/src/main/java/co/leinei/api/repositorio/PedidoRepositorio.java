@@ -34,4 +34,19 @@ public interface PedidoRepositorio extends JpaRepository<Pedido, Long> {
 
     @Query("select distinct p.fechaEntrega from Pedido p order by p.fechaEntrega desc")
     List<LocalDate> fechasConPedidos(Pageable pagina);
+
+    /** Pedidos activos de un domiciliario (su página de reparto), los más viejos primero. */
+    @EntityGraph(attributePaths = {"items", "domiciliario"})
+    List<Pedido> findByDomiciliarioIdAndEstadoInOrderByCreadoAsc(Long domiciliarioId, Collection<EstadoPedido> estados);
+
+    /** Pedidos de un rango de días (estadísticas). */
+    @EntityGraph(attributePaths = {"items"})
+    List<Pedido> findByFechaEntregaBetween(LocalDate desde, LocalDate hasta);
+
+    /** Primer día en que pidió cada cliente (para saber cuáles son nuevos). Filas: [celular, fecha]. */
+    @Query("""
+            select p.clienteCelular, min(p.fechaEntrega) from Pedido p
+            where p.estado <> co.leinei.api.dominio.EstadoPedido.CANCELADO and p.clienteCelular in :celulares
+            group by p.clienteCelular""")
+    List<Object[]> primerPedido(@org.springframework.data.repository.query.Param("celulares") Collection<String> celulares);
 }

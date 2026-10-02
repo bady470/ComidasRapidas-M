@@ -63,6 +63,13 @@ public class Pedido {
     private OrigenPedido origen = OrigenPedido.WEB;
     @Column(name = "pago_reportado_en")
     private Instant pagoReportado;
+    /** Punto de entrega que marcó el cliente en el mapa (domicilio por distancia). */
+    @Column(name = "entrega_lat")
+    private Double entregaLat;
+    @Column(name = "entrega_lng")
+    private Double entregaLng;
+    @Column(name = "distancia_km")
+    private Double distanciaKm;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "domiciliario_id")
     private Domiciliario domiciliario;
@@ -145,6 +152,12 @@ public class Pedido {
     public EstadoPago getEstadoPago() { return estadoPago; }
     public Instant getPagoReportado() { return pagoReportado; }
     public void setPagoReportado(Instant v) { pagoReportado = v; }
+    public Double getEntregaLat() { return entregaLat; }
+    public void setEntregaLat(Double v) { entregaLat = v; }
+    public Double getEntregaLng() { return entregaLng; }
+    public void setEntregaLng(Double v) { entregaLng = v; }
+    public Double getDistanciaKm() { return distanciaKm; }
+    public void setDistanciaKm(Double v) { distanciaKm = v; }
     public Domiciliario getDomiciliario() { return domiciliario; }
     public void setDomiciliario(Domiciliario v) { domiciliario = v; }
     public void setEstadoPago(EstadoPago v) { estadoPago = v; }

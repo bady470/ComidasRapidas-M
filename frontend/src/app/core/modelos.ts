@@ -8,7 +8,7 @@ export const NOMBRE_PAGO: Record<EstadoPago, string> = {
   POR_CONFIRMAR: 'Comprobante por revisar',
   RECIBIDO: 'Pagado',
 };
-export type MetodoPago = 'CUENTA' | 'EFECTIVO';
+export type MetodoPago = 'CUENTA' | 'EFECTIVO' | 'EN_LINEA';
 export type TipoEntrega = 'DOMICILIO' | 'RECOGER';
 export type ModoPedido = 'INMEDIATO' | 'PROGRAMADO';
 export type TipoPromocion = 'COMBO' | 'PORCENTAJE' | 'PRECIO_ESPECIAL' | 'ENVIO_GRATIS';
@@ -40,6 +40,11 @@ export const MODULOS = {
   zonas: 'zonas',
   reportes: 'reportes',
   pedidoManual: 'pedido_manual',
+  pagosEnLinea: 'pagos_en_linea',
+  caja: 'caja',
+  cocina: 'cocina',
+  clientes: 'clientes',
+  mapas: 'mapas',
 } as const;
 
 export const DIAS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -61,7 +66,141 @@ export interface Tienda {
   efectivo: boolean; cuentas: Cuenta[];
   /** Módulos del plan de la empresa (ver MODULOS). */
   modulos: string[];
+  /** Pago en línea con pasarela; null si la tienda no lo ofrece ahora. */
+  pagoEnLinea: PagoEnLineaPublico | null;
+  /** Modo «estamos llenos» vigente (los tiempos y el domicilio de arriba ya lo tienen en cuenta). */
+  saturacion: Saturacion;
+  /** Cómo se cobra el domicilio: valor fijo, por zona o por distancia en el mapa. */
+  entrega: EntregaPublica;
 }
+
+// ---------- Mapas ----------
+export interface Tramo { hastaKm: number; valor: number; }
+export interface EntregaPublica { modo: 'FIJO' | 'ZONAS' | 'DISTANCIA'; localLat: number | null; localLng: number | null; tramos: Tramo[]; radioKm: number | null; }
+export interface ConfigMapa { localLat: number | null; localLng: number | null; modo: 'FIJO' | 'DISTANCIA'; tramos: Tramo[]; seguimientoVivo: boolean; }
+export interface Repartidor { lat: number; lng: number; actualizado: string; }
+export interface MapaSeguimiento { localLat: number | null; localLng: number | null; entregaLat: number | null; entregaLng: number | null; repartidor: Repartidor | null; }
+export interface PedidoReparto {
+  codigo: string; estado: EstadoPedido; cliente: string; celular: string; direccion: string; barrio: string; referencia: string;
+  notas: string; lat: number | null; lng: number | null; total: number; cobrar: number; productos: string;
+}
+export interface Reparto { domiciliario: string; tienda: string; localLat: number | null; localLng: number | null; seguimientoVivo: boolean; pedidos: PedidoReparto[]; }
+export interface UbicacionDomiciliario { id: number; nombre: string; lat: number; lng: number; actualizado: string; vigente: boolean; enCamino: number; }
+
+export interface Saturacion {
+  minutosExtra: number; demoraHasta: string | null; domiciliosPausadosHasta: string | null; pedidosPausadosHasta: string | null;
+}
+
+export type AccionSaturacion = 'DEMORA' | 'PAUSAR_DOMICILIOS' | 'PAUSAR_PEDIDOS' | 'QUITAR_DEMORA' | 'REANUDAR_DOMICILIOS' | 'REANUDAR_PEDIDOS' | 'NORMAL';
+
+// ---------- Estadísticas y cierre de caja ----------
+export interface ResumenVentas {
+  ventas: number; pedidos: number; ticketPromedio: number; unidades: number; ganancia: number; cobrado: number;
+  porCobrar: number; cancelados: number; clientes: number; clientesNuevos: number; domicilios: number;
+}
+export interface ParteVentas { clave: string; nombre: string; pedidos: number; total: number; }
+export interface Estadisticas {
+  desde: string; hasta: string; anteriorDesde: string; anteriorHasta: string;
+  actual: ResumenVentas; anterior: ResumenVentas;
+  dias: { fecha: string; ventas: number; pedidos: number }[];
+  productos: { nombre: string; unidades: number; ventas: number }[];
+  horas: { hora: number; pedidos: number; ventas: number }[];
+  semana: { dia: number; pedidos: number; ventas: number }[];
+  pagos: ParteVentas[]; entrega: ParteVentas[]; origen: ParteVentas[];
+}
+
+export interface CierreCaja {
+  baseInicial: number; gastos: number; notaGastos: string; efectivoContado: number; efectivoEsperado: number;
+  diferencia: number; nota: string; cerradoPor: string; cerradoEn: string;
+}
+export interface Caja {
+  fecha: string; pedidos: number; ventas: number; efectivoRecibido: number; transferencias: number; enLinea: number; porCobrar: number;
+  medios: { clave: string; nombre: string; pedidos: number; recibido: number; pendiente: number }[];
+  domiciliarios: { id: number; nombre: string; pedidos: number; entregados: number; efectivoACobrar: number; efectivoCobrado: number; domicilios: number }[];
+  pendientes: { id: number; codigo: string; cliente: string; total: number; medio: string; estadoPago: EstadoPago; estado: EstadoPedido }[];
+  cierre: CierreCaja | null; fechas: string[];
+}
+// ---------- Cocina y clientes ----------
+export type ModoImpresion = 'APAGADA' | 'MANUAL' | 'AUTOMATICA';
+export interface ConfigCocina {
+  modo: ModoImpresion; momento: 'NUEVO' | 'CONFIRMADO'; esperaPago: boolean; papel: 58 | 80; copias: number; precios: boolean; pie: string;
+}
+export interface ClienteResumen {
+  celular: string; nombre: string; pedidos: number; total: number; ticketPromedio: number; primero: string; ultimo: string;
+  diasSinPedir: number; favorito: string; ultimoContacto: string | null; volvio: boolean;
+}
+export interface Clientes {
+  resumen: { total: number; frecuentes: number; nuevosMes: number; dormidos: number; contactados: number; recuperados: number };
+  lista: ClienteResumen[]; mensaje: string;
+}
+
+export interface CierreCajaForm { baseInicial: number; gastos: number; notaGastos: string; efectivoContado: number; nota: string; }
+
+// ---------- Pagos en línea ----------
+export type Proveedor = 'WOMPI' | 'BOLD';
+export type Ambiente = 'PRUEBAS' | 'PRODUCCION';
+export type ModalidadPago = 'APAGADO' | 'PROPIA' | 'PLATAFORMA';
+export type EstadoTransaccion = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' | 'ANULADO' | 'ERROR' | 'VENCIDO';
+export type Liquidacion = 'NO_APLICA' | 'POR_LIQUIDAR' | 'LIQUIDADO';
+
+export const NOMBRE_TRANSACCION: Record<EstadoTransaccion, string> = {
+  PENDIENTE: 'Esperando el pago',
+  APROBADO: 'Aprobado',
+  RECHAZADO: 'Rechazado',
+  ANULADO: 'Reversado',
+  ERROR: 'Con error',
+  VENCIDO: 'Vencido',
+};
+
+export const NOMBRE_MODALIDAD: Record<ModalidadPago, string> = {
+  APAGADO: 'Apagado',
+  PROPIA: 'Cuenta propia de la empresa',
+  PLATAFORMA: 'Cuenta de la plataforma',
+};
+
+export interface PagoEnLineaPublico { proveedor: Proveedor; nombre: string; medios: string; }
+
+export interface EstadoPagoEnLinea {
+  proveedor: Proveedor; nombre: string; estado: EstadoTransaccion; medio: string; detalle: string;
+  intentos: number; actualizado: string;
+}
+
+export interface Llaves {
+  proveedor: Proveedor; ambiente: Ambiente; llavePublica: string;
+  llavePrivada: string; secretoIntegridad: string; secretoEventos: string;
+}
+
+export interface LlavesGuardadas {
+  proveedor: Proveedor; nombreProveedor: string; ambiente: Ambiente; llavePublica: string;
+  tieneLlavePrivada: boolean; tieneSecretoIntegridad: boolean; tieneSecretoEventos: boolean;
+}
+
+export interface TotalesPagos { aprobados: number; montoAprobado: number; comisiones: number; porLiquidar: number; liquidado: number; }
+
+export interface ConfigPagosEmpresa {
+  modalidad: ModalidadPago; proveedor: Proveedor; moduloActivo: boolean; editablePorEmpresa: boolean; pausado: boolean;
+  comisionPorcentaje: number; comisionFija: number; llaves: LlavesGuardadas;
+  listo: boolean; motivo: string; urlEventos: string; totales: TotalesPagos;
+}
+
+export interface ConfigPagosEmpresaForm {
+  modalidad: ModalidadPago; proveedor: Proveedor; editablePorEmpresa: boolean; pausado: boolean;
+  comisionPorcentaje: number; comisionFija: number; llaves: Llaves | null;
+}
+
+export interface PasarelaPlataforma {
+  llaves: LlavesGuardadas; activa: boolean; completa: boolean; faltante: string | null; urlEventos: string; empresasUsandola: number;
+}
+
+export interface TransaccionPago {
+  uuid: string; empresa: string; empresaNombre: string; referencia: string; codigoPedido: string; proveedor: Proveedor;
+  modalidad: 'PROPIA' | 'PLATAFORMA'; ambiente: Ambiente; monto: number; estado: EstadoTransaccion; medio: string; detalle: string;
+  comision: number; neto: number; liquidacion: Liquidacion; creado: string; aprobado: string | null; liquidado: string | null;
+  liquidadoPor: string | null; notaLiquidacion: string;
+}
+
+export interface PortalPagos { config: ConfigPagosEmpresa; recientes: TransaccionPago[]; }
+export interface Recaudos { lista: TransaccionPago[]; totales: TotalesPagos; }
 
 export interface Categoria { id: number; nombre: string; }
 export interface Opcion { id: number; nombre: string; precioExtra: number; disponible: boolean; }
@@ -96,6 +235,8 @@ export interface CrearPedido {
   items: ItemPedido[]; tipoEntrega: TipoEntrega; zonaId: number | null; nombre: string; celular: string;
   barrio: string; direccion: string; referencia: string; franja: string; metodoPago: MetodoPago;
   cuentaId: number | null; notas: string;
+  /** Punto de entrega en el mapa (domicilio por distancia). */
+  lat?: number | null; lng?: number | null;
 }
 
 export interface PedidoCreado {
@@ -115,6 +256,10 @@ export interface Seguimiento {
   eventos: EventoPublico[]; creado: string; direccionTienda: string;
   tieneComprobante: boolean; pagoReportado: string | null;
   domiciliarioNombre: string; domiciliarioCelular: string;
+  /** Último intento de pago en línea (null si nunca intentó pagar en línea). */
+  pagoEnLinea: EstadoPagoEnLinea | null;
+  /** Mapa del pedido (null si la empresa no tiene mapas). */
+  mapa: MapaSeguimiento | null;
 }
 
 // ---------- Administración ----------
@@ -132,12 +277,14 @@ export interface PedidoAdmin {
   eventos: { estado: EstadoPedido; nota: string; autor: string; fecha: string }[];
   tieneComprobante: boolean; pagoReportado: string | null;
   domiciliarioId: number | null; domiciliarioNombre: string; domiciliarioCelular: string;
+  entregaLat: number | null; entregaLng: number | null; distanciaKm: number | null;
 }
 
-export interface Domiciliario { id: number; nombre: string; celular: string; activo: boolean; }
+/** token: el de su link de reparto (/reparto/{token}). */
+export interface Domiciliario { id: number; nombre: string; celular: string; activo: boolean; token: string | null; }
 
 export interface Notificacion {
-  id: number; tipo: 'PEDIDO_NUEVO' | 'PAGO_REPORTADO'; pedidoId: number | null; codigo: string;
+  id: number; tipo: 'PEDIDO_NUEVO' | 'PAGO_REPORTADO' | 'PAGO_RECIBIDO' | 'PAGO_REVERSADO'; pedidoId: number | null; codigo: string;
   titulo: string; mensaje: string; leida: boolean; creado: string;
 }
 

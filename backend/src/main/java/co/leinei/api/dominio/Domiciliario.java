@@ -21,6 +21,35 @@ public class Domiciliario {
     private int orden;
     @Column(name = "creado_en", updatable = false)
     private Instant creado = Instant.now();
+    /** Link personal de reparto (/reparto/{token}). */
+    private String token;
+    @Column(name = "ubicacion_lat")
+    private Double ubicacionLat;
+    @Column(name = "ubicacion_lng")
+    private Double ubicacionLng;
+    @Column(name = "ubicacion_precision")
+    private Integer ubicacionPrecision;
+    @Column(name = "ubicacion_en")
+    private Instant ubicacionEn;
+
+    public String getToken() { return token; }
+    public void setToken(String v) { token = v; }
+    public Double getUbicacionLat() { return ubicacionLat; }
+    public Double getUbicacionLng() { return ubicacionLng; }
+    public Integer getUbicacionPrecision() { return ubicacionPrecision; }
+    public Instant getUbicacionEn() { return ubicacionEn; }
+
+    public void ubicar(double lat, double lng, Integer precision) {
+        ubicacionLat = lat;
+        ubicacionLng = lng;
+        ubicacionPrecision = precision;
+        ubicacionEn = Instant.now();
+    }
+
+    /** Ubicación reciente (de los últimos minutos): si es más vieja, el celular dejó de compartirla. */
+    public boolean ubicacionVigente(Instant ahora, java.time.Duration vigencia) {
+        return ubicacionEn != null && ubicacionEn.isAfter(ahora.minus(vigencia));
+    }
 
     public Long getId() { return id; }
     public java.util.UUID getUuid() { return uuid; }

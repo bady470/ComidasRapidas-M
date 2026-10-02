@@ -1,9 +1,11 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { Icono } from '../compartido/icono';
+import { ModoLleno } from './modo-lleno';
 import { GrupoMenu, Shell } from '../compartido/shell';
 import { AdminApi } from '../core/api';
 import { AvisosPortal } from '../core/avisos-portal';
+import { ImpresionCocina } from '../core/impresion-cocina';
 import { EmpresaActual } from '../core/empresa';
 import { EstadoTienda } from '../core/estado-tienda';
 import { HoraPipe } from '../core/formato';
@@ -12,12 +14,13 @@ import { SesionAdmin } from '../core/sesion';
 
 @Component({
   selector: 'app-admin-layout',
-  imports: [RouterOutlet, Shell, Icono, HoraPipe],
+  imports: [RouterOutlet, Shell, Icono, HoraPipe, ModoLleno],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-shell [marca]="tienda()?.nombre ?? ''" subtitulo="Portal de pedidos" [logoUrl]="tienda()?.logoUrl" [grupos]="menu()"
                [usuario]="sesion.actual()?.nombre ?? ''" rol="Administrador" [inicio]="emp.url('/admin')" (salir)="salir()">
       <div acciones class="mt-botones">
+        <app-modo-lleno />
         <span class="en-vivo" [class.off]="!avisos.enVivo()" [title]="avisos.enVivo() ? 'Conectado: los cambios llegan al instante' : 'Reconectando…'">
           {{ avisos.enVivo() ? 'En vivo' : 'Reconectando' }}</span>
         <button class="mt-icono campana" type="button" (click)="alternarAvisos()" [attr.aria-expanded]="avisosAbiertos()"
@@ -59,6 +62,8 @@ export class AdminLayout implements OnInit {
   protected estado = inject(EstadoTienda);
   protected emp = inject(EmpresaActual);
   protected avisos = inject(AvisosPortal);
+  /** Comandas automáticas: escucha los pedidos en cualquier página del portal. */
+  private impresion = inject(ImpresionCocina);
   protected readonly M = MODULOS;
   private api = inject(AdminApi);
   private router = inject(Router);
@@ -67,15 +72,25 @@ export class AdminLayout implements OnInit {
   protected menu = computed<GrupoMenu[]>(() => [
     { titulo: 'Operación', items: [
       { ruta: 'pedidos', texto: 'Pedidos', icono: 'pedidos', insignia: this.porPagar() ? `${this.porPagar()} por pagar` : null },
-      ...(this.estado.tieneModulo(MODULOS.reportes) ? [{ ruta: 'ventas', texto: 'Ventas', icono: 'ventas' }] : []),
+      ...(this.estado.tieneModulo(MODULOS.reportes) ? [
+        { ruta: 'estadisticas', texto: 'Estadísticas', icono: 'estadisticas' },
+        { ruta: 'ventas', texto: 'Ventas del día', icono: 'ventas' },
+      ] : []),
+      ...(this.estado.tieneModulo(MODULOS.caja) ? [{ ruta: 'caja', texto: 'Cierre de caja', icono: 'caja' }] : []),
+      ...(this.estado.tieneModulo(MODULOS.cocina) ? [{ ruta: 'cocina', texto: 'Cocina', icono: 'cocina' }] : []),
       { ruta: 'domiciliarios', texto: 'Domiciliarios', icono: 'domiciliarios' },
+      ...(this.estado.tieneModulo(MODULOS.clientes) ? [{ ruta: 'clientes', texto: 'Clientes', icono: 'clientes' }] : []),
     ] },
     { titulo: 'Catálogo', items: [
       { ruta: 'productos', texto: 'Productos', icono: 'productos' },
       { ruta: 'categorias', texto: 'Categorías', icono: 'categorias' },
       ...(this.estado.tieneModulo(MODULOS.promociones) ? [{ ruta: 'promociones', texto: 'Promociones', icono: 'promociones' }] : []),
     ] },
-    { titulo: 'Configuración', items: [{ ruta: 'tienda', texto: 'Mi tienda', icono: 'tienda' }] },
+    { titulo: 'Configuración', items: [
+      { ruta: 'tienda', texto: 'Mi tienda', icono: 'tienda' },
+      ...(this.estado.tieneModulo(MODULOS.mapas) ? [{ ruta: 'mapa', texto: 'Domicilios y mapa', icono: 'mapa' }] : []),
+      ...(this.estado.tieneModulo(MODULOS.pagosEnLinea) ? [{ ruta: 'pagos-en-linea', texto: 'Pagos en línea', icono: 'pagos' }] : []),
+    ] },
   ]);
 
   protected avisosAbiertos = signal(false);
@@ -92,6 +107,7 @@ export class AdminLayout implements OnInit {
   ngOnInit(): void {
     this.estado.asegurar();
     this.avisos.iniciar(this.emp.slug());
+    this.impresion.iniciar(this.emp.slug());
   }
 
   protected alternarAvisos(): void {
@@ -104,7 +120,7 @@ export class AdminLayout implements OnInit {
   protected abrir(n: Notificacion): void {
     this.avisosAbiertos.set(false);
     this.router.navigate([this.emp.url('/admin/pedidos')], {
-      queryParams: { q: n.codigo || null, filtro: n.tipo === 'PAGO_REPORTADO' ? 'POR_PAGAR' : null },
+      queryParams: { q: n.codigo || null, filtro: n.tipo === 'PAGO_REPORTADO' || n.tipo === 'PAGO_REVERSADO' ? 'POR_PAGAR' : null },
     });
   }
 

@@ -149,12 +149,6 @@ interface Seccion { id: string; nombre: string; productos: Producto[]; }
     @if (abierto(); as p) {
       <app-selector-producto [producto]="p" (elegido)="agregar($event)" (cerrar)="abierto.set(null)" />
     }
-
-    @if (carrito.totalUnidades()) {
-      <div class="cartbar">
-        <a [routerLink]="emp.url('/carrito')"><span>Ver carrito · {{ carrito.totalUnidades() }} {{ carrito.totalUnidades() === 1 ? 'producto' : 'productos' }}</span><span>Pedir</span></a>
-      </div>
-    }
   `,
 })
 export class CatalogoPage {

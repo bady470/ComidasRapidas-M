@@ -27,6 +27,13 @@ public class ManejadorErrores {
         return ProblemDetail.forStatusAndDetail(e.getEstado(), e.getMessage());
     }
 
+    /** La pasarela de pagos no respondió o rechazó la solicitud: el mensaje ya es para el usuario. */
+    @ExceptionHandler(co.leinei.api.pagos.PasarelaException.class)
+    public ProblemDetail pasarela(co.leinei.api.pagos.PasarelaException e) {
+        log.warn("Pasarela de pagos: {}", e.getMessage(), e.getCause());
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, e.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail validacion(MethodArgumentNotValidException e) {
         Map<String, String> errores = new LinkedHashMap<>();

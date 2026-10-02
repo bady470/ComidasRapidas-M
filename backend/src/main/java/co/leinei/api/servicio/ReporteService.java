@@ -45,8 +45,11 @@ public class ReporteService {
             if (p.getTipoEntrega() == TipoEntrega.RECOGER) aRecoger++; else aDomicilio++;
             if (p.getEstadoPago() == EstadoPago.RECIBIDO) cobrado += p.getTotal();
 
-            String cuenta = p.getMetodoPago() == MetodoPago.CUENTA
-                    ? p.getCuentaEntidad() + " · " + p.getCuentaTitular() : "Efectivo";
+            String cuenta = switch (p.getMetodoPago()) {
+                case CUENTA -> p.getCuentaEntidad() + " · " + p.getCuentaTitular();
+                case EN_LINEA -> "En línea · " + p.getCuentaTitular();
+                case EFECTIVO -> "Efectivo";
+            };
             int[] c = porCuenta.computeIfAbsent(cuenta, k -> new int[3]);
             c[0]++;
             c[1] += p.getTotal();
