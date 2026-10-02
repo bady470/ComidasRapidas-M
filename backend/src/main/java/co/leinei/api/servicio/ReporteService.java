@@ -30,7 +30,7 @@ public class ReporteService {
     @Transactional(readOnly = true)
     public AdminDto.Produccion produccion(LocalDate fecha) {
         int costoOperativoUnidad = configService.tienda().getCostoOperativoUnidad();
-        List<Pedido> pedidos = pedidoRepo.findByFechaEntregaOrderByCreadoDesc(fecha).stream()
+        List<Pedido> pedidos = pedidoRepo.findByPublicadoTrueAndFechaEntregaOrderByCreadoDesc(fecha).stream()
                 .filter(p -> p.getEstado() != EstadoPedido.CANCELADO).toList();
 
         Map<String, int[]> porProducto = new LinkedHashMap<>(); // unidades, ventas, costo

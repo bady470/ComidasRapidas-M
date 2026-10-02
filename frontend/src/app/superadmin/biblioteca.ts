@@ -76,9 +76,20 @@ const NOMBRE_FILTRO: Record<string, string> = {
         @for (p of visibles(); track p.slug) {
           <article class="card bib-card" [class.elegido]="seleccion().has(p.slug)">
             <button type="button" class="art" (click)="alternar(p.slug)" [attr.aria-pressed]="seleccion().has(p.slug)" [attr.aria-label]="'Elegir ' + p.nombre" style="border:0;padding:0;cursor:pointer;position:relative">
-              <img [src]="api.imagenBiblioteca(p.imagen)" [alt]="p.nombre" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block">
+              @if (tieneFoto(p.slug)) {
+                <img [src]="api.fotoBiblioteca(p.slug, version())" [alt]="p.nombre" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block">
+              } @else {
+                <span class="bib-sin" aria-hidden="true">{{ iniciales(p.nombre) }}<small>Sin foto</small></span>
+              }
               <span class="bib-check" aria-hidden="true">{{ seleccion().has(p.slug) ? '✓' : '+' }}</span>
             </button>
+            <div class="bib-foto">
+              <label class="btn" style="cursor:pointer">
+                {{ tieneFoto(p.slug) ? 'Cambiar foto' : 'Subir foto' }}
+                <input type="file" accept="image/png,image/jpeg,image/webp" hidden (change)="subir(p.slug, $event)">
+              </label>
+              @if (esPropia(p.slug)) { <button class="btn" type="button" (click)="quitar(p.slug)">Quitar</button> }
+            </div>
             <div class="body">
               <div class="chips">
                 @if (p.etiqueta) { <span class="chip hot">{{ p.etiqueta }}</span> }
@@ -118,6 +129,10 @@ const NOMBRE_FILTRO: Record<string, string> = {
     .bib-grid { padding-bottom: 90px; }
     .bib-card { transition: box-shadow .15s, transform .15s, border-color .15s; }
     .bib-card.elegido { border-color: var(--brand, #c4372d); box-shadow: 0 0 0 2px var(--brand, #c4372d); }
+    .bib-sin { width: 100%; height: 100%; display: grid; place-content: center; text-align: center; font-size: 42px; font-weight: 800;
+      color: var(--brand, #c4372d); background: linear-gradient(135deg, #f6efe9, #efe3da); }
+    .bib-sin small { font-size: 12px; font-weight: 600; color: #8a7f76; }
+    .bib-foto { display: flex; gap: 8px; padding: 10px 14px 0; }
     .bib-check { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
       font-weight: 800; background: rgb(255 255 255 / .92); color: #333; box-shadow: 0 2px 8px rgb(0 0 0 / .25); }
     .elegido .bib-check { background: var(--brand, #c4372d); color: #fff; }
@@ -136,6 +151,7 @@ export class BibliotecaPage {
   protected empresas = signal<EmpresaResumen[]>([]);
   protected error = signal('');
   protected ocupado = signal(false);
+  protected version = signal(Date.now());
 
   protected destino = signal('');
   protected ajuste = signal(0);
@@ -171,6 +187,26 @@ export class BibliotecaPage {
       error: (e) => this.error.set(mensajeError(e)),
     });
     effect(() => { const e = this.empresa(); if (e) this.destino.set(e); });
+  }
+
+  protected tieneFoto(slug: string): boolean { return !!this.lib()?.conFoto.includes(slug); }
+  protected esPropia(slug: string): boolean { return !!this.lib()?.fotosPropias.includes(slug); }
+  protected iniciales(n: string): string { return n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase(); }
+  protected subir(slug: string, ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    const f = input.files?.[0];
+    input.value = '';
+    if (!f) return;
+    this.api.subirFotoBiblioteca(slug, f).subscribe({
+      next: (b) => { this.lib.set(b); this.version.set(Date.now()); },
+      error: (e) => this.error.set(mensajeError(e)),
+    });
+  }
+  protected quitar(slug: string): void {
+    this.api.quitarFotoBiblioteca(slug).subscribe({
+      next: (b) => { this.lib.set(b); this.version.set(Date.now()); },
+      error: (e) => this.error.set(mensajeError(e)),
+    });
   }
 
   protected new_set(): Set<string> { return new Set(); }

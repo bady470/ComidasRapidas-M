@@ -24,16 +24,18 @@ public class CatalogoService {
     private final ArchivoRepositorio archivoRepo;
     private final ConfigService configService;
     private final PrecioService precios;
+    private final BannerService banners;
 
     public CatalogoService(ProductoRepositorio productoRepo, CategoriaRepositorio categoriaRepo,
                            PromocionRepositorio promocionRepo, ArchivoRepositorio archivoRepo,
-                           ConfigService configService, PrecioService precios) {
+                           ConfigService configService, PrecioService precios, BannerService banners) {
         this.productoRepo = productoRepo;
         this.categoriaRepo = categoriaRepo;
         this.promocionRepo = promocionRepo;
         this.archivoRepo = archivoRepo;
         this.configService = configService;
         this.precios = precios;
+        this.banners = banners;
     }
 
     // ------------------------------------------------------------------ público
@@ -66,7 +68,7 @@ public class CatalogoService {
                         p.getProducto() == null ? null : p.getProducto().getId(), idsDe(p)))
                 .toList();
 
-        return new PublicoDto.Catalogo(tienda, cats, productos, promos);
+        return new PublicoDto.Catalogo(tienda, cats, productos, promos, EmpresaContexto.tieneModulo(Modulos.PROMOCIONES) ? banners.publicos() : List.of());
     }
 
     private static List<PublicoDto.Grupo> gruposPublicos(Producto p) {

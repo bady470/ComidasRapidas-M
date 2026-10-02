@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input, model, signal } from '@angular/core';
+import { Icono } from './icono';
 import { FormsModule } from '@angular/forms';
 import { dinero } from '../core/formato';
 import { EntregaPublica } from '../core/modelos';
@@ -10,7 +11,7 @@ import { Mapa, Marcador, buscarDireccion, kmEntre, miUbicacion } from './mapa';
  */
 @Component({
   selector: 'app-selector-ubicacion',
-  imports: [FormsModule, Mapa],
+  imports: [Icono, FormsModule, Mapa],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="field">
@@ -19,7 +20,7 @@ import { Mapa, Marcador, buscarDireccion, kmEntre, miUbicacion } from './mapa';
         <input name="buscarDir" [ngModel]="texto()" (ngModelChange)="texto.set($event)" (keydown.enter)="$event.preventDefault(); buscar()"
                placeholder="Escribe tu dirección y barrio" autocomplete="street-address">
         <button class="btn" type="button" [disabled]="buscando() || !texto().trim()" (click)="buscar()">{{ buscando() ? 'Buscando…' : 'Buscar' }}</button>
-        <button class="btn" type="button" [disabled]="ubicando()" (click)="usarMiUbicacion()">📍 {{ ubicando() ? 'Ubicando…' : 'Mi ubicación' }}</button>
+        <button class="btn" type="button" [disabled]="ubicando()" (click)="usarMiUbicacion()"><app-icono nombre="pin" /> {{ ubicando() ? 'Ubicando…' : 'Mi ubicación' }}</button>
       </div>
       @if (resultados().length) {
         <ul class="resultados-direccion">

@@ -42,8 +42,8 @@ public class AvisosService {
                         n.getPedidoId() == null ? "" : codigos.getOrDefault(n.getPedidoId(), ""),
                         n.getTitulo(), n.getMensaje(), n.isLeida(), n.getCreado()))
                 .toList();
-        long porPagar = pedidos.countByEstadoPagoInAndEstadoNot(PedidoService.SIN_PAGAR, EstadoPedido.CANCELADO);
-        long porConfirmar = pedidos.countByEstadoPagoInAndEstadoNot(List.of(EstadoPago.POR_CONFIRMAR), EstadoPedido.CANCELADO);
+        long porPagar = pedidos.countByPublicadoTrueAndEstadoPagoInAndEstadoNot(PedidoService.SIN_PAGAR, EstadoPedido.CANCELADO);
+        long porConfirmar = pedidos.countByPublicadoTrueAndEstadoPagoInAndEstadoNot(List.of(EstadoPago.POR_CONFIRMAR), EstadoPedido.CANCELADO);
         return new AdminDto.Avisos(notificaciones.countByLeidaFalse(), porPagar, porConfirmar, lista);
     }
 

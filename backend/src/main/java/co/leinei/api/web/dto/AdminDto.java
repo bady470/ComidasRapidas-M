@@ -112,6 +112,18 @@ public final class AdminDto {
 
     public record DisponibleRequest(boolean disponible) {}
 
+    public record Banner(Long id, String titulo, String subtitulo, String boton, Long imagenId, String color, boolean activo, int orden) {}
+
+    public record BannerRequest(
+            @NotBlank(message = "Escribe el título del banner") @Size(max = 80) String titulo,
+            @Size(max = 200) String subtitulo,
+            @Size(max = 30) String boton,
+            Long imagenId,
+            @Pattern(regexp = "^(#[0-9A-Fa-f]{6})?$", message = "El color debe ser como #1D4ED8") String color,
+            boolean activo) {}
+
+    public record OrdenRequest(@NotNull List<Long> ids) {}
+
     public record Promocion(Long id, String nombre, String descripcion, TipoPromocion tipo, Integer cantidad,
                             Integer precio, Integer porcentaje, int minimo, Long productoId, List<Long> productoIds,
                             boolean activa, boolean destacada, LocalDate desde, LocalDate hasta, boolean vigente) {}

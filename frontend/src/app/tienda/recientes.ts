@@ -12,5 +12,5 @@ export function pedidosRecientes(): PedidoReciente[] {
 
 export function guardarPedidoReciente(codigo: string, celular: string): void {
   const lista = [{ codigo, celular, fecha: new Date().toISOString() }, ...pedidosRecientes().filter((p) => p.codigo !== codigo)];
-  try { localStorage.setItem(CLAVE(), JSON.stringify(lista.slice(0, 10))); } catch { /* nada */ }
+  try { localStorage.setItem(CLAVE(), JSON.stringify(lista.slice(0, 50))); } catch { /* nada */ }
 }

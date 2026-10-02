@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, signal } from '@angular/core';
+import { Icono } from '../compartido/icono';
 import { TiendaApi, mensajeError } from '../core/api';
 import { CelularPipe, dinero, linkWhatsapp } from '../core/formato';
 import { Reparto, PedidoReparto } from '../core/modelos';
@@ -15,7 +16,7 @@ const METROS = 30;
  */
 @Component({
   selector: 'app-reparto',
-  imports: [CelularPipe, Mapa],
+  imports: [Icono, CelularPipe, Mapa],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="wrap reparto">
@@ -33,7 +34,7 @@ const METROS = 30;
             </div>
             <span class="hint">Deja esta página abierta mientras repartes. {{ pantallaActiva() ? 'La pantalla no se apagará.' : '' }}</span>
           } @else {
-            <button class="primary" type="button" (click)="compartir()">📍 Empezar a compartir mi ubicación</button>
+            <button class="primary" type="button" (click)="compartir()"><app-icono nombre="pin" /> Empezar a compartir mi ubicación</button>
             <span class="hint">{{ d.seguimientoVivo ? 'Así tus clientes ven que vas en camino.' : 'El negocio ve dónde vas.' }} Solo se comparte mientras esta página esté abierta.</span>
           }
           @if (aviso()) { <p class="err">{{ aviso() }}</p> }
@@ -51,15 +52,15 @@ const METROS = 30;
             <div style="font-size:16px">{{ p.direccion }}{{ p.barrio ? ', ' + p.barrio : '' }}</div>
             @if (p.referencia) { <div class="muted">{{ p.referencia }}</div> }
             <div class="muted">{{ p.productos }}</div>
-            @if (p.notas) { <div class="alerta aviso">📝 {{ p.notas }}</div> }
+            @if (p.notas) { <div class="alerta aviso"><app-icono nombre="nota" /> {{ p.notas }}</div> }
             <div class="alerta" [class.mala]="p.cobrar > 0" [class.buena]="p.cobrar === 0">
               <b>{{ p.cobrar > 0 ? 'Cobrar ' + precio(p.cobrar) + ' en efectivo' : 'Ya está pagado: no cobres' }}</b>
             </div>
             <div class="row" style="gap:8px;flex-wrap:wrap">
-              <a class="btn" [href]="navegar(p)" target="_blank" rel="noopener">🧭 Cómo llegar</a>
-              @if (p.celular) { <a class="btn" [href]="wa(p)" target="_blank" rel="noopener">💬 WhatsApp</a> }
+              <a class="btn" [href]="navegar(p)" target="_blank" rel="noopener"><app-icono nombre="brujula" /> Cómo llegar</a>
+              @if (p.celular) { <a class="btn" [href]="wa(p)" target="_blank" rel="noopener"><app-icono nombre="chat" /> WhatsApp</a> }
               @if (p.estado !== 'EN_CAMINO') {
-                <button class="btn main" type="button" [disabled]="ocupado() === p.codigo" (click)="avanzar(p, 'sali')">🛵 Salí</button>
+                <button class="btn main" type="button" [disabled]="ocupado() === p.codigo" (click)="avanzar(p, 'sali')"><app-icono nombre="domiciliarios" /> Salí</button>
               } @else {
                 <button class="btn okb" type="button" [disabled]="ocupado() === p.codigo" (click)="avanzar(p, 'entregado')">✓ Entregado</button>
               }

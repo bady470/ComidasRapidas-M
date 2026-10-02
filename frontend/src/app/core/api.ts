@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
   AdminUsuario, Catalogo, CategoriaAdmin, ConfigAdmin, Cotizacion, CrearPedido, EstadoPago, EstadoPedido, ItemPedido,
-  PedidoAdmin, PedidoCreado, PedidoManual, Produccion, ProductoAdmin, ProductoForm, PromocionAdmin, PromocionForm,
+  BannerAdmin, BannerForm, PedidoAdmin, PedidoCreado, PedidoManual, Produccion, ProductoAdmin, ProductoForm, PromocionAdmin, PromocionForm,
   Seguimiento, Sesion, TipoEntrega,
   Avisos, Domiciliario, ActualizarEmpresa, CrearEmpresa, EmpresaDetalle, EmpresaResumen, ModuloPlataforma, ResumenPlataforma, Superadmin, Biblioteca, ResultadoBiblioteca, Plan, EmpresaCreada, ConfigCorreo, ConfigCorreoForm, ResultadoPrueba,
   AccionSaturacion, Caja, CierreCajaForm, Estadisticas, Saturacion, Clientes, ConfigCocina,
@@ -217,6 +217,14 @@ export class AdminApi {
     return this.http.delete<void>(`${this.base}/promociones/${id}`);
   }
 
+  // ---- Banners del carrusel
+  banners(): Observable<BannerAdmin[]> { return this.http.get<BannerAdmin[]>(`${this.base}/banners`); }
+  guardarBanner(id: number | null, b: BannerForm): Observable<BannerAdmin[]> {
+    return id ? this.http.put<BannerAdmin[]>(`${this.base}/banners/${id}`, b) : this.http.post<BannerAdmin[]>(`${this.base}/banners`, b);
+  }
+  eliminarBanner(id: number): Observable<BannerAdmin[]> { return this.http.delete<BannerAdmin[]>(`${this.base}/banners/${id}`); }
+  ordenarBanners(ids: number[]): Observable<BannerAdmin[]> { return this.http.put<BannerAdmin[]>(`${this.base}/banners/orden`, { ids }); }
+
   // ---- Configuración
   config(): Observable<ConfigAdmin> {
     return this.http.get<ConfigAdmin>(`${this.base}/config`);
@@ -367,8 +375,16 @@ export class PlataformaApi {
   biblioteca(): Observable<Biblioteca> {
     return this.http.get<Biblioteca>(`${this.base}/biblioteca`);
   }
-  imagenBiblioteca(nombre: string): string {
-    return `${this.base}/publico/biblioteca/imagenes/${encodeURIComponent(nombre)}`;
+  fotoBiblioteca(slug: string, version = 0): string {
+    return `${this.base}/publico/biblioteca/fotos/${encodeURIComponent(slug)}?v=${version}`;
+  }
+  subirFotoBiblioteca(slug: string, archivo: File): Observable<Biblioteca> {
+    const datos = new FormData();
+    datos.append('archivo', archivo);
+    return this.http.post<Biblioteca>(`${this.base}/biblioteca/${encodeURIComponent(slug)}/foto`, datos);
+  }
+  quitarFotoBiblioteca(slug: string): Observable<Biblioteca> {
+    return this.http.delete<Biblioteca>(`${this.base}/biblioteca/${encodeURIComponent(slug)}/foto`);
   }
   importarBiblioteca(uuid: string, slugs: string[], ajustePorcentaje: number): Observable<ResultadoBiblioteca> {
     return this.http.post<ResultadoBiblioteca>(`${this.base}/empresas/${uuid}/biblioteca`, { slugs, ajustePorcentaje });

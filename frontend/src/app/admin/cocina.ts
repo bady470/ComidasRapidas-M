@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Icono } from '../compartido/icono';
 import { FormsModule } from '@angular/forms';
 import { AdminApi, mensajeError } from '../core/api';
 import { Avisos } from '../core/avisos';
@@ -21,7 +22,7 @@ const COLUMNAS: Columna[] = [
  */
 @Component({
   selector: 'app-cocina',
-  imports: [FormsModule],
+  imports: [Icono, FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="admin-h">
@@ -32,8 +33,8 @@ const COLUMNAS: Columna[] = [
           <label class="check" [title]="'Activa esto solo en el computador que tiene la impresora'">
             <input type="checkbox" [checked]="imp.esteEquipo()" (change)="imp.usarEsteEquipo($any($event.target).checked)"> Este equipo imprime</label>
         }
-        <button class="btn" type="button" (click)="configAbierta.set(!configAbierta())">🖨 Impresión</button>
-        <button class="btn" type="button" (click)="pantallaCompleta()">⛶ Pantalla completa</button>
+        <button class="btn" type="button" (click)="configAbierta.set(!configAbierta())"><app-icono nombre="imprimir" /> Impresión</button>
+        <button class="btn" type="button" (click)="pantallaCompleta()"><app-icono nombre="pantalla" /> Pantalla completa</button>
       </div>
     </div>
     @if (error()) { <div class="alerta mala" style="margin-bottom:12px">{{ error() }}</div> }
@@ -92,7 +93,7 @@ const COLUMNAS: Columna[] = [
             <article class="kds-card" [class.tarde]="min >= limite()" [class.atento]="min >= limite() / 2 && min < limite()">
               <header>
                 <b class="kds-cod num">{{ p.codigo }}</b>
-                <span class="kds-tipo">{{ p.tipoEntrega === 'DOMICILIO' ? '🛵 Domicilio' : '🏪 Recoge' }}</span>
+                <span class="kds-tipo">@if (p.tipoEntrega === 'DOMICILIO') { <app-icono nombre="domiciliarios" [tam]="15" /> Domicilio } @else { <app-icono nombre="local" [tam]="15" /> Recoge }</span>
                 <span class="kds-min num" [attr.aria-label]="'Hace ' + min + ' minutos'">{{ min }} min</span>
               </header>
               <div class="kds-cliente">{{ p.clienteNombre }}{{ p.origen === 'WHATSAPP' ? ' · WhatsApp' : '' }}</div>
@@ -101,15 +102,15 @@ const COLUMNAS: Columna[] = [
                   <li><b>{{ i.cantidad }} ×</b> {{ i.nombre }}@if (i.detalle) {<span>{{ i.detalle }}</span>}</li>
                 }
               </ul>
-              @if (p.notas) { <div class="kds-nota">📝 {{ p.notas }}</div> }
-              @if (p.metodoPago === 'EN_LINEA' && p.estadoPago !== 'RECIBIDO') { <div class="kds-aviso">⏳ Esperando el pago en línea</div> }
+              @if (p.notas) { <div class="kds-nota"><app-icono nombre="nota" [tam]="15" /> {{ p.notas }}</div> }
+              @if (p.metodoPago === 'EN_LINEA' && p.estadoPago !== 'RECIBIDO') { <div class="kds-aviso"><app-icono nombre="reloj" [tam]="15" /> Esperando el pago en línea</div> }
               <footer>
                 @if (siguiente(p); as s) {
                   <button class="btn main" type="button" [disabled]="moviendo() === p.id" (click)="mover(p, s.estado)">{{ s.texto }}</button>
                 }
                 @if (imp.config().modo !== 'APAGADA') {
                   <button class="btn" type="button" (click)="imprimir(p)" [title]="imp.yaImpreso(p.id) ? 'Ya se imprimió; toca para imprimir otra vez' : 'Imprimir comanda'">
-                    🖨{{ imp.yaImpreso(p.id) ? ' ✓' : '' }}</button>
+                    <app-icono nombre="imprimir" />{{ imp.yaImpreso(p.id) ? ' ✓' : '' }}</button>
                 }
               </footer>
             </article>

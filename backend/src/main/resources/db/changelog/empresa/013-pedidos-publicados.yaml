@@ -1,0 +1,11 @@
+# Un pedido de pago en línea no le llega a la empresa hasta que la pasarela confirme el pago.
+# Mientras tanto queda guardado pero sin publicar (publicado = false) y no aparece en su portal.
+databaseChangeLog:
+  - changeSet:
+      id: empresa-013-pedidos-publicados
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE producto.tbl_pedidos ADD COLUMN publicado BOOLEAN NOT NULL DEFAULT true;
+              CREATE INDEX ix_pedidos_publicado ON producto.tbl_pedidos (publicado) WHERE publicado = false;

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { Icono } from '../compartido/icono';
 import { FormsModule } from '@angular/forms';
 import { Mapa, Marcador, buscarDireccion, miUbicacion } from '../compartido/mapa';
 import { AdminApi, mensajeError } from '../core/api';
@@ -15,7 +16,7 @@ const TRAMOS_SUGERIDOS: Tramo[] = [{ hastaKm: 2, valor: 3000 }, { hastaKm: 4, va
  */
 @Component({
   selector: 'app-mapa-config',
-  imports: [FormsModule, Mapa],
+  imports: [Icono, FormsModule, Mapa],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="admin-h"><h1>Domicilios y mapa</h1></div>
@@ -28,7 +29,7 @@ const TRAMOS_SUGERIDOS: Tramo[] = [{ hastaKm: 2, valor: 3000 }, { hastaKm: 4, va
           <div class="ubicacion-acciones">
             <input name="buscarLocal" [ngModel]="texto()" (ngModelChange)="texto.set($event)" (keydown.enter)="$event.preventDefault(); buscar()" placeholder="Dirección del local, ciudad">
             <button class="btn" type="button" [disabled]="buscando()" (click)="buscar()">Buscar</button>
-            <button class="btn" type="button" (click)="aqui()">📍 Estoy en el local</button>
+            <button class="btn" type="button" (click)="aqui()"><app-icono nombre="pin" /> Estoy en el local</button>
           </div>
           @if (resultados().length) {
             <ul class="resultados-direccion">

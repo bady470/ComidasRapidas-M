@@ -60,7 +60,7 @@ public class CajaService {
     }
 
     private OperacionDto.Caja calcular(LocalDate fecha, CierreCaja cierre) {
-        List<Pedido> lista = pedidos.findByFechaEntregaOrderByCreadoDesc(fecha).stream()
+        List<Pedido> lista = pedidos.findByPublicadoTrueAndFechaEntregaOrderByCreadoDesc(fecha).stream()
                 .filter(p -> p.getEstado() != EstadoPedido.CANCELADO).toList();
 
         // clave → [pedidos, recibido, pendiente]; LinkedHashMap para un orden estable: efectivo, cuentas, en línea.

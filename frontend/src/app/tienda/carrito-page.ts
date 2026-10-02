@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Icono } from '../compartido/icono';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TiendaApi, mensajeError } from '../core/api';
@@ -22,7 +23,7 @@ const CLAVE_CLIENTE = () => claveLocal('cliente');
 
 @Component({
   selector: 'app-carrito',
-  imports: [FormsModule, RouterLink, DineroPipe, DiaLargoPipe, CelularPipe, PagarPedido, PagarEnLinea, SelectorUbicacion],
+  imports: [Icono, FormsModule, RouterLink, DineroPipe, DiaLargoPipe, CelularPipe, PagarPedido, PagarEnLinea, SelectorUbicacion],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="wrap">
@@ -41,6 +42,9 @@ const CLAVE_CLIENTE = () => claveLocal('cliente');
             </span>
             @if (p.tipoEntrega === 'RECOGER' && p.direccionTienda) { <span class="muted">Recoges en {{ p.direccionTienda }}</span> }
           </div>
+          @if (p.metodoPago === 'CUENTA' && estadoPago() === 'PENDIENTE') {
+            <div class="alerta aviso"><b>Tu pedido aún no se ha enviado a la tienda.</b> Haz la transferencia y adjunta aquí abajo el comprobante: apenas lo envíes, el pedido le llega a la tienda. Mientras tanto, tus productos siguen en tu carrito.</div>
+          }
           @if (p.metodoPago === 'EN_LINEA') {
             @if (errorPago()) { <div class="alerta mala">{{ errorPago() }}</div> }
             <app-pagar-en-linea [codigo]="p.codigo" [celular]="celularPedido()" [total]="p.total"
@@ -48,12 +52,12 @@ const CLAVE_CLIENTE = () => claveLocal('cliente');
           } @else if (p.metodoPago === 'CUENTA') {
             <app-pagar-pedido [codigo]="p.codigo" [celular]="celularPedido()" [total]="p.total"
               [entidad]="p.cuentaEntidad" [titular]="p.cuentaTitular" [numero]="p.cuentaNumero"
-              [estadoPago]="estadoPago()" (enviado)="estadoPago.set($event.estadoPago)" />
+              [estadoPago]="estadoPago()" (enviado)="alEnviarComprobante($event)" />
           } @else {
             <div class="panel"><b>Pagas {{ p.total | dinero }} en efectivo {{ p.tipoEntrega === 'RECOGER' ? 'al recoger' : 'al recibir' }}.</b></div>
           }
           @if (p.whatsappTienda) {
-            <a class="wa" [href]="linkWa()" target="_blank" rel="noopener">Enviar pedido por WhatsApp</a>
+            <a class="wa" [href]="linkWa()" target="_blank" rel="noopener"><app-icono nombre="chat" /> Enviar pedido por WhatsApp</a>
             <p class="muted" style="text-align:center">Si el botón no abre WhatsApp, escríbenos al <b class="num">{{ p.whatsappTienda | celular }}</b>.</p>
           }
           <a class="ghost" [routerLink]="emp.url('/pedido/' + p.codigo)">Ver por dónde va mi pedido</a>
@@ -77,7 +81,7 @@ const CLAVE_CLIENTE = () => claveLocal('cliente');
         <div class="checkout">
           <!-- Datos de entrega -->
           <form class="panel" (ngSubmit)="pedir()" novalidate>
-            <h3>¿Cómo lo quieres?</h3>
+            <h3 class="ck-h"><span class="ck-n">1</span>¿Cómo lo quieres?</h3>
             @if (tienda(); as t) {
               @if (t.domicilioActivo && t.recogerActivo) {
                 <div class="seg-entrega" role="radiogroup" aria-label="Tipo de entrega">
@@ -93,10 +97,13 @@ const CLAVE_CLIENTE = () => claveLocal('cliente');
               }
             }
 
-            <div class="field"><label for="nombre">Nombre</label>
-              <input id="nombre" name="nombre" autocomplete="name" [(ngModel)]="datos.nombre" placeholder="¿A nombre de quién?"></div>
-            <div class="field"><label for="celular">Celular (WhatsApp)</label>
-              <input id="celular" name="celular" inputmode="tel" autocomplete="tel" [(ngModel)]="datos.celular" placeholder="300 123 4567"></div>
+            <h3 class="ck-h"><span class="ck-n">2</span>Tus datos</h3>
+            <div class="ck-dos">
+              <div class="field"><label for="nombre">Nombre</label>
+                <input id="nombre" name="nombre" autocomplete="name" [(ngModel)]="datos.nombre" placeholder="¿A nombre de quién?"></div>
+              <div class="field"><label for="celular">Celular (WhatsApp)</label>
+                <input id="celular" name="celular" inputmode="tel" autocomplete="tel" [(ngModel)]="datos.celular" placeholder="300 123 4567"></div>
+            </div>
 
             @if (tipo() === 'DOMICILIO') {
               @if (tienda()?.zonas?.length) {
@@ -126,24 +133,31 @@ const CLAVE_CLIENTE = () => claveLocal('cliente');
                 </select></div>
             }
 
+            <h3 class="ck-h"><span class="ck-n">3</span>¿Cómo vas a pagar?</h3>
             <div class="field">
-              <span class="flabel">¿Cómo vas a pagar?</span>
-              <div class="opts">
+              <div class="pagos" role="radiogroup" aria-label="Forma de pago">
                 @if (tienda()?.pagoEnLinea; as l) {
-                  <label class="opt">
+                  <label class="pago-op">
                     <input type="radio" name="pago" value="LINEA" [(ngModel)]="pago">
-                    <span><b>Pagar en línea</b> · {{ l.nombre }}<br><span class="muted">{{ l.medios }}. Se confirma solo, sin comprobante.</span></span>
+                    <span class="pago-ico"><app-icono nombre="rayo" [tam]="20" /></span>
+                    <span class="pago-txt"><b>Pagar en línea <span class="pago-rec">Recomendado</span></b>
+                      <small>Te llevamos directo a la pasarela segura y se confirma solo, sin comprobante.</small>
+                      <span class="pago-medios"><span>Nequi</span><span>PSE</span><span>Tarjeta débito</span><span>Tarjeta crédito</span><span>Bancolombia</span><span>y más</span></span></span>
                   </label>
                 }
                 @for (n of tienda()?.cuentas ?? []; track n.id) {
-                  <label class="opt">
+                  <label class="pago-op">
                     <input type="radio" name="pago" [value]="'C' + n.id" [(ngModel)]="pago">
-                    <span><b>{{ n.entidad }}</b> · {{ n.titular }}<br><span class="muted num">{{ n.numero }}</span></span>
+                    <span class="pago-ico"><app-icono nombre="movil" [tam]="20" /></span>
+                    <span class="pago-txt"><b>Transferencia a {{ n.entidad }}</b><small>{{ n.titular }} · <span class="num">{{ n.numero }}</span>. Después envías el comprobante.</small></span>
                   </label>
                 }
                 @if (tienda()?.efectivo) {
-                  <label class="opt"><input type="radio" name="pago" value="EFECTIVO" [(ngModel)]="pago">
-                    <span><b>Efectivo</b><br><span class="muted">{{ tipo() === 'RECOGER' ? 'Pagas al recoger' : 'Pagas al recibir' }}</span></span></label>
+                  <label class="pago-op">
+                    <input type="radio" name="pago" value="EFECTIVO" [(ngModel)]="pago">
+                    <span class="pago-ico"><app-icono nombre="efectivo" [tam]="20" /></span>
+                    <span class="pago-txt"><b>Efectivo</b><small>{{ tipo() === 'RECOGER' ? 'Pagas al recoger' : 'Pagas al recibir' }}</small></span>
+                  </label>
                 }
               </div>
             </div>
@@ -153,7 +167,7 @@ const CLAVE_CLIENTE = () => claveLocal('cliente');
 
           <!-- Resumen -->
           <aside class="panel sticky">
-            <h3>Tu pedido</h3>
+            <h3 class="ck-h">Tu pedido</h3>
             @for (l of cotizacion()?.lineas ?? []; track clave(l.productoId, l.opcionIds)) {
               <div class="line">
                 <div>
@@ -317,6 +331,21 @@ export class CarritoPage {
       next: (p) => {
         const punto = this.ubicacion();
         try { localStorage.setItem(CLAVE_CLIENTE(), JSON.stringify({ ...d, celular: cel, lat: punto?.lat ?? null, lng: punto?.lng ?? null })); } catch { /* nada */ }
+        if (p.metodoPago !== 'EFECTIVO') {
+          // Pago en línea o transferencia: el pedido no le llega a la empresa hasta que se pague (o se adjunte el
+          // comprobante), y el carrito se conserva hasta entonces.
+          try { localStorage.setItem(claveLocal('pago_pendiente'), p.codigo); } catch { /* nada */ }
+          if (p.metodoPago === 'EN_LINEA') { this.irAPagar(p.codigo, cel); return; }
+          this.ultimoMensaje = this.mensaje(p, cot);
+          this.celularPedido.set(cel);
+          this.estadoPago.set('PENDIENTE');
+          this.intento.set(null);
+          this.errorPago.set('');
+          this.creado.set(p);
+          window.scrollTo(0, 0);
+          this.enviando.set(false);
+          return;
+        }
         guardarPedidoReciente(p.codigo, cel);
         this.ultimoMensaje = this.mensaje(p, cot);
         this.celularPedido.set(cel);
@@ -326,7 +355,6 @@ export class CarritoPage {
         this.creado.set(p);
         this.carrito.vaciar();
         window.scrollTo(0, 0);
-        if (p.metodoPago === 'EN_LINEA') { this.irAPagar(p.codigo, cel); return; }
         this.enviando.set(false);
       },
       error: (e) => {
@@ -338,7 +366,7 @@ export class CarritoPage {
   }
 
   protected textoBoton(): string {
-    if (this.pago === 'LINEA') return 'Hacer pedido y pagar en línea';
+    if (this.pago === 'LINEA') return 'Ir a pagar';
     return this.pago.startsWith('C') ? 'Hacer pedido y pagar' : 'Hacer pedido';
   }
 
@@ -349,9 +377,18 @@ export class CarritoPage {
       next: (r) => { location.href = r.url; },
       error: (e) => {
         this.enviando.set(false);
-        this.errorPago.set('Tu pedido quedó registrado, pero no pudimos abrir el pago: ' + mensajeError(e));
+        this.error.set('No pudimos abrir la pasarela de pago: ' + mensajeError(e) + ' Tu pedido no se ha enviado y tu carrito sigue igual; intenta de nuevo.');
       },
     });
+  }
+
+  /** Adjuntó el comprobante: ahora sí el pedido le llega a la tienda y se vacía el carrito. */
+  protected alEnviarComprobante(s: Seguimiento): void {
+    this.estadoPago.set(s.estadoPago);
+    if (!s.enviado) return;
+    guardarPedidoReciente(s.codigo, this.celularPedido());
+    try { localStorage.removeItem(claveLocal('pago_pendiente')); } catch { /* nada */ }
+    this.carrito.vaciar();
   }
 
   /** El cliente cambió de forma de pago (o revisó el pago) desde la confirmación. */

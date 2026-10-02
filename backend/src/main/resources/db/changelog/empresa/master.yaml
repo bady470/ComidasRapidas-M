@@ -13,3 +13,5 @@ databaseChangeLog:
   - include: { file: 009-caja-y-saturacion.yaml, relativeToChangelogFile: true }
   - include: { file: 010-cocina-y-clientes.yaml, relativeToChangelogFile: true }
   - include: { file: 011-mapas.yaml, relativeToChangelogFile: true }
+  - include: { file: 012-banners.yaml, relativeToChangelogFile: true }
+  - include: { file: 013-pedidos-publicados.yaml, relativeToChangelogFile: true }

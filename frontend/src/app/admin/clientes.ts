@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { Icono } from '../compartido/icono';
 import { FormsModule } from '@angular/forms';
 import { AdminApi, mensajeError } from '../core/api';
 import { Avisos } from '../core/avisos';
@@ -9,8 +10,8 @@ import { ClienteResumen, Clientes } from '../core/modelos';
 
 type Filtro = 'dormidos' | 'frecuentes' | 'nuevos' | 'contactados' | 'todos';
 
-const MENSAJE_BASE = 'Hola {nombre} 👋, te extrañamos en {tienda}. Hace {dias} días no pides tu {favorito}. ' +
-  'Hoy te esperamos con algo especial: pide aquí 👉 {link}';
+const MENSAJE_BASE = 'Hola {nombre}, te extrañamos en {tienda}. Hace {dias} días no pides tu {favorito}. ' +
+  'Hoy te esperamos con algo especial: pide aquí: {link}';
 
 /**
  * Clientes de la tienda y los que dejaron de pedir. Un botón arma el mensaje de WhatsApp con su nombre y lo que más
@@ -18,7 +19,7 @@ const MENSAJE_BASE = 'Hola {nombre} 👋, te extrañamos en {tienda}. Hace {dias
  */
 @Component({
   selector: 'app-clientes',
-  imports: [FormsModule, DineroPipe, CelularPipe],
+  imports: [Icono, FormsModule, DineroPipe, CelularPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="admin-h"><h1>Clientes</h1></div>
@@ -35,7 +36,7 @@ const MENSAJE_BASE = 'Hola {nombre} 👋, te extrañamos en {tienda}. Hace {dias
       </div>
 
       <details class="panel" style="margin-bottom:16px" [open]="editando()">
-        <summary style="cursor:pointer;font-weight:700" (click)="$event.preventDefault(); editando.set(!editando())">✉️ Mensaje para que vuelvan</summary>
+        <summary style="cursor:pointer;font-weight:700" (click)="$event.preventDefault(); editando.set(!editando())"><app-icono nombre="correo" /> Mensaje para que vuelvan</summary>
         <p class="muted" style="font-size:13px">Puedes usar <code>{{ '{' }}nombre{{ '}' }}</code>, <code>{{ '{' }}tienda{{ '}' }}</code>,
           <code>{{ '{' }}favorito{{ '}' }}</code>, <code>{{ '{' }}dias{{ '}' }}</code> y <code>{{ '{' }}link{{ '}' }}</code>
           (la dirección de tu tienda). Si quieres dar un beneficio, escríbelo aquí: por ejemplo «con este mensaje tienes el domicilio gratis».</p>
@@ -78,7 +79,7 @@ const MENSAJE_BASE = 'Hola {nombre} 👋, te extrañamos en {tienda}. Hace {dias
                   @else if (c.ultimoContacto) { <span class="muted">Le escribiste {{ haceFecha(c.ultimoContacto) }}</span> }
                   @else { <span class="muted">—</span> }
                 </td>
-                <td class="r"><button class="btn" type="button" (click)="escribir(c)">💬 Escribir</button></td>
+                <td class="r"><button class="btn" type="button" (click)="escribir(c)"><app-icono nombre="chat" /> Escribir</button></td>
               </tr>
             } @empty {
               <tr><td colspan="7" class="muted" style="padding:16px">{{ d.lista.length ? 'Ningún cliente con este filtro.' : 'Todavía no hay clientes con celular.' }}</td></tr>

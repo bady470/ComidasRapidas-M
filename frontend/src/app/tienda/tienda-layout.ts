@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject } from '@angular/core';
+import { BotonModo } from '../compartido/modo';
+import { Icono } from '../compartido/icono';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
@@ -11,7 +13,7 @@ import { CelularPipe, soloHora } from '../core/formato';
 
 @Component({
   selector: 'app-tienda-layout',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, CelularPipe, Logo, CarritoFlotante],
+  imports: [Icono, BotonModo, RouterOutlet, RouterLink, RouterLinkActive, CelularPipe, Logo, CarritoFlotante],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="top">
@@ -24,7 +26,7 @@ import { CelularPipe, soloHora } from '../core/formato';
           <a [routerLink]="emp.url()" routerLinkActive="activo" [routerLinkActiveOptions]="{ exact: true }">Menú</a>
           <a [routerLink]="emp.url('/seguimiento')" routerLinkActive="activo">Mi pedido</a>
         </nav>
-        <a class="pillbtn escritorio" [routerLink]="emp.url('/carrito')">Carrito <span class="pill num">{{ carrito.totalUnidades() }}</span></a>
+        <app-modo />
       </div>
     </header>
 
@@ -32,7 +34,7 @@ import { CelularPipe, soloHora } from '../core/formato';
       @let s = t.saturacion;
       @if (s.pedidosPausadosHasta || s.domiciliosPausadosHasta || s.minutosExtra) {
         <div class="aviso-demanda" role="status"><div class="wrap">
-          <span aria-hidden="true">🔥</span>
+          <app-icono nombre="llama" />
           @if (s.pedidosPausadosHasta) { Estamos a tope de pedidos. Volvemos a recibir a las {{ hora(s.pedidosPausadosHasta) }}. }
           @else if (s.domiciliosPausadosHasta) { Pausamos los domicilios hasta las {{ hora(s.domiciliosPausadosHasta) }}.{{ t.recogerActivo ? ' Puedes pedir para recoger en el local.' : '' }} }
           @else { Hay mucha demanda: tu pedido puede tardar {{ t.tiempoMin }}–{{ t.tiempoMax }} minutos. }

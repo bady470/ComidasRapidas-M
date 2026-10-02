@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
+import { Icono } from './icono';
 import { TiendaApi, mensajeError } from '../core/api';
 import { Avisos } from '../core/avisos';
 import { DineroPipe, copiar } from '../core/formato';
@@ -10,7 +11,7 @@ import { EstadoPago, Seguimiento } from '../core/modelos';
  */
 @Component({
   selector: 'app-pagar-pedido',
-  imports: [DineroPipe],
+  imports: [Icono, DineroPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (estadoPago() === 'RECIBIDO') {
@@ -34,8 +35,8 @@ import { EstadoPago, Seguimiento } from '../core/modelos';
           <li><span>Toma una captura del comprobante y adjúntala aquí.</span>
             <label class="subir-comprobante" [class.listo]="!!archivo()">
               <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" hidden (change)="elegir($event)">
-              @if (archivo(); as a) { <b>{{ a.name }}</b><span class="muted">Toca para cambiarlo</span> }
-              @else { <b>{{ estadoPago() === 'POR_CONFIRMAR' ? 'Enviar otro comprobante' : 'Adjuntar comprobante' }}</b><span class="muted">Foto, captura de pantalla o PDF (máx. 5 MB)</span> }
+              @if (archivo(); as a) { <b><app-icono nombre="clip" [tam]="16" /> {{ a.name }}</b><span class="muted">Toca para cambiarlo</span> }
+              @else { <b><app-icono nombre="clip" [tam]="16" /> {{ estadoPago() === 'POR_CONFIRMAR' ? 'Enviar otro comprobante' : 'Adjuntar comprobante' }}</b><span class="muted">Foto, captura de pantalla o PDF (máx. 5 MB)</span> }
             </label>
           </li>
         </ol>

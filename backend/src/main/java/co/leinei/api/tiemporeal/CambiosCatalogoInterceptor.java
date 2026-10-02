@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
 public class CambiosCatalogoInterceptor implements HandlerInterceptor {
 
     private static final Pattern CATALOGO =
-            Pattern.compile("^/api/t/[^/]+/admin/(productos|categorias|promociones|config|marca|archivos)(/.*)?$");
+            Pattern.compile("^/api/t/[^/]+/admin/(productos|categorias|promociones|banners|config|marca|archivos)(/.*)?$");
 
     private final TiempoReal tiempoReal;
 

@@ -121,18 +121,33 @@ public class PedidoService {
         p.setDistanciaKm(entrega.km());
         p.setOrigen(OrigenPedido.WEB);
         p.registrarEvento(EstadoPedido.NUEVO, "", "cliente");
+        // Pago en línea o transferencia: el pedido queda guardado pero la empresa no lo ve hasta que se pague (la pasarela
+        // confirma) o el cliente adjunte el comprobante. En efectivo se envía de una vez.
+        p.setPublicado(p.getMetodoPago() == MetodoPago.EFECTIVO);
         pedidoRepo.save(p);
-        notificaciones.save(Notificacion.de(Notificacion.Tipo.PEDIDO_NUEVO, p.getId(),
-                "Pedido nuevo " + p.getCodigo() + " · " + pesos(p.getTotal()),
-                p.getClienteNombre() + (p.getTipoEntrega() == TipoEntrega.RECOGER ? " · recoge en el local" : " · " + lugar(p))
-                        + " · " + comoPaga(p)));
-        avisarCambio(p, "nuevo");
+        if (p.isPublicado()) avisarNuevo(p);
 
         int extra = c.minutosExtraVigentes(Instant.now());
         return new PublicoDto.PedidoCreado(p.getCodigo(), p.getFechaEntrega(), p.getFranja(), p.getTipoEntrega(),
                 c.getModoPedido(), c.getTiempoMin() + extra, c.getTiempoMax() + extra, p.getTotal(), p.getMetodoPago(),
                 p.getCuentaEntidad(), p.getCuentaTitular(), p.getCuentaNumero(), c.getWhatsapp(),
                 p.getTipoEntrega() == TipoEntrega.RECOGER ? c.getDireccion() : "");
+    }
+
+    /** Avisa a la empresa que hay un pedido nuevo (notificación y pantallas en vivo). */
+    private void avisarNuevo(Pedido p) {
+        notificaciones.save(Notificacion.de(Notificacion.Tipo.PEDIDO_NUEVO, p.getId(),
+                "Pedido nuevo " + p.getCodigo() + " · " + pesos(p.getTotal()),
+                p.getClienteNombre() + (p.getTipoEntrega() == TipoEntrega.RECOGER ? " · recoge en el local" : " · " + lugar(p))
+                        + " · " + comoPaga(p)));
+        avisarCambio(p, "nuevo");
+    }
+
+    /** El pedido pasa a la empresa: se pagó en línea o el cliente escogió otra forma de pago. */
+    private void publicar(Pedido p) {
+        if (p.isPublicado()) return;
+        p.setPublicado(true);
+        avisarNuevo(p);
     }
 
     /** El cliente consulta con su código y su celular; si no coinciden, responde como si no existiera. */
@@ -169,6 +184,7 @@ public class PedidoService {
         comprobantes.save(c);
         p.setEstadoPago(EstadoPago.POR_CONFIRMAR);
         p.setPagoReportado(Instant.now());
+        publicar(p); // con el comprobante el pedido ya le llega a la empresa
         notificaciones.save(Notificacion.de(Notificacion.Tipo.PAGO_REPORTADO, p.getId(),
                 "Pago reportado " + p.getCodigo() + " · " + pesos(p.getTotal()),
                 p.getClienteNombre() + " adjuntó el comprobante de su transferencia por " + p.getCuentaEntidad()
@@ -197,7 +213,7 @@ public class PedidoService {
         }
         if (metodo == MetodoPago.EN_LINEA) throw ReglaNegocioException.invalido("Escoge transferencia o efectivo.");
         asignarPago(p, configService.tienda(), metodo, cuentaId, false);
-        avisarCambio(p, "pago");
+        if (!p.isPublicado() && p.getMetodoPago() == MetodoPago.EFECTIVO) publicar(p); else avisarCambio(p, "pago");
         return aSeguimiento(p);
     }
 
@@ -231,6 +247,7 @@ public class PedidoService {
                 p.setCuentaNumero(medio == null ? "" : medio);
                 p.setEstadoPago(EstadoPago.RECIBIDO);
                 p.setPagoReportado(Instant.now());
+                publicar(p); // recién ahora le llega a la empresa
                 String cancelado = p.getEstado() == EstadoPedido.CANCELADO ? " Ojo: el pedido estaba cancelado, revisa la devolución." : "";
                 notificaciones.save(Notificacion.de(Notificacion.Tipo.PAGO_RECIBIDO, p.getId(),
                         "Pago recibido " + p.getCodigo() + " · " + pesos(monto),
@@ -275,7 +292,7 @@ public class PedidoService {
                 p.getCreado(), direccionTienda, p.getPagoReportado() != null, p.getPagoReportado(),
                 p.getDomiciliario() == null ? "" : p.getDomiciliario().getNombre(),
                 p.getDomiciliario() == null ? "" : p.getDomiciliario().getCelular(),
-                estadoEnLinea(p), mapa(p));
+                estadoEnLinea(p), mapa(p), p.isPublicado());
     }
 
     /** Ubicación del domiciliario: se muestra si la mandó en los últimos minutos. */
@@ -316,10 +333,10 @@ public class PedidoService {
     @Transactional(readOnly = true)
     public List<AdminDto.Pedido> listar(LocalDate fecha, EstadoPedido estado, String busqueda, boolean porPagar) {
         List<Pedido> base = porPagar
-                ? pedidoRepo.findByEstadoPagoInAndEstadoNotOrderByCreadoDesc(SIN_PAGAR, EstadoPedido.CANCELADO)
+                ? pedidoRepo.findByPublicadoTrueAndEstadoPagoInAndEstadoNotOrderByCreadoDesc(SIN_PAGAR, EstadoPedido.CANCELADO)
                 : fecha != null
-                ? pedidoRepo.findByFechaEntregaOrderByCreadoDesc(fecha)
-                : pedidoRepo.findAllByOrderByCreadoDesc(PageRequest.of(0, 300));
+                ? pedidoRepo.findByPublicadoTrueAndFechaEntregaOrderByCreadoDesc(fecha)
+                : pedidoRepo.findByPublicadoTrueOrderByCreadoDesc(PageRequest.of(0, 300));
         String q = busqueda == null ? "" : busqueda.trim().toLowerCase(Locale.ROOT);
         List<Pedido> lista = base.stream()
                 .filter(p -> estado == null || p.getEstado() == estado)

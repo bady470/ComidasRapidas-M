@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, afterNextRender, effect, inject, input, output, untracked, viewChild } from '@angular/core';
 import * as L from 'leaflet';
+import { svgIcono } from './icono';
 
 /** Un punto en el mapa. tipo define el ícono: el local, el punto de entrega, el domiciliario. */
 export interface Marcador {
@@ -8,7 +9,7 @@ export interface Marcador {
   texto?: string;
 }
 
-const EMOJI: Record<Marcador['tipo'], string> = { local: '🏪', destino: '🏠', moto: '🛵' };
+const ICONO: Record<Marcador['tipo'], string> = { local: 'local', destino: 'casa', moto: 'domiciliarios' };
 
 /** Centro de Colombia, por si no hay ningún punto. */
 const COLOMBIA: L.LatLngExpression = [4.6, -74.08];
@@ -78,7 +79,7 @@ export class Mapa {
       if (!capa) {
         capa = L.marker([m.lat, m.lng], {
           draggable: arrastrable, keyboard: false,
-          icon: L.divIcon({ className: 'mk-envoltura', html: `<span class="mk mk-${m.tipo}"><i>${EMOJI[m.tipo]}</i></span>`, iconSize: [40, 40], iconAnchor: [20, 36] }),
+          icon: L.divIcon({ className: 'mk-envoltura', html: `<span class="mk mk-${m.tipo}"><i>${svgIcono(ICONO[m.tipo], 20, m.tipo === 'moto' ? '#1b7a3c' : '#c4372d')}</i></span>`, iconSize: [40, 40], iconAnchor: [20, 36] }),
         }).addTo(mapa);
         if (arrastrable) capa.on('dragend', () => { const p = capa!.getLatLng(); this.movido.emit({ lat: redondear(p.lat), lng: redondear(p.lng) }); });
         this.capas.set(m.id, capa);

@@ -46,7 +46,7 @@ public class ClientesService {
                                (array_agg(p.cliente_nombre ORDER BY p.creado_en DESC))[1],
                                count(*), sum(p.total), min(p.creado_en), max(p.creado_en)
                           FROM producto.tbl_pedidos p
-                         WHERE p.estado <> 'CANCELADO' AND p.cliente_celular <> ''
+                         WHERE p.publicado AND p.estado <> 'CANCELADO' AND p.cliente_celular <> ''
                          GROUP BY p.cliente_celular
                          ORDER BY max(p.creado_en) DESC
                          LIMIT :maximo""")
@@ -59,7 +59,7 @@ public class ClientesService {
         List<Object[]> productos = em.createNativeQuery("""
                         SELECT p.cliente_celular, i.nombre, sum(i.cantidad)
                           FROM producto.tbl_pedidos p JOIN producto.tbl_pedidos_items i ON i.pedido_id = p.id
-                         WHERE p.estado <> 'CANCELADO' AND p.cliente_celular <> ''
+                         WHERE p.publicado AND p.estado <> 'CANCELADO' AND p.cliente_celular <> ''
                          GROUP BY p.cliente_celular, i.nombre""")
                 .getResultList();
         for (Object[] f : productos) {

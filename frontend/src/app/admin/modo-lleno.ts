@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { Icono } from '../compartido/icono';
 import { FormsModule } from '@angular/forms';
 import { AdminApi, mensajeError } from '../core/api';
 import { Avisos } from '../core/avisos';
@@ -12,11 +13,11 @@ import { AccionSaturacion } from '../core/modelos';
  */
 @Component({
   selector: 'app-modo-lleno',
-  imports: [FormsModule],
+  imports: [Icono, FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <button class="btn" type="button" [class.lleno-activo]="activo()" (click)="abierto.set(!abierto())" [attr.aria-expanded]="abierto()">
-      🔥 {{ activo() ? resumen() : 'Estamos llenos' }}
+      <app-icono nombre="llama" /> {{ activo() ? resumen() : 'Estamos llenos' }}
     </button>
     @if (abierto()) {
       <div class="panel lleno-panel" role="dialog" aria-label="Modo estamos llenos">
@@ -29,9 +30,9 @@ import { AccionSaturacion } from '../core/modelos';
         @if (s(); as sat) {
           @if (activo()) {
             <div class="alerta aviso">
-              @if (sat.minutosExtra) { <div>⏱ Entregas con <b>+{{ sat.minutosExtra }} min</b> hasta las {{ hora(sat.demoraHasta) }} · <button class="linkbtn" type="button" (click)="hacer('QUITAR_DEMORA')">Quitar</button></div> }
-              @if (sat.domiciliosPausadosHasta) { <div>🛵 Domicilios pausados hasta las {{ hora(sat.domiciliosPausadosHasta) }} · <button class="linkbtn" type="button" (click)="hacer('REANUDAR_DOMICILIOS')">Reanudar</button></div> }
-              @if (sat.pedidosPausadosHasta) { <div>⛔ Sin recibir pedidos hasta las {{ hora(sat.pedidosPausadosHasta) }} · <button class="linkbtn" type="button" (click)="hacer('REANUDAR_PEDIDOS')">Reanudar</button></div> }
+              @if (sat.minutosExtra) { <div><app-icono nombre="reloj" /> Entregas con <b>+{{ sat.minutosExtra }} min</b> hasta las {{ hora(sat.demoraHasta) }} · <button class="linkbtn" type="button" (click)="hacer('QUITAR_DEMORA')">Quitar</button></div> }
+              @if (sat.domiciliosPausadosHasta) { <div><app-icono nombre="domiciliarios" /> Domicilios pausados hasta las {{ hora(sat.domiciliosPausadosHasta) }} · <button class="linkbtn" type="button" (click)="hacer('REANUDAR_DOMICILIOS')">Reanudar</button></div> }
+              @if (sat.pedidosPausadosHasta) { <div><app-icono nombre="pausa" /> Sin recibir pedidos hasta las {{ hora(sat.pedidosPausadosHasta) }} · <button class="linkbtn" type="button" (click)="hacer('REANUDAR_PEDIDOS')">Reanudar</button></div> }
             </div>
           }
         }
@@ -50,8 +51,8 @@ import { AccionSaturacion } from '../core/modelos';
           </div></div>
         <div class="field"><span class="flabel">Pausar</span>
           <div class="row" style="gap:6px;flex-wrap:wrap">
-            @if (tieneDomicilio()) { <button class="btn" type="button" [disabled]="ocupado()" (click)="hacer('PAUSAR_DOMICILIOS')">🛵 Solo domicilios</button> }
-            <button class="btn bad" type="button" [disabled]="ocupado()" (click)="hacer('PAUSAR_PEDIDOS')">⛔ Todos los pedidos</button>
+            @if (tieneDomicilio()) { <button class="btn" type="button" [disabled]="ocupado()" (click)="hacer('PAUSAR_DOMICILIOS')"><app-icono nombre="domiciliarios" /> Solo domicilios</button> }
+            <button class="btn bad" type="button" [disabled]="ocupado()" (click)="hacer('PAUSAR_PEDIDOS')"><app-icono nombre="pausa" /> Todos los pedidos</button>
           </div></div>
         @if (error()) { <p class="err">{{ error() }}</p> }
         @if (activo()) { <button class="btn okb" type="button" [disabled]="ocupado()" (click)="hacer('NORMAL')">Volver a la normalidad</button> }

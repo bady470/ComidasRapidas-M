@@ -37,6 +37,8 @@ public class Pedido {
     private String direccion = "";
     private String referencia = "";
     private String notas = "";
+    /** false mientras un pedido de pago en línea espera el pago: la empresa aún no lo ve. */
+    private boolean publicado = true;
     private int subtotal;
     private int descuento;
     @Column(name = "promocion_aplicada")
@@ -149,6 +151,8 @@ public class Pedido {
     public void setCuentaTitular(String v) { cuentaTitular = v == null ? "" : v; }
     public String getCuentaNumero() { return cuentaNumero; }
     public void setCuentaNumero(String v) { cuentaNumero = v == null ? "" : v; }
+    public boolean isPublicado() { return publicado; }
+    public void setPublicado(boolean v) { publicado = v; }
     public EstadoPago getEstadoPago() { return estadoPago; }
     public Instant getPagoReportado() { return pagoReportado; }
     public void setPagoReportado(Instant v) { pagoReportado = v; }

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Icono } from '../compartido/icono';
 import { FormsModule } from '@angular/forms';
 import { SelectorProducto, Seleccion } from '../compartido/selector-producto';
 import { AdminApi, mensajeError } from '../core/api';
@@ -17,7 +18,7 @@ interface LineaManual { clave: string; producto: Producto; opcionIds: number[]; 
 
 @Component({
   selector: 'app-pedidos',
-  imports: [FormsModule, DineroPipe, DiaCortoPipe, HoraPipe, CelularPipe, SelectorProducto],
+  imports: [Icono, FormsModule, DineroPipe, DiaCortoPipe, HoraPipe, CelularPipe, SelectorProducto],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="toolbar">
@@ -172,7 +173,7 @@ interface LineaManual { clave: string; producto: Producto; opcionIds: number[]; 
                         <p>{{ p.direccion }}{{ (p.zona || p.barrio) ? ', ' + (p.zona || p.barrio) : '' }}</p>
                         @if (p.referencia) { <p class="muted">{{ p.referencia }}</p> }
                         @if (p.entregaLat != null) {
-                          <p><a class="linkbtn" [href]="mapaPedido(p)" target="_blank" rel="noopener">📍 Ver en el mapa{{ p.distanciaKm != null ? ' · a ' + km(p.distanciaKm) + ' km' : '' }}</a></p>
+                          <p><a class="linkbtn" [href]="mapaPedido(p)" target="_blank" rel="noopener"><app-icono nombre="pin" [tam]="15" /> Ver en el mapa{{ p.distanciaKm != null ? ' · a ' + km(p.distanciaKm) + ' km' : '' }}</a></p>
                         }
                         @if (p.estado !== 'CANCELADO') {
                           <div class="row" style="margin-top:8px">
@@ -206,7 +207,7 @@ interface LineaManual { clave: string; producto: Producto; opcionIds: number[]; 
                   <div class="row detalle-acciones">
                     @if (p.clienteCelular) { <a class="btn" [href]="wa(p)" target="_blank" rel="noopener">WhatsApp al cliente</a> }
                     @if (imp.config().modo !== 'APAGADA' && estadoTienda.tieneModulo(M.cocina)) {
-                      <button class="btn" type="button" (click)="imp.imprimir(p)">🖨 Imprimir comanda{{ imp.yaImpreso(p.id) ? ' (otra vez)' : '' }}</button>
+                      <button class="btn" type="button" (click)="imp.imprimir(p)"><app-icono nombre="imprimir" /> Imprimir comanda{{ imp.yaImpreso(p.id) ? ' (otra vez)' : '' }}</button>
                     }
                     @if (p.estado !== 'CANCELADO' && p.estado !== 'ENTREGADO') {
                       @if (confirmar() === p.id) {

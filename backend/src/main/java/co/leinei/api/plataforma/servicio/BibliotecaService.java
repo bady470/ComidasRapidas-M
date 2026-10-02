@@ -8,8 +8,11 @@ import co.leinei.api.dominio.Producto;
 import co.leinei.api.repositorio.ArchivoRepositorio;
 import co.leinei.api.repositorio.CategoriaRepositorio;
 import co.leinei.api.repositorio.ProductoRepositorio;
+import co.leinei.api.servicio.ArchivoService;
 import co.leinei.api.servicio.ReglaNegocioException;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -30,7 +33,9 @@ public class BibliotecaService {
     public record Item(String slug, String categoria, String nombre, String descripcion, int precio, int costo,
                        String imagen, String etiqueta, List<String> filtros, List<Grupo_> grupos) {}
     public record CategoriaInfo(String nombre, int orden, int cantidad) {}
-    public record Biblioteca(List<CategoriaInfo> categorias, List<String> filtros, List<Item> productos) {}
+    /** `conFoto`: productos que tienen foto (propia o de archivo); `fotosPropias`: los que el superadmin subió desde el panel. */
+    public record Biblioteca(List<CategoriaInfo> categorias, List<String> filtros, List<Item> productos,
+                             List<String> conFoto, List<String> fotosPropias) {}
     public record Resultado(int importados, int omitidos, int categoriasNuevas) {}
 
     public record Imagen(byte[] datos, String tipoContenido) {}
@@ -41,10 +46,14 @@ public class BibliotecaService {
 
     private final Map<String, Integer> ordenCategorias = new LinkedHashMap<>();
     private final Map<String, Item> porSlug = new LinkedHashMap<>();
-    private final Map<String, byte[]> imagenes = new HashMap<>();
-    private Biblioteca biblioteca;
+    /** Fotos que vienen dentro de la aplicación (catalogo-base/img/&lt;nombre&gt;.jpg|webp|png), si las hay. */
+    private final Map<String, Imagen> imagenes = new HashMap<>();
+    private final JdbcClient control;
+    private Biblioteca base;
 
-    public BibliotecaService(ProductoRepositorio productoRepo, CategoriaRepositorio categoriaRepo, ArchivoRepositorio archivoRepo) {
+    public BibliotecaService(ProductoRepositorio productoRepo, CategoriaRepositorio categoriaRepo, ArchivoRepositorio archivoRepo,
+                             @Qualifier("controlJdbc") JdbcClient control) {
+        this.control = control;
         this.productoRepo = productoRepo;
         this.categoriaRepo = categoriaRepo;
         this.archivoRepo = archivoRepo;
@@ -94,11 +103,12 @@ public class BibliotecaService {
             porSlug.put(i.slug(), i);
             filtros.addAll(i.filtros());
             cuenta.merge(i.categoria(), 1, Integer::sum);
+            cargarImagen(i.slug());
             cargarImagen(i.imagen());
         }
         List<CategoriaInfo> cats = ordenCategorias.entrySet().stream()
                 .map(e -> new CategoriaInfo(e.getKey(), e.getValue(), cuenta.getOrDefault(e.getKey(), 0))).toList();
-        biblioteca = new Biblioteca(cats, List.copyOf(filtros), List.copyOf(items));
+        base = new Biblioteca(cats, List.copyOf(filtros), List.copyOf(items), List.of(), List.of());
     }
 
     private static Item construir(String[] p, List<Grupo_> grupos, String[] g, List<Opcion_> ops) {
@@ -108,24 +118,64 @@ public class BibliotecaService {
         return new Item(p[1], p[2], p[3], p[4], Integer.parseInt(p[5]), Integer.parseInt(p[6]), p[7], p[8], filtros, todos);
     }
 
+    /** Busca la foto del producto entre los archivos de la aplicación; si no hay, el producto queda sin foto. */
     private void cargarImagen(String nombre) {
-        if (imagenes.containsKey(nombre)) return;
-        try (InputStream in = getClass().getResourceAsStream("/catalogo-base/img/" + nombre + ".png")) {
-            if (in == null) throw new IllegalStateException("Falta la imagen " + nombre);
-            imagenes.put(nombre, in.readAllBytes());
-        } catch (IOException e) {
-            throw new IllegalStateException("No se pudo leer la imagen " + nombre, e);
+        if (nombre == null || nombre.isBlank() || imagenes.containsKey(nombre)) return;
+        for (String ext : List.of("jpg", "jpeg", "webp", "png")) {
+            try (InputStream in = getClass().getResourceAsStream("/catalogo-base/img/" + nombre + "." + ext)) {
+                if (in == null) continue;
+                byte[] datos = in.readAllBytes();
+                String tipo = ArchivoService.tipoDe(datos);
+                if (tipo != null) { imagenes.put(nombre, new Imagen(datos, tipo)); return; }
+            } catch (IOException e) {
+                throw new IllegalStateException("No se pudo leer la imagen " + nombre, e);
+            }
         }
     }
 
     // ------------------------------------------------------------------ consulta
 
-    public Biblioteca todo() { return biblioteca; }
+    public Biblioteca todo() {
+        Set<String> propias = new TreeSet<>(control.sql("SELECT slug FROM plataforma.tbl_biblioteca_fotos").query(String.class).list());
+        List<String> conFoto = base.productos().stream()
+                .filter(i -> propias.contains(i.slug()) || deArchivo(i).isPresent()).map(Item::slug).toList();
+        return new Biblioteca(base.categorias(), base.filtros(), base.productos(), conFoto, List.copyOf(propias));
+    }
 
-    public Imagen imagen(String nombre) {
-        byte[] b = imagenes.get(nombre);
-        if (b == null) throw ReglaNegocioException.noEncontrado("La imagen no existe.");
-        return new Imagen(b, "image/png");
+    /** Foto que trae la aplicación: primero un archivo con el slug del producto, si no el de su clave de imagen. */
+    private Optional<Imagen> deArchivo(Item i) {
+        Imagen propia = imagenes.get(i.slug());
+        return Optional.ofNullable(propia != null ? propia : imagenes.get(i.imagen()));
+    }
+
+    /** Foto de un producto de la biblioteca: la que subió el superadmin, o la que trae la aplicación. */
+    public Imagen foto(String slug) {
+        Item item = porSlug.get(slug);
+        if (item == null) throw ReglaNegocioException.noEncontrado("Ese producto no existe.");
+        return propia(slug).or(() -> deArchivo(item))
+                .orElseThrow(() -> ReglaNegocioException.noEncontrado("Este producto no tiene foto."));
+    }
+
+    private Optional<Imagen> propia(String slug) {
+        return control.sql("SELECT datos, tipo_contenido FROM plataforma.tbl_biblioteca_fotos WHERE slug = ?")
+                .param(slug).query((rs, n) -> new Imagen(rs.getBytes("datos"), rs.getString("tipo_contenido"))).optional();
+    }
+
+    /** El superadmin sube una foto real para un producto de la biblioteca (JPG, PNG o WebP de hasta 2 MB). */
+    public void guardarFoto(String slug, byte[] datos) {
+        if (!porSlug.containsKey(slug)) throw ReglaNegocioException.noEncontrado("Ese producto no existe.");
+        if (datos == null || datos.length == 0) throw ReglaNegocioException.invalido("El archivo está vacío.");
+        if (datos.length > 2 * 1024 * 1024) throw ReglaNegocioException.invalido("La imagen pesa más de 2 MB. Usa una más liviana.");
+        String tipo = ArchivoService.tipoDe(datos);
+        if (tipo == null) throw ReglaNegocioException.invalido("Solo se aceptan imágenes PNG, JPG o WebP.");
+        control.sql("""
+                INSERT INTO plataforma.tbl_biblioteca_fotos (slug, tipo_contenido, datos) VALUES (?, ?, ?)
+                ON CONFLICT (slug) DO UPDATE SET tipo_contenido = EXCLUDED.tipo_contenido, datos = EXCLUDED.datos, actualizado_en = now()
+                """).params(slug, tipo, datos).update();
+    }
+
+    public void quitarFoto(String slug) {
+        control.sql("DELETE FROM plataforma.tbl_biblioteca_fotos WHERE slug = ?").param(slug).update();
     }
 
     // ------------------------------------------------------------------ importación
@@ -154,7 +204,7 @@ public class BibliotecaService {
         int importados = 0, omitidos = 0, nuevas = 0;
 
         // En el orden de la biblioteca, para que cada categoría quede ordenada igual que en el catálogo base.
-        for (Item i : biblioteca.productos()) {
+        for (Item i : base.productos()) {
             if (!pedidos.contains(i.slug())) continue;
             if (productoRepo.existsBySlug(i.slug())) { omitidos++; continue; }
 
@@ -168,12 +218,15 @@ public class BibliotecaService {
                 categorias.put(i.categoria().toLowerCase(Locale.ROOT), cat);
                 nuevas++;
             }
-            Long archivoId = archivos.computeIfAbsent(i.imagen(), k -> {
+            // Cada empresa recibe su propia copia de la foto (si el producto tiene). Las fotos de archivo se comparten entre productos parecidos.
+            Optional<Imagen> propia = propia(i.slug());
+            Optional<Imagen> foto = propia.isPresent() ? propia : deArchivo(i);
+            Long archivoId = foto.map(f -> archivos.computeIfAbsent(propia.isPresent() ? "slug:" + i.slug() : (imagenes.containsKey(i.slug()) ? "arch:" + i.slug() : "img:" + i.imagen()), k -> {
                 Archivo a = new Archivo();
-                a.setTipoContenido("image/png");
-                a.setDatos(imagenes.get(k));
+                a.setTipoContenido(f.tipoContenido());
+                a.setDatos(f.datos());
                 return archivoRepo.save(a).getId();
-            });
+            })).orElse(null);
 
             Producto p = new Producto();
             p.setSlug(i.slug());

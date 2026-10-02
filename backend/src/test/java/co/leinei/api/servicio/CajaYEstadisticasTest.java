@@ -65,7 +65,7 @@ class CajaYEstadisticasTest {
                 pedido(99_000, MetodoPago.EFECTIVO, EstadoPago.PENDIENTE, EstadoPedido.CANCELADO, null)); // no cuenta
         PedidoRepositorio pedidos = mock(PedidoRepositorio.class);
         CierreCajaRepositorio cierres = mock(CierreCajaRepositorio.class);
-        when(pedidos.findByFechaEntregaOrderByCreadoDesc(HOY)).thenReturn(dia);
+        when(pedidos.findByPublicadoTrueAndFechaEntregaOrderByCreadoDesc(HOY)).thenReturn(dia);
         when(cierres.findByFecha(HOY)).thenReturn(Optional.empty());
         when(cierres.save(any())).thenAnswer(a -> a.getArgument(0));
 
@@ -100,7 +100,7 @@ class CajaYEstadisticasTest {
         Pedido hoy2 = pedido(30_000, MetodoPago.EN_LINEA, EstadoPago.RECIBIDO, EstadoPedido.ENTREGADO, null);
         Pedido antes = pedido(20_000, MetodoPago.CUENTA, EstadoPago.RECIBIDO, EstadoPedido.ENTREGADO, null);
         antes.setFechaEntrega(HOY.minusDays(3));
-        when(pedidos.findByFechaEntregaBetween(HOY.minusDays(5), HOY)).thenReturn(List.of(hoy1, hoy2, antes));
+        when(pedidos.findByPublicadoTrueAndFechaEntregaBetween(HOY.minusDays(5), HOY)).thenReturn(List.of(hoy1, hoy2, antes));
         when(pedidos.primerPedido(any())).thenReturn(List.of());
         ConfigService config = mock(ConfigService.class);
         when(config.tienda()).thenReturn(new ConfigTienda());

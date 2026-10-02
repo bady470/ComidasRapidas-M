@@ -21,18 +21,18 @@ public interface PedidoRepositorio extends JpaRepository<Pedido, Long> {
     Optional<Pedido> findByCodigo(String codigo);
 
     @EntityGraph(attributePaths = {"items", "domiciliario"})
-    List<Pedido> findByFechaEntregaOrderByCreadoDesc(LocalDate fecha);
+    List<Pedido> findByPublicadoTrueAndFechaEntregaOrderByCreadoDesc(LocalDate fecha);
 
     @EntityGraph(attributePaths = {"items", "domiciliario"})
-    List<Pedido> findAllByOrderByCreadoDesc(Pageable pagina);
+    List<Pedido> findByPublicadoTrueOrderByCreadoDesc(Pageable pagina);
 
     /** Pedidos sin pagar de cualquier día (no cancelados): nunca se pierden de vista. */
     @EntityGraph(attributePaths = {"items", "domiciliario"})
-    List<Pedido> findByEstadoPagoInAndEstadoNotOrderByCreadoDesc(Collection<EstadoPago> pagos, EstadoPedido estado);
+    List<Pedido> findByPublicadoTrueAndEstadoPagoInAndEstadoNotOrderByCreadoDesc(Collection<EstadoPago> pagos, EstadoPedido estado);
 
-    long countByEstadoPagoInAndEstadoNot(Collection<EstadoPago> pagos, EstadoPedido estado);
+    long countByPublicadoTrueAndEstadoPagoInAndEstadoNot(Collection<EstadoPago> pagos, EstadoPedido estado);
 
-    @Query("select distinct p.fechaEntrega from Pedido p order by p.fechaEntrega desc")
+    @Query("select distinct p.fechaEntrega from Pedido p where p.publicado = true order by p.fechaEntrega desc")
     List<LocalDate> fechasConPedidos(Pageable pagina);
 
     /** Pedidos activos de un domiciliario (su página de reparto), los más viejos primero. */
@@ -41,12 +41,12 @@ public interface PedidoRepositorio extends JpaRepository<Pedido, Long> {
 
     /** Pedidos de un rango de días (estadísticas). */
     @EntityGraph(attributePaths = {"items"})
-    List<Pedido> findByFechaEntregaBetween(LocalDate desde, LocalDate hasta);
+    List<Pedido> findByPublicadoTrueAndFechaEntregaBetween(LocalDate desde, LocalDate hasta);
 
     /** Primer día en que pidió cada cliente (para saber cuáles son nuevos). Filas: [celular, fecha]. */
     @Query("""
             select p.clienteCelular, min(p.fechaEntrega) from Pedido p
-            where p.estado <> co.leinei.api.dominio.EstadoPedido.CANCELADO and p.clienteCelular in :celulares
+            where p.publicado = true and p.estado <> co.leinei.api.dominio.EstadoPedido.CANCELADO and p.clienteCelular in :celulares
             group by p.clienteCelular""")
     List<Object[]> primerPedido(@org.springframework.data.repository.query.Param("celulares") Collection<String> celulares);
 }

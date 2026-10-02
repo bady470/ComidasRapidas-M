@@ -48,7 +48,7 @@ public class EstadisticasService {
         LocalDate antesHasta = desde.minusDays(1);
         LocalDate antesDesde = antesHasta.minusDays(dias - 1);
 
-        List<Pedido> todos = pedidos.findByFechaEntregaBetween(antesDesde, hasta);
+        List<Pedido> todos = pedidos.findByPublicadoTrueAndFechaEntregaBetween(antesDesde, hasta);
         List<Pedido> actuales = todos.stream().filter(p -> !p.getFechaEntrega().isBefore(desde)).toList();
         List<Pedido> anteriores = todos.stream().filter(p -> p.getFechaEntrega().isBefore(desde)).toList();
         int costoOperativo = configService.tienda().getCostoOperativoUnidad();

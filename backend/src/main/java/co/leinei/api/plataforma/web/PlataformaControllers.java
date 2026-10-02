@@ -203,6 +203,18 @@ public final class PlataformaControllers {
 
         @GetMapping
         public BibliotecaService.Biblioteca todo() { return biblioteca.todo(); }
+
+        @PostMapping(value = "/{slug}/foto", consumes = "multipart/form-data")
+        public BibliotecaService.Biblioteca subirFoto(@PathVariable String slug, @RequestParam("archivo") MultipartFile archivo) throws IOException {
+            biblioteca.guardarFoto(slug, archivo.getBytes());
+            return biblioteca.todo();
+        }
+
+        @DeleteMapping("/{slug}/foto")
+        public BibliotecaService.Biblioteca quitarFoto(@PathVariable String slug) {
+            biblioteca.quitarFoto(slug);
+            return biblioteca.todo();
+        }
     }
 
     /** Público: a qué empresa pertenece un dominio propio, y el logo de cada empresa. */
@@ -225,13 +237,14 @@ public final class PlataformaControllers {
             return new PlataformaDto.Dominio(registro.identificadorPorDominio(host).orElse(null));
         }
 
-        /** Ilustraciones de la biblioteca (públicas: es contenido de ejemplo y un <img> no envía el token). */
-        @GetMapping("/biblioteca/imagenes/{nombre}")
-        public ResponseEntity<byte[]> imagenBiblioteca(@PathVariable String nombre) {
-            var img = biblioteca.imagen(nombre);
+        /** Fotos de la biblioteca (públicas: es contenido de ejemplo y un <img> no envía el token). Sin caché larga: el superadmin puede cambiarlas. */
+        @GetMapping("/biblioteca/fotos/{slug}")
+        public ResponseEntity<byte[]> fotoBiblioteca(@PathVariable String slug) {
+            var img = biblioteca.foto(slug);
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(img.tipoContenido()))
-                    .cacheControl(CacheControl.maxAge(Duration.ofDays(30)).cachePublic())
+                    .cacheControl(CacheControl.noCache().cachePublic())
+                    .eTag("\"" + Integer.toHexString(java.util.Arrays.hashCode(img.datos())) + "\"")
                     .header("X-Content-Type-Options", "nosniff")
                     .body(img.datos());
         }

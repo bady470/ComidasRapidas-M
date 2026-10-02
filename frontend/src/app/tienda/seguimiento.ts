@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, input, signal } from '@angular/core';
+import { catchError, forkJoin, of } from 'rxjs';
+import { Icono } from '../compartido/icono';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TiendaApi, mensajeError } from '../core/api';
@@ -10,6 +12,8 @@ import { guardarPedidoReciente, pedidosRecientes } from './recientes';
 import { PagarPedido } from '../compartido/pagar-pedido';
 import { PagarEnLinea } from '../compartido/pagar-en-linea';
 import { Mapa, Marcador } from '../compartido/mapa';
+import { Carrito } from '../core/carrito';
+import { claveLocal } from '../core/empresa';
 
 const PASOS: Record<string, { titulo: string; detalle: string }> = {
   NUEVO: { titulo: 'Recibimos tu pedido', detalle: 'Lo vamos a revisar y confirmar.' },
@@ -22,7 +26,7 @@ const PASOS: Record<string, { titulo: string; detalle: string }> = {
 
 @Component({
   selector: 'app-seguimiento',
-  imports: [FormsModule, RouterLink, DineroPipe, DiaLargoPipe, HoraPipe, PagarPedido, PagarEnLinea, Mapa],
+  imports: [Icono, FormsModule, RouterLink, DineroPipe, DiaLargoPipe, HoraPipe, PagarPedido, PagarEnLinea, Mapa],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="wrap">
@@ -48,6 +52,11 @@ const PASOS: Record<string, { titulo: string; detalle: string }> = {
 
           @if (p.estado === 'CANCELADO') {
             <div class="alerta mala">Este pedido fue cancelado. Si crees que es un error, escríbenos por WhatsApp.</div>
+          } @else if (!p.enviado) {
+            <div class="alerta aviso">
+              <b>Tu pedido todavía no se ha enviado.</b> {{ p.metodoPago === 'CUENTA' ? 'Se envía a la tienda apenas adjuntes el comprobante de tu transferencia.' : 'Se envía a la tienda apenas se confirme el pago.' }} Mientras tanto, tus productos siguen en tu carrito.
+              <div style="margin-top:10px"><a class="btn" [routerLink]="emp.url('/carrito')">Volver al carrito</a></div>
+            </div>
           } @else {
             <div class="panel">
               <h3>¿Por dónde va?</h3>
@@ -72,7 +81,7 @@ const PASOS: Record<string, { titulo: string; detalle: string }> = {
 
           @if (marcadores().length && p.estado !== 'CANCELADO' && p.estado !== 'ENTREGADO') {
             <div class="panel">
-              <h3>{{ p.mapa?.repartidor ? '🛵 ' + (p.domiciliarioNombre || 'Tu domiciliario') + ' va en camino' : 'En el mapa' }}</h3>
+              <h3>@if (p.mapa?.repartidor) { <app-icono nombre="domiciliarios" /> {{ (p.domiciliarioNombre || 'Tu domiciliario') + ' va en camino' }} } @else { En el mapa }</h3>
               <app-mapa [marcadores]="marcadores()" [alto]="280" etiqueta="Mapa de tu pedido" />
               @if (p.mapa?.repartidor; as r) {
                 <span class="hint">Se mueve en vivo · última ubicación {{ haceCuanto(r.actualizado) }}.</span>
@@ -101,28 +110,73 @@ const PASOS: Record<string, { titulo: string; detalle: string }> = {
           @if (verificando()) { <div class="alerta aviso">Revisando tu pago con la pasarela…</div> }
           @if (p.metodoPago === 'EN_LINEA' && p.estado !== 'CANCELADO') {
             <app-pagar-en-linea [codigo]="p.codigo" [celular]="celularActual" [total]="p.total" [estadoPago]="p.estadoPago"
-              [intento]="p.pagoEnLinea" [tipoEntrega]="p.tipoEntrega" (cambiado)="pedido.set($event)" />
+              [intento]="p.pagoEnLinea" [tipoEntrega]="p.tipoEntrega" (cambiado)="pedido.set($event); alPagado($event)" />
           }
           @if (p.metodoPago === 'CUENTA' && p.estadoPago !== 'RECIBIDO' && p.estado !== 'CANCELADO') {
             <app-pagar-pedido [codigo]="p.codigo" [celular]="celularActual" [total]="p.total"
               [entidad]="p.cuentaEntidad" [titular]="p.cuentaTitular" [numero]="p.cuentaNumero"
-              [estadoPago]="p.estadoPago" (enviado)="pedido.set($event)" />
+              [estadoPago]="p.estadoPago" (enviado)="pedido.set($event); alPagado($event)" />
           }
           <button class="linkbtn" (click)="otro()">Consultar otro pedido</button>
         } @else {
-          <h1 style="font-size:32px">¿Por dónde va mi pedido?</h1>
-          <p class="muted" style="font-size:15px">Escribe el código que te dimos al pedir (empieza por P-) y el celular con que lo hiciste.</p>
+          <h1 style="font-size:32px">{{ recientes.length ? 'Mis pedidos' : '¿Por dónde va mi pedido?' }}</h1>
+          <p class="muted" style="font-size:15px">{{ recientes.length ? 'Toca un pedido para ver por dónde va.' : 'Escribe el código que te dimos al pedir (empieza por P-) y el celular con que lo hiciste.' }}</p>
 
           @if (recientes.length) {
-            <div class="panel">
-              <span class="lbl">Tus pedidos en este celular</span>
-              @for (r of recientes; track r.codigo) {
-                <button class="ghost" (click)="consultar(r.codigo, r.celular)">{{ r.codigo }}</button>
+            <div class="panel mp">
+              <div class="mp-cab">
+                <h3>Mis pedidos</h3>
+                <span class="muted">{{ visibles().length }} de {{ lista().length }}</span>
+              </div>
+
+              <div class="mp-filtros">
+                <div class="mp-grupo" role="group" aria-label="Filtrar por estado">
+                  @for (f of estados; track f.valor) {
+                    <button type="button" class="chip" [class.hot]="estadoSel() === f.valor" [attr.aria-pressed]="estadoSel() === f.valor" (click)="estadoSel.set(f.valor)">{{ f.texto }}</button>
+                  }
+                </div>
+                <div class="mp-grupo" role="group" aria-label="Filtrar por fecha">
+                  @for (f of fechas; track f.valor) {
+                    <button type="button" class="chip" [class.hot]="fechaSel() === f.valor" [attr.aria-pressed]="fechaSel() === f.valor" (click)="fechaSel.set(f.valor)">{{ f.texto }}</button>
+                  }
+                </div>
+                @if (fechaSel() === 'RANGO') {
+                  <div class="mp-rango">
+                    <label>Desde <input type="date" [ngModel]="desde()" (ngModelChange)="desde.set($event)" name="desde"></label>
+                    <label>Hasta <input type="date" [ngModel]="hasta()" (ngModelChange)="hasta.set($event)" name="hasta"></label>
+                  </div>
+                }
+              </div>
+
+              @if (cargandoLista()) {
+                <div class="esqueleto" style="height:84px"></div><div class="esqueleto" style="height:84px"></div>
+              } @else {
+                @for (p of visibles(); track p.codigo) {
+                  <button type="button" class="mp-item" (click)="abrir(p.codigo)">
+                    <span class="mp-fila">
+                      <b class="mp-codigo">{{ p.codigo }}</b>
+                      <span class="st st-{{ p.estado }}">{{ nombreEstado(p.estado) }}</span>
+                    </span>
+                    <span class="mp-prod">{{ resumenItems(p) }}</span>
+                    <span class="mp-fila mp-pie">
+                      <span class="muted">{{ fecha(p.creado) }} · {{ p.tipoEntrega === 'RECOGER' ? 'Recoger' : 'Domicilio' }}</span>
+                      <span class="spacer"></span>
+                      <span class="st pay-{{ p.estadoPago }}">{{ p.estadoPago === 'RECIBIDO' ? 'Pagado' : p.estadoPago === 'POR_CONFIRMAR' ? 'En revisión' : 'Pago pendiente' }}</span>
+                      <b class="num">{{ p.total | dinero }}</b>
+                    </span>
+                  </button>
+                } @empty {
+                  <div class="empty">Ningún pedido coincide con esos filtros.</div>
+                }
+                @if (noEncontrados() > 0) {
+                  <p class="muted">{{ noEncontrados() }} {{ noEncontrados() === 1 ? 'pedido no se pudo cargar' : 'pedidos no se pudieron cargar' }}; puedes buscarlos abajo con su código.</p>
+                }
               }
             </div>
           }
 
           <form class="panel" (ngSubmit)="consultar(codigoForm, celularForm)">
+            @if (recientes.length) { <h3>Buscar otro pedido</h3> }
             <div class="field"><label for="codigo">Código del pedido</label>
               <input id="codigo" name="codigo" [(ngModel)]="codigoForm" placeholder="P-ABC234" autocapitalize="characters"></div>
             <div class="field"><label for="cel">Celular</label>
@@ -140,6 +194,7 @@ export class SeguimientoPage implements OnInit {
   private api = inject(TiendaApi);
   private router = inject(Router);
   protected emp = inject(EmpresaActual);
+  private carrito = inject(Carrito);
 
   /** Viene de la ruta /pedido/:codigo */
   readonly codigo = input<string>('');
@@ -165,6 +220,68 @@ export class SeguimientoPage implements OnInit {
   private canal: { codigo: string; cerrar: () => void } | null = null;
   protected enVivo = signal(false);
 
+  // ---- Lista "Mis pedidos"
+  protected readonly estados = [
+    { valor: 'TODOS', texto: 'Todos' }, { valor: 'CURSO', texto: 'En curso' },
+    { valor: 'ENTREGADO', texto: 'Entregados' }, { valor: 'CANCELADO', texto: 'Cancelados' },
+  ] as const;
+  protected readonly fechas = [
+    { valor: 'TODO', texto: 'Todas las fechas' }, { valor: 'HOY', texto: 'Hoy' }, { valor: '7', texto: '7 días' },
+    { valor: '30', texto: '30 días' }, { valor: 'RANGO', texto: 'Elegir fechas' },
+  ] as const;
+  protected estadoSel = signal<'TODOS' | 'CURSO' | 'ENTREGADO' | 'CANCELADO'>('TODOS');
+  protected fechaSel = signal<'TODO' | 'HOY' | '7' | '30' | 'RANGO'>('TODO');
+  protected desde = signal('');
+  protected hasta = signal('');
+  protected lista = signal<Seguimiento[]>([]);
+  protected cargandoLista = signal(false);
+  protected noEncontrados = signal(0);
+
+  protected visibles = computed(() => {
+    const est = this.estadoSel();
+    const fe = this.fechaSel();
+    const ahora = new Date();
+    const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()).getTime();
+    let desde = 0; let hasta = Infinity;
+    if (fe === 'HOY') desde = inicioHoy;
+    else if (fe === '7') desde = inicioHoy - 6 * 86_400_000;
+    else if (fe === '30') desde = inicioHoy - 29 * 86_400_000;
+    else if (fe === 'RANGO') {
+      if (this.desde()) desde = new Date(this.desde() + 'T00:00:00').getTime();
+      if (this.hasta()) hasta = new Date(this.hasta() + 'T23:59:59').getTime();
+    }
+    return this.lista()
+      .filter((p) => est === 'TODOS' || (est === 'CURSO' ? p.estado !== 'ENTREGADO' && p.estado !== 'CANCELADO' : p.estado === est))
+      .filter((p) => { const t = new Date(p.creado).getTime(); return t >= desde && t <= hasta; })
+      .sort((a, b) => new Date(b.creado).getTime() - new Date(a.creado).getTime());
+  });
+
+  protected fecha(iso: string): string {
+    const f = new Date(iso);
+    return f.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }).replace('.', '') + ' · '
+      + f.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
+  }
+  protected resumenItems(p: Seguimiento): string {
+    const partes = p.items.slice(0, 2).map((i) => `${i.cantidad} x ${i.nombre}`);
+    const mas = p.items.length - 2;
+    return partes.join(', ') + (mas > 0 ? ` y ${mas} más` : '');
+  }
+  protected abrir(codigo: string): void {
+    const r = this.recientes.find((x) => x.codigo === codigo);
+    if (r) this.consultar(r.codigo, r.celular);
+  }
+
+  private cargarLista(): void {
+    if (!this.recientes.length) return;
+    this.cargandoLista.set(true);
+    forkJoin(this.recientes.map((r) => this.api.seguimiento(r.codigo, r.celular).pipe(catchError(() => of(null))))).subscribe((res) => {
+      const ok = res.filter((x): x is Seguimiento => !!x);
+      this.lista.set(ok);
+      this.noEncontrados.set(res.length - ok.length);
+      this.cargandoLista.set(false);
+    });
+  }
+
   constructor() {
     // Respaldo por si la conexión en vivo no está disponible.
     const intervalo = setInterval(() => this.refrescar(), 60_000);
@@ -174,7 +291,7 @@ export class SeguimientoPage implements OnInit {
   private refrescar(): void {
     const p = this.pedido();
     if (p && document.visibilityState === 'visible') {
-      this.api.seguimiento(p.codigo, this.celularActual).subscribe({ next: (s) => this.pedido.set(s), error: () => {} });
+      this.api.seguimiento(p.codigo, this.celularActual).subscribe({ next: (s) => { this.pedido.set(s); this.alPagado(s); }, error: () => {} });
     }
   }
 
@@ -200,7 +317,7 @@ export class SeguimientoPage implements OnInit {
 
   ngOnInit(): void {
     const codigo = this.codigo();
-    if (!codigo) return;
+    if (!codigo) { this.cargarLista(); return; }
     // Vuelve del checkout de la pasarela (?pago=retorno; Wompi agrega &id=<transacción>): se revisa el pago de una vez.
     const q = this.ruta.snapshot.queryParamMap;
     if (q.get('pago') === 'retorno') this.verificarAlCargar = { transaccion: q.get('id') };
@@ -232,8 +349,9 @@ export class SeguimientoPage implements OnInit {
     this.api.seguimiento(c, cel).subscribe({
       next: (s) => {
         this.celularActual = cel;
-        guardarPedidoReciente(s.codigo, cel);
+        if (s.enviado) guardarPedidoReciente(s.codigo, cel);
         this.pedido.set(s);
+        this.alPagado(s);
         this.escuchar(s.codigo, cel);
         this.cargando.set(false);
         const verificar = this.verificarAlCargar;
@@ -250,9 +368,19 @@ export class SeguimientoPage implements OnInit {
   private verificar(codigo: string, celular: string, transaccion: string | null): void {
     this.verificando.set(true);
     this.api.verificarPago(codigo, celular, transaccion).subscribe({
-      next: (s) => { this.pedido.set(s); this.verificando.set(false); },
+      next: (s) => { this.pedido.set(s); this.alPagado(s); this.verificando.set(false); },
       error: () => this.verificando.set(false), // el aviso de la pasarela lo confirmará igual
     });
+  }
+
+  /** Pago en línea confirmado: ahora sí se vacía el carrito y el pedido pasa a «Mis pedidos». */
+  protected alPagado(s: Seguimiento): void {
+    if (!s.enviado) return;
+    guardarPedidoReciente(s.codigo, this.celularActual);
+    const clave = claveLocal('pago_pendiente');
+    try {
+      if (localStorage.getItem(clave) === s.codigo) { this.carrito.vaciar(); localStorage.removeItem(clave); }
+    } catch { /* nada */ }
   }
 
   protected comoPaga(p: Seguimiento): string {
@@ -282,6 +410,7 @@ export class SeguimientoPage implements OnInit {
     this.canal = null;
     this.pedido.set(null);
     this.recientes = pedidosRecientes();
+    this.cargarLista();
     this.router.navigateByUrl(this.emp.url('/seguimiento'));
   }
 }

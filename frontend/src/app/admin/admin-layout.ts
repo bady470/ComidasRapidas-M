@@ -84,7 +84,10 @@ export class AdminLayout implements OnInit {
     { titulo: 'Catálogo', items: [
       { ruta: 'productos', texto: 'Productos', icono: 'productos' },
       { ruta: 'categorias', texto: 'Categorías', icono: 'categorias' },
-      ...(this.estado.tieneModulo(MODULOS.promociones) ? [{ ruta: 'promociones', texto: 'Promociones', icono: 'promociones' }] : []),
+      ...(this.estado.tieneModulo(MODULOS.promociones) ? [
+        { ruta: 'promociones', texto: 'Promociones', icono: 'promociones' },
+        { ruta: 'banners', texto: 'Banners', icono: 'imagen' },
+      ] : []),
     ] },
     { titulo: 'Configuración', items: [
       { ruta: 'tienda', texto: 'Mi tienda', icono: 'tienda' },

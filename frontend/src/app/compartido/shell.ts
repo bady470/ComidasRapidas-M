@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, afterNextRender, computed, inject, input, output, signal } from '@angular/core';
+import { BotonModo } from './modo';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { entrar } from '../core/animar';
 import { Icono } from './icono';
@@ -22,7 +23,7 @@ export interface GrupoMenu { titulo?: string; items: ItemMenu[]; }
  */
 @Component({
   selector: 'app-shell',
-  imports: [RouterLink, RouterLinkActive, Icono, Logo],
+  imports: [BotonModo, RouterLink, RouterLinkActive, Icono, Logo],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="mt" [class.mt-abierto]="abierto()">
@@ -58,6 +59,7 @@ export interface GrupoMenu { titulo?: string; items: ItemMenu[]; }
           <button class="mt-menu" type="button" (click)="abierto.set(!abierto())" aria-label="Abrir el menú"><app-icono nombre="menu" /></button>
           <h1 class="mt-titulo">{{ titulo() }}</h1>
           <span class="spacer"></span>
+          <app-modo />
           <div class="mt-acciones"><ng-content select="[acciones]" /></div>
         </header>
         <main class="mt-contenido" #contenido><ng-content /></main>

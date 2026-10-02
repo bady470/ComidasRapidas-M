@@ -216,7 +216,11 @@ export interface Promocion {
   precio: number | null; porcentaje: number | null; minimo: number; productoId: number | null; productoIds: number[];
 }
 
-export interface Catalogo { tienda: Tienda; categorias: Categoria[]; productos: Producto[]; promociones: Promocion[]; }
+/** Lámina del carrusel de la portada. */
+export interface Banner { id: number; titulo: string; subtitulo: string; boton: string; imagenId: number | null; color: string; }
+export interface BannerAdmin extends Banner { activo: boolean; orden: number; }
+export interface BannerForm { titulo: string; subtitulo: string; boton: string; imagenId: number | null; color: string; activo: boolean; }
+export interface Catalogo { tienda: Tienda; categorias: Categoria[]; productos: Producto[]; promociones: Promocion[]; banners: Banner[]; }
 
 export interface ItemPedido { productoId: number; cantidad: number; opcionIds: number[]; }
 
@@ -260,6 +264,8 @@ export interface Seguimiento {
   pagoEnLinea: EstadoPagoEnLinea | null;
   /** Mapa del pedido (null si la empresa no tiene mapas). */
   mapa: MapaSeguimiento | null;
+  /** false: pedido de pago en línea sin pagar; la empresa todavía no lo ve. */
+  enviado: boolean;
 }
 
 // ---------- Administración ----------
@@ -393,7 +399,7 @@ export interface BibItem {
   imagen: string; etiqueta: string; filtros: string[]; grupos: BibGrupo[];
 }
 export interface BibCategoria { nombre: string; orden: number; cantidad: number; }
-export interface Biblioteca { categorias: BibCategoria[]; filtros: string[]; productos: BibItem[]; }
+export interface Biblioteca { categorias: BibCategoria[]; filtros: string[]; productos: BibItem[]; conFoto: string[]; fotosPropias: string[]; }
 export interface ResultadoBiblioteca { importados: number; omitidos: number; categoriasNuevas: number; }
 
 // ---- Planes comerciales

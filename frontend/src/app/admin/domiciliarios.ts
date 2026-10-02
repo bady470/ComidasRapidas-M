@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Icono } from '../compartido/icono';
 import { FormsModule, NgForm } from '@angular/forms';
 import { AdminApi, mensajeError } from '../core/api';
 import { Avisos } from '../core/avisos';
@@ -12,13 +13,13 @@ import { Mapa, Marcador } from '../compartido/mapa';
 /** Personas que llevan los domicilios. Se asignan a cada pedido desde «Pedidos». */
 @Component({
   selector: 'app-domiciliarios',
-  imports: [FormsModule, CelularPipe, Mapa],
+  imports: [Icono, FormsModule, CelularPipe, Mapa],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (conMapas()) {
       <section class="panel" style="margin-bottom:16px">
         <div class="row" style="justify-content:space-between;flex-wrap:wrap">
-          <h3>🛵 Domiciliarios en el mapa</h3>
+          <h3><app-icono nombre="domiciliarios" /> Domiciliarios en el mapa</h3>
           <span class="en-vivo" [class.off]="!avisosPortal.enVivo()">{{ avisosPortal.enVivo() ? 'En vivo' : 'Reconectando' }}</span>
         </div>
         @if (ubicaciones().length) {
@@ -39,7 +40,7 @@ import { Mapa, Marcador } from '../compartido/mapa';
         <h3>Domiciliarios</h3>
         <p class="muted">Asígnalos a cada pedido a domicilio desde «Pedidos». Al asignarlo puedes enviarle el pedido por WhatsApp,
           y el cliente ve quién le lleva su pedido.
-          @if (conMapas()) { Con su <b>link de reparto</b> (🔗) ve sus pedidos en el celular, marca «Salí» y «Entregado», y el cliente lo ve acercarse en el mapa. }</p>
+          @if (conMapas()) { Con su <b>link de reparto</b> (botón «Link») ve sus pedidos en el celular, marca «Salí» y «Entregado», y el cliente lo ve acercarse en el mapa. }</p>
         <div class="tablewrap tabla-datos" style="margin-inline:-16px;margin-bottom:-16px">
           <table>
             <thead><tr><th>Nombre</th><th>Celular</th><th>Estado</th><th class="r">Acciones</th></tr></thead>
@@ -66,8 +67,8 @@ import { Mapa, Marcador } from '../compartido/mapa';
                     <td><span class="st" [class.pay-RECIBIDO]="d.activo" [class.pay-PENDIENTE]="!d.activo">{{ d.activo ? 'Activo' : 'Inactivo' }}</span></td>
                     <td class="r">
                       @if (conMapas() && d.activo && d.token) {
-                        <button class="btn" type="button" (click)="copiarLink(d)" title="Copiar su link de reparto">🔗 Link</button>
-                        @if (d.celular) { <a class="btn" [href]="waLink(d)" target="_blank" rel="noopener" title="Enviarle su link por WhatsApp">💬</a> }
+                        <button class="btn" type="button" (click)="copiarLink(d)" title="Copiar su link de reparto"><app-icono nombre="enlace" /> Link</button>
+                        @if (d.celular) { <a class="btn" [href]="waLink(d)" target="_blank" rel="noopener" title="Enviarle su link por WhatsApp" aria-label="Enviarle su link por WhatsApp"><app-icono nombre="chat" /></a> }
                       }
                       <button class="btn" type="button" (click)="editar(d)">Editar</button>
                     </td>

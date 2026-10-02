@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, ElementRef, afterNextRender, inject, input, model, output, signal } from '@angular/core';
+import { BotonModo } from './modo';
 import { FormsModule } from '@angular/forms';
 import { gsap } from 'gsap';
 import { sinMovimiento } from '../core/animar';
@@ -11,7 +12,7 @@ import { Logo } from './logo';
  */
 @Component({
   selector: 'app-acceso',
-  imports: [FormsModule, Icono, Logo],
+  imports: [BotonModo, FormsModule, Icono, Logo],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="ac">
@@ -28,6 +29,7 @@ import { Logo } from './logo';
       </section>
 
       <section class="ac-form">
+        <app-modo class="ac-modo" />
         <form (ngSubmit)="enviar.emit()" class="ac-caja">
           <div class="ac-cab">
             <app-logo [logoUrl]="logoUrl()" [nombre]="marca()" class="ac-logo-mini" />

@@ -5,6 +5,7 @@ import co.leinei.api.empresa.EmpresaContexto;
 import co.leinei.api.empresa.Modulos;
 import co.leinei.api.plataforma.servicio.MarcaService;
 import co.leinei.api.servicio.ArchivoService;
+import co.leinei.api.servicio.BannerService;
 import co.leinei.api.servicio.CatalogoService;
 import co.leinei.api.servicio.ConfigService;
 import co.leinei.api.web.dto.AdminDto;
@@ -25,12 +26,14 @@ public class AdminCatalogoController {
     private final ConfigService config;
     private final ArchivoService archivos;
     private final MarcaService marca;
+    private final BannerService banners;
 
-    public AdminCatalogoController(CatalogoService catalogo, ConfigService config, ArchivoService archivos, MarcaService marca) {
+    public AdminCatalogoController(CatalogoService catalogo, ConfigService config, ArchivoService archivos, MarcaService marca, BannerService banners) {
         this.catalogo = catalogo;
         this.config = config;
         this.archivos = archivos;
         this.marca = marca;
+        this.banners = banners;
     }
 
     // ---- Logo de la empresa (se guarda en la base de control, con la marca)
@@ -138,6 +141,38 @@ public class AdminCatalogoController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void eliminarPromocion(@PathVariable Long id) {
         catalogo.eliminarPromocion(id);
+    }
+
+    // ---- Banners del carrusel de la portada (forman parte del módulo de promociones)
+    @GetMapping("/banners")
+    public List<AdminDto.Banner> banners() {
+        exigirPromociones();
+        return banners.listar();
+    }
+
+    @PostMapping("/banners")
+    @ResponseStatus(HttpStatus.CREATED)
+    public List<AdminDto.Banner> crearBanner(@Valid @RequestBody AdminDto.BannerRequest req) {
+        exigirPromociones();
+        return banners.crear(req);
+    }
+
+    @PutMapping("/banners/orden")
+    public List<AdminDto.Banner> ordenarBanners(@Valid @RequestBody AdminDto.OrdenRequest req) {
+        exigirPromociones();
+        return banners.ordenar(req.ids());
+    }
+
+    @PutMapping("/banners/{id}")
+    public List<AdminDto.Banner> actualizarBanner(@PathVariable Long id, @Valid @RequestBody AdminDto.BannerRequest req) {
+        exigirPromociones();
+        return banners.actualizar(id, req);
+    }
+
+    @DeleteMapping("/banners/{id}")
+    public List<AdminDto.Banner> eliminarBanner(@PathVariable Long id) {
+        exigirPromociones();
+        return banners.eliminar(id);
     }
 
     // ---- Configuración de la tienda

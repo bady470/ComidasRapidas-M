@@ -61,8 +61,10 @@ public final class PublicoDto {
                             Integer precio, Integer porcentaje, int minimo, Long productoId,
                             List<Long> productoIds) {}
 
+    public record Banner(Long id, String titulo, String subtitulo, String boton, Long imagenId, String color) {}
+
     public record Catalogo(Tienda tienda, List<Categoria> categorias, List<Producto> productos,
-                           List<Promocion> promociones) {}
+                           List<Promocion> promociones, List<Banner> banners) {}
 
     public record ItemPedido(
             @NotNull Long productoId,
@@ -117,5 +119,7 @@ public final class PublicoDto {
                               // Último intento de pago en línea (null si nunca intentó pagar en línea).
                               co.leinei.api.pagos.PagosDto.EstadoPublico pagoEnLinea,
                               // Mapa del pedido (null si la empresa no tiene mapas).
-                              MapaDto.MapaSeguimiento mapa) {}
+                              MapaDto.MapaSeguimiento mapa,
+                              /** false: pedido de pago en línea que aún no se paga; la empresa todavía no lo ve. */
+                              boolean enviado) {}
 }

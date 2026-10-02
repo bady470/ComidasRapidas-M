@@ -26,6 +26,7 @@ function rutasEmpresa(): Routes {
         { path: 'ventas', title: 'Ventas', loadComponent: () => import('./admin/produccion').then((m) => m.ProduccionPage) },
         { path: 'productos', title: 'Productos', loadComponent: () => import('./admin/productos').then((m) => m.ProductosPage) },
         { path: 'categorias', title: 'Categorías', loadComponent: () => import('./admin/categorias').then((m) => m.CategoriasPage) },
+        { path: 'banners', title: 'Banners', loadComponent: () => import('./admin/banners').then((m) => m.BannersPage) },
         { path: 'promociones', title: 'Promociones', loadComponent: () => import('./admin/promociones').then((m) => m.PromocionesPage) },
         { path: 'domiciliarios', title: 'Domiciliarios', loadComponent: () => import('./admin/domiciliarios').then((m) => m.DomiciliariosPage) },
         { path: 'tienda', title: 'Mi tienda', loadComponent: () => import('./admin/config').then((m) => m.ConfigPage) },
