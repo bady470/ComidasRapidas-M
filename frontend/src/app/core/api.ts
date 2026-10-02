@@ -8,7 +8,7 @@ import {
   Seguimiento, Sesion, TipoEntrega,
   Avisos, Domiciliario, ActualizarEmpresa, CrearEmpresa, EmpresaDetalle, EmpresaResumen, ModuloPlataforma, ResumenPlataforma, Superadmin, Biblioteca, ResultadoBiblioteca, Plan, EmpresaCreada, ConfigCorreo, ConfigCorreoForm, ResultadoPrueba,
   AccionSaturacion, Caja, CierreCajaForm, Estadisticas, Saturacion, Clientes, ConfigCocina,
-  ConfigMapa, Reparto, UbicacionDomiciliario,
+  ConfigMapa, Reparto, UbicacionDomiciliario, MenuSedes, PanelSedes, ProductoEnSede, SedeForm,
   ConfigPagosEmpresa, ConfigPagosEmpresaForm, Liquidacion, Llaves, MetodoPago, PasarelaPlataforma, PortalPagos, Proveedor, Recaudos,
 } from './modelos';
 
@@ -154,7 +154,7 @@ export class AdminApi {
   domiciliarios(): Observable<Domiciliario[]> {
     return this.http.get<Domiciliario[]>(`${this.base}/domiciliarios`);
   }
-  guardarDomiciliario(id: number | null, d: { nombre: string; celular: string; activo: boolean }): Observable<Domiciliario[]> {
+  guardarDomiciliario(id: number | null, d: { nombre: string; celular: string; activo: boolean; sedeId?: number | null }): Observable<Domiciliario[]> {
     return id ? this.http.put<Domiciliario[]>(`${this.base}/domiciliarios/${id}`, d)
               : this.http.post<Domiciliario[]>(`${this.base}/domiciliarios`, d);
   }
@@ -243,6 +243,23 @@ export class AdminApi {
   cerrarCaja(fecha: string, f: CierreCajaForm): Observable<Caja> {
     return this.http.put<Caja>(`${this.base}/caja`, f, { params: { fecha } });
   }
+  // ---- Varias sedes
+  sedes(): Observable<PanelSedes> {
+    return this.http.get<PanelSedes>(`${this.base}/sedes`);
+  }
+  guardarSede(id: number | null, s: SedeForm): Observable<PanelSedes> {
+    return id ? this.http.put<PanelSedes>(`${this.base}/sedes/${id}`, s) : this.http.post<PanelSedes>(`${this.base}/sedes`, s);
+  }
+  menuSedes(menu: MenuSedes): Observable<PanelSedes> {
+    return this.http.put<PanelSedes>(`${this.base}/sedes/menu`, { menu });
+  }
+  productoEnSedes(id: number): Observable<ProductoEnSede[]> {
+    return this.http.get<ProductoEnSede[]>(`${this.base}/productos/${id}/sedes`);
+  }
+  guardarProductoEnSedes(id: number, sedes: ProductoEnSede[]): Observable<ProductoEnSede[]> {
+    return this.http.put<ProductoEnSede[]>(`${this.base}/productos/${id}/sedes`, { sedes });
+  }
+
   // ---- Mapas
   configMapa(): Observable<ConfigMapa> {
     return this.http.get<ConfigMapa>(`${this.base}/mapa`);

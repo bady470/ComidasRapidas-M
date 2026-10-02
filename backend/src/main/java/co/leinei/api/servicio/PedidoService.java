@@ -45,6 +45,7 @@ public class PedidoService {
     private final TiempoReal tiempoReal;
     private final ConfigPagosService pagosEnLinea;
     private final TransaccionesPago transacciones;
+    private final SedeService sedes;
 
     /** Estados de pago que cuentan como "sin pagar". */
     static final List<EstadoPago> SIN_PAGAR = List.of(EstadoPago.PENDIENTE, EstadoPago.POR_CONFIRMAR);
@@ -55,7 +56,8 @@ public class PedidoService {
                          PrecioService precios, co.leinei.api.config.LeineiProperties props,
                          ComprobantePagoRepositorio comprobantes, NotificacionRepositorio notificaciones,
                          DomiciliarioRepositorio domiciliarios, TiempoReal tiempoReal, ConfigPagosService pagosEnLinea,
-                         TransaccionesPago transacciones) {
+                         TransaccionesPago transacciones, SedeService sedes) {
+        this.sedes = sedes;
         this.tiempoReal = tiempoReal;
         this.pagosEnLinea = pagosEnLinea;
         this.transacciones = transacciones;
@@ -74,7 +76,7 @@ public class PedidoService {
     /** Calcula el carrito. Si hay zonas y el cliente aún no escoge la suya, el domicilio sale en 0. */
     @Transactional(readOnly = true)
     public PrecioService.Cotizacion cotizar(PublicoDto.CotizarRequest r) {
-        ConfigTienda c = configService.tienda();
+        ConfigTienda c = configService.actual();
         TipoEntrega tipo = tipoPorDefecto(c, r.tipoEntrega());
         LocalDate fecha = configService.disponibilidad().fechaServicio();
         int domicilio = domicilio(c, tipo, r.zonaId(), r.lat(), r.lng(), false, false).valor();
@@ -83,7 +85,7 @@ public class PedidoService {
 
     @Transactional
     public PublicoDto.PedidoCreado crear(PublicoDto.CrearPedidoRequest r) {
-        ConfigTienda c = configService.tienda();
+        ConfigTienda c = configService.actual();
         DisponibilidadService.Disponibilidad d = configService.disponibilidad();
         if (!c.isAbierto()) {
             throw ReglaNegocioException.conflicto("En este momento no estamos recibiendo pedidos. Escríbenos por WhatsApp.");
@@ -119,6 +121,7 @@ public class PedidoService {
         p.setEntregaLat(entrega.lat());
         p.setEntregaLng(entrega.lng());
         p.setDistanciaKm(entrega.km());
+        p.setSedeId(sedes.paraPedido());
         p.setOrigen(OrigenPedido.WEB);
         p.registrarEvento(EstadoPedido.NUEVO, "", "cliente");
         // Pago en línea o transferencia: el pedido queda guardado pero la empresa no lo ve hasta que se pague (la pasarela
@@ -284,7 +287,7 @@ public class PedidoService {
                 .map(i -> new PublicoDto.ItemSeguimiento(i.getNombre(), i.getDetalle(), i.getCantidad(), i.getPrecioUnitario()))
                 .toList();
         String nombre = p.getClienteNombre().split("\\s+")[0];
-        String direccionTienda = tipo == TipoEntrega.RECOGER ? configService.tienda().getDireccion() : "";
+        String direccionTienda = tipo == TipoEntrega.RECOGER ? configService.deSede(p.getSedeId()).getDireccion() : "";
         return new PublicoDto.Seguimiento(p.getCodigo(), p.getEstado(), p.getEstado().mensaje(tipo), p.getEstadoPago(),
                 tipo, EstadoPedido.flujo(tipo), p.getFechaEntrega(), p.getFranja(), nombre, p.getBarrio(), p.getZona(),
                 items, p.getSubtotal(), p.getDescuento(), p.getPromocionAplicada(), p.getDomicilio(), p.getTotal(),
@@ -301,7 +304,7 @@ public class PedidoService {
     /** Mapa del seguimiento: el local, el punto de entrega y el domiciliario (solo en camino y si es reciente). */
     private MapaDto.MapaSeguimiento mapa(Pedido p) {
         if (!EmpresaContexto.tieneModulo(co.leinei.api.empresa.Modulos.MAPAS)) return null;
-        ConfigTienda c = configService.tienda();
+        ConfigTienda c = configService.deSede(p.getSedeId());
         Domiciliario d = p.getDomiciliario();
         MapaDto.Repartidor rep = null;
         if (c.isSeguimientoVivo() && d != null && p.getEstado() == EstadoPedido.EN_CAMINO
@@ -338,14 +341,17 @@ public class PedidoService {
                 ? pedidoRepo.findByPublicadoTrueAndFechaEntregaOrderByCreadoDesc(fecha)
                 : pedidoRepo.findByPublicadoTrueOrderByCreadoDesc(PageRequest.of(0, 300));
         String q = busqueda == null ? "" : busqueda.trim().toLowerCase(Locale.ROOT);
+        Long sede = sedes.filtro();
         List<Pedido> lista = base.stream()
+                .filter(p -> sede == null || sede.equals(p.getSedeId()))
                 .filter(p -> estado == null || p.getEstado() == estado)
                 .filter(p -> q.isEmpty() || (p.getCodigo() + " " + p.getClienteNombre() + " " + p.getClienteCelular()
                         + " " + p.getBarrio() + " " + p.getZona()).toLowerCase(Locale.ROOT).contains(q))
                 .toList();
         Set<Long> conComprobante = lista.isEmpty() ? Set.of()
                 : new HashSet<>(comprobantes.pedidosConComprobante(lista.stream().map(Pedido::getId).toList()));
-        return lista.stream().map(p -> aDto(p, conComprobante.contains(p.getId()))).toList();
+        Map<Long, String> nombres = sedes.activas() ? sedes.nombres() : Map.of();
+        return lista.stream().map(p -> aDto(p, conComprobante.contains(p.getId()), nombres)).toList();
     }
 
     /** Último comprobante que adjuntó el cliente. */
@@ -378,7 +384,7 @@ public class PedidoService {
     /** Pedido que llegó por WhatsApp o por teléfono. No revisa el horario ni el pedido mínimo. */
     @Transactional
     public AdminDto.Pedido crearManual(AdminDto.PedidoManualRequest r, String autor) {
-        ConfigTienda c = configService.tienda();
+        ConfigTienda c = configService.actual();
         LocalDate fecha = r.fechaEntrega() != null ? r.fechaEntrega() : configService.disponibilidad().fechaServicio();
         Entrega entrega = domicilio(c, r.tipoEntrega(), r.zonaId(), null, null, false, true);
         PrecioService.Cotizacion cot = precios.calcular(lineas(r.items(), false), catalogo.promocionesActivas(),
@@ -386,6 +392,7 @@ public class PedidoService {
         Pedido p = nuevoPedido(cot, fecha, franja(c, r.franja()), r.tipoEntrega(), entrega.zona(), r.nombre(),
                 Objects.requireNonNullElse(r.celular(), ""), r.barrio(), r.direccion(), "", r.notas());
         asignarPago(p, c, r.metodoPago(), r.cuentaId(), true);
+        p.setSedeId(sedes.paraPedido());
         p.setOrigen(OrigenPedido.WHATSAPP);
         p.setEstado(EstadoPedido.CONFIRMADO);
         p.registrarEvento(EstadoPedido.NUEVO, "Pedido por WhatsApp", autor);
@@ -491,7 +498,8 @@ public class PedidoService {
         for (PublicoDto.ItemPedido item : items) {
             Producto p = productos.get(item.productoId());
             if (p == null) throw ReglaNegocioException.invalido("Uno de los productos ya no está en el catálogo. Actualiza la página.");
-            if (soloDisponibles && !p.isDisponible()) throw ReglaNegocioException.conflicto(p.getNombre() + " está agotado.");
+            if (soloDisponibles && !p.ofrecidoEnSede()) throw ReglaNegocioException.conflicto(p.getNombre() + " no está en el menú de esta sede.");
+            if (soloDisponibles && !p.disponibleVenta()) throw ReglaNegocioException.conflicto(p.getNombre() + " está agotado.");
             List<Opcion> opciones = opcionesValidas(p, item.opciones(), soloDisponibles);
             String clave = p.getId() + ":" + opciones.stream().map(o -> String.valueOf(o.getId())).sorted().collect(Collectors.joining(","));
             PrecioService.Linea previa = unidas.get(clave);
@@ -605,10 +613,16 @@ public class PedidoService {
     private static boolean blanco(String s) { return s == null || s.isBlank(); }
 
     AdminDto.Pedido aDto(Pedido p) {
-        return aDto(p, p.getId() != null && comprobantes.countByPedidoId(p.getId()) > 0);
+        return aDto(p, p.getId() != null && comprobantes.countByPedidoId(p.getId()) > 0,
+                sedes.activas() ? sedes.nombres() : Map.of());
     }
 
     AdminDto.Pedido aDto(Pedido p, boolean tieneComprobante) {
+        return aDto(p, tieneComprobante, sedes.activas() ? sedes.nombres() : Map.of());
+    }
+
+    /** nombres: nombre de cada sede (vacío sin varias sedes); se pasa para no consultarlo por cada pedido. */
+    AdminDto.Pedido aDto(Pedido p, boolean tieneComprobante, Map<Long, String> nombres) {
         Domiciliario d = p.getDomiciliario();
         List<AdminDto.Item> items = p.getItems().stream()
                 .map(i -> new AdminDto.Item(i.getProductoId(), i.getNombre(), i.getDetalle(), i.getCantidad(),
@@ -625,7 +639,8 @@ public class PedidoService {
                 p.getCuentaNumero(), p.getEstadoPago(), p.getEstado(), p.getOrigen(), eventos,
                 tieneComprobante, p.getPagoReportado(),
                 d == null ? null : d.getId(), d == null ? "" : d.getNombre(), d == null ? "" : d.getCelular(),
-                p.getEntregaLat(), p.getEntregaLng(), p.getDistanciaKm());
+                p.getEntregaLat(), p.getEntregaLng(), p.getDistanciaKm(),
+                p.getSedeId(), p.getSedeId() == null ? "" : nombres.getOrDefault(p.getSedeId(), ""));
     }
 
     /** Avisa al portal de la empresa y al cliente que sigue ese pedido (después de guardar). */

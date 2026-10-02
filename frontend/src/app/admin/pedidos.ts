@@ -132,6 +132,7 @@ interface LineaManual { clave: string; producto: Producto; opcionIds: number[]; 
               <td>
                 <button class="desplegar" type="button" [attr.aria-expanded]="abierto(p)" [attr.aria-label]="'Ver detalle del pedido ' + p.codigo" (click)="alternar(p.id); $event.stopPropagation()">{{ abierto(p) ? '▾' : '▸' }}</button>
                 <b class="num">{{ p.codigo }}</b>
+                @if (p.sede) { <div class="muted">Sede {{ p.sede }}</div> }
                 <div class="muted">{{ p.creado | hora }}{{ p.origen === 'WHATSAPP' ? ' · WhatsApp' : '' }}</div>
               </td>
               <td><b>{{ p.clienteNombre }}</b><div class="muted num">{{ p.clienteCelular | celular }}</div></td>
@@ -401,7 +402,8 @@ export class PedidosPage {
 
   /** Activos más el que ya tenga el pedido (aunque lo hayan desactivado). */
   protected domiciliariosPara(p: PedidoAdmin): Domiciliario[] {
-    return this.domiciliarios().filter((d) => d.activo || d.id === p.domiciliarioId);
+    return this.domiciliarios().filter((d) => (d.activo && (d.sedeId == null || p.sedeId == null || d.sedeId === p.sedeId))
+      || d.id === p.domiciliarioId);
   }
 
   protected asignar(p: PedidoAdmin, domiciliarioId: number | null): void {

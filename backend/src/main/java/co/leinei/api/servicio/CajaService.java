@@ -24,23 +24,37 @@ public class CajaService {
 
     private final PedidoRepositorio pedidos;
     private final CierreCajaRepositorio cierres;
+    private final SedeService sedes;
 
-    public CajaService(PedidoRepositorio pedidos, CierreCajaRepositorio cierres) {
+    public CajaService(PedidoRepositorio pedidos, CierreCajaRepositorio cierres, SedeService sedes) {
         this.pedidos = pedidos;
         this.cierres = cierres;
+        this.sedes = sedes;
+    }
+
+    /**
+     * La caja es de una sede. Sin varias sedes, la principal. Con varias sedes, la escogida en la barra del portal;
+     * si se están viendo todas, se muestra la suma (para cerrar hay que escoger una sede).
+     */
+    private Long sedeDeCaja() {
+        return sedes.activas() ? sedes.filtro() : sedes.principal().getId();
     }
 
     @Transactional(readOnly = true)
     public OperacionDto.Caja ver(LocalDate fecha) {
-        return calcular(fecha, cierres.findByFecha(fecha).orElse(null));
+        Long sede = sedeDeCaja();
+        return calcular(fecha, sede, sede == null ? null : cierres.findByFechaAndSedeId(fecha, sede).orElse(null));
     }
 
     @Transactional
     public OperacionDto.Caja cerrar(LocalDate fecha, OperacionDto.CierreRequest r, String quien) {
-        OperacionDto.Caja caja = calcular(fecha, null);
-        CierreCaja c = cierres.findByFecha(fecha).orElseGet(CierreCaja::new);
+        Long sede = sedeDeCaja();
+        if (sede == null) throw ReglaNegocioException.conflicto("Escoge una sede en la barra de arriba para cerrar su caja.");
+        OperacionDto.Caja caja = calcular(fecha, sede, null);
+        CierreCaja c = cierres.findByFechaAndSedeId(fecha, sede).orElseGet(CierreCaja::new);
         int esperado = (int) (r.baseInicial() + caja.efectivoRecibido() - r.gastos());
         c.setFecha(fecha);
+        c.setSedeId(sede);
         c.setBaseInicial(r.baseInicial());
         c.setGastos(r.gastos());
         c.setNotaGastos(limpio(r.notaGastos()));
@@ -56,12 +70,13 @@ public class CajaService {
         c.setNota(limpio(r.nota()));
         c.setCerradoPor(quien);
         c.setCerradoEn(Instant.now());
-        return calcular(fecha, cierres.save(c));
+        return calcular(fecha, sede, cierres.save(c));
     }
 
-    private OperacionDto.Caja calcular(LocalDate fecha, CierreCaja cierre) {
+    private OperacionDto.Caja calcular(LocalDate fecha, Long sede, CierreCaja cierre) {
         List<Pedido> lista = pedidos.findByPublicadoTrueAndFechaEntregaOrderByCreadoDesc(fecha).stream()
-                .filter(p -> p.getEstado() != EstadoPedido.CANCELADO).toList();
+                .filter(p -> p.getEstado() != EstadoPedido.CANCELADO)
+                .filter(p -> sede == null || sede.equals(p.getSedeId())).toList();
 
         // clave → [pedidos, recibido, pendiente]; LinkedHashMap para un orden estable: efectivo, cuentas, en línea.
         Map<String, long[]> medios = new LinkedHashMap<>();
@@ -130,7 +145,8 @@ public class CajaService {
                 cierre.getNotaGastos(), cierre.getEfectivoContado(), cierre.getEfectivoEsperado(), cierre.getDiferencia(),
                 cierre.getNota(), cierre.getCerradoPor(), cierre.getCerradoEn());
         return new OperacionDto.Caja(fecha, lista.size(), ventas, efectivo, transferencias, enLinea, porCobrar, listaMedios,
-                domiciliarios, pendientes, c, cierres.fechasCerradas(PageRequest.of(0, 31)));
+                domiciliarios, pendientes, c, cierres.fechasCerradas(sede != null ? sede : sedes.principal().getId(), PageRequest.of(0, 31)),
+                sede, sede == null ? "" : sedes.nombres().getOrDefault(sede, ""), sede != null);
     }
 
     /** El efectivo se cobra al entregar; lo demás cuenta cuando el pago está confirmado. */

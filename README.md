@@ -86,6 +86,8 @@ Tablas `tbl_` en plural, índices `idx_`, funciones `fn_`, triggers `trg_`. Toda
 | `caja` | Cierre de caja del día: efectivo, transferencias, pagos en línea y lo que entrega cada domiciliario |
 | `cocina` | Pantalla de cocina y comandas impresas (manual o automática) en impresora térmica |
 | `clientes` | Clientes frecuentes y los que dejaron de pedir, con mensaje de WhatsApp para que vuelvan |
+| `mapas` | Domicilio según la distancia en el mapa y domiciliario en vivo (link de reparto y seguimiento) |
+| `sedes` | Varios locales con su horario, domicilio y caja; el menú igual en todas o personalizado por sede |
 
 ### Direcciones y dominio propio
 
@@ -162,6 +164,40 @@ Cada empresa tiene una **modalidad** que define el superadmin en el detalle de l
   - Los clientes se agrupan por celular, con cuánto piden, cuánto gastan, lo que más piden y hace cuánto no piden. Hay filtros para los que dejaron de pedir (15, 30, 60 o 90 días o más), los frecuentes (3 pedidos o más), los nuevos y a los que ya se les escribió.
   - «💬 Escribir» abre WhatsApp con un mensaje armado. El mensaje se puede editar y usa `{nombre}`, `{tienda}`, `{favorito}`, `{dias}` y `{link}`.
   - Cada mensaje queda registrado en `cliente.tbl_contactos_clientes`, y si el cliente vuelve a pedir se cuenta como **recuperado**.
+
+### Mapas: domicilio por distancia y domiciliario en vivo
+
+Módulo `mapas`. Usa OpenStreetMap con Leaflet, sin llaves ni costo.
+
+- **Domicilio por distancia** (*Portal → Domicilios y mapa*):
+  - La empresa marca su local en el mapa y define tramos «hasta X km → $Y» (máximo 10). El último tramo es el radio hasta donde llega.
+  - En el carrito, el cliente busca su dirección (Nominatim de OpenStreetMap), usa su ubicación o toca el mapa y ajusta el pin. El valor se calcula al instante y el servidor lo recalcula al crear el pedido.
+  - Fuera del radio, el pedido no se acepta y se ofrece recoger en el local.
+  - La distancia es **en línea recta** (haversine). El punto queda en el pedido (`entrega_lat`, `entrega_lng`, `distancia_km`), con un enlace «Ver en el mapa» en el portal y en el WhatsApp al domiciliario.
+  - Con el modo «valor fijo o por zonas», todo sigue como antes.
+- **Link de reparto** (*Portal → Domiciliarios*, botones 🔗 y 💬):
+  - Cada domiciliario tiene un link personal (`/{empresa}/reparto/{token}`, 32 caracteres aleatorios) que se puede cambiar. No necesita cuenta ni instalar nada.
+  - Ahí ve sus pedidos asignados con la dirección, lo que debe cobrar y los botones «Cómo llegar» (Google Maps), «Salí» y «Entregado».
+  - Mientras tiene la página abierta y compartiendo, su celular manda la ubicación cada 15 s, o antes si se movió más de 30 m, y pide que la pantalla no se apague.
+- **En vivo**:
+  - El cliente ve a su domiciliario acercarse en «Mi pedido» mientras el pedido va en camino. La ubicación llega por tiempo real (evento `ubicacion`) y se oculta si tiene más de 5 minutos.
+  - El negocio ve a todos sus domiciliarios en un mapa en *Domiciliarios*. El seguimiento en vivo se puede apagar en *Domicilios y mapa*.
+- **En producción**: los mosaicos de `tile.openstreetmap.org` y la búsqueda de Nominatim tienen políticas de uso para volúmenes bajos. Con mucho tráfico conviene un proveedor de mapas propio o pago.
+
+### Varias sedes
+
+Módulo `sedes`. Toda empresa tiene una **sede principal**, que la migración crea con los datos de la tienda. Sin el módulo, todo funciona como una sola tienda y la principal se mantiene igual a la configuración.
+
+- **Lo que cambia por sede** (*Portal → Sedes*): nombre, dirección, ciudad, WhatsApp, ubicación en el mapa, tramos de domicilio, abierta o cerrada, tiempos de entrega, horario de los 7 días y su propio «estamos llenos». Lo demás es de la empresa: marca, formas de pago, cocina, mensajes, etc.
+- **Menú**: se escoge en *Sedes*.
+  - **El mismo en todas**: mismos productos y precios. Cada sede solo marca lo que se le agotó (*Productos → Por sede*).
+  - **Personalizado por sede**: además, cada sede escoge qué productos vende y puede tener su propio precio (vacío = el precio del producto).
+  - Lo que cambia por sede se guarda en `producto.tbl_productos_sede`. Al cotizar y crear el pedido se cobra el precio de la sede y se rechaza lo que esa sede no vende o tiene agotado.
+- **Tienda**: con más de una sede, la barra muestra «📍 Sede» para cambiarla (o escoger «la más cercana a mí»). La primera vez se pregunta sola. La sede viaja a la API en el encabezado `X-Sede`, y el pedido queda en esa sede (`producto.tbl_pedidos.sede_id`).
+- **Portal**: un selector en la barra filtra todo por sede: pedidos, cocina, estadísticas, ventas del día y caja. «Todas las sedes» suma todo. Con una sede escogida, *Mi tienda*, *Domicilios y mapa* y «estamos llenos» cambian esa sede.
+  - La caja se cierra por sede (`tbl_cierres_caja` es única por fecha y sede).
+  - Los domiciliarios pueden ser de una sede o de todas.
+- **Lo que hizo la migración**: horarios, pedidos y cierres de caja quedaron en la sede principal.
 
 ### Tiempo real
 
@@ -251,7 +287,14 @@ Los errores llegan como `{ "status": 400, "detail": "Mensaje para mostrar" }` y 
 | GET · PUT | `/cocina/config` | Impresión de comandas (módulo `cocina`) |
 | GET | `/clientes` | Clientes agrupados por celular, con resumen (módulo `clientes`) |
 | POST · PUT | `/clientes/contactos` · `/clientes/mensaje` | Registrar que se le escribió a un cliente · guardar el mensaje |
+| GET · PUT | `/mapa` | Ubicación del local, modo de domicilio, tramos y seguimiento en vivo (módulo `mapas`) |
+| GET | `/domiciliarios/ubicaciones` | Domiciliarios en el mapa |
+| POST | `/domiciliarios/{id}/renovar-link` | Link de reparto nuevo (el anterior deja de servir) |
 | POST | `/saturacion` | `DEMORA`, `PAUSAR_DOMICILIOS`, `PAUSAR_PEDIDOS`, `QUITAR_DEMORA`, `REANUDAR_*` o `NORMAL` |
+
+**Sedes** — `/api/t/{empresa}/admin`: `GET` `/sedes` (sedes y modo del menú) · `POST /sedes` · `PUT /sedes/{id}` · `PUT /sedes/menu` · `GET`/`PUT` `/productos/{id}/sedes`. La sede de cada petición va en el encabezado `X-Sede`.
+
+**Página del domiciliario** — `/api/t/{empresa}/public/reparto/{token}`: `GET` sus pedidos · `POST /ubicacion` · `POST /pedidos/{codigo}/sali` · `POST /pedidos/{codigo}/entregado`.
 
 **Pagos en línea**
 

@@ -52,7 +52,9 @@ public final class OperacionDto {
 
     public record Caja(LocalDate fecha, int pedidos, long ventas, long efectivoRecibido, long transferencias, long enLinea,
                        long porCobrar, List<Medio> medios, List<DomiciliarioCaja> domiciliarios, List<Pendiente> pendientes,
-                       Cierre cierre, List<LocalDate> fechas) {}
+                       Cierre cierre, List<LocalDate> fechas,
+                       /** Sede de la caja (null = todas las sedes sumadas) y si se puede cerrar (solo por sede). */
+                       Long sedeId, String sede, boolean puedeCerrar) {}
 
     public record CierreRequest(
             @Min(value = 0, message = "La base no puede ser negativa") int baseInicial,

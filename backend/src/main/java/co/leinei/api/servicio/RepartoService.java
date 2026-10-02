@@ -44,7 +44,7 @@ public class RepartoService {
         Domiciliario d = domiciliario(token);
         ConfigTienda c = config.tienda();
         List<MapaDto.PedidoReparto> lista = activos(d).stream().map(p -> new MapaDto.PedidoReparto(p.getCodigo(), p.getEstado(),
-                p.getClienteNombre(), p.getClienteCelular(), p.getDireccion(), !p.getZona().isBlank() ? p.getZona() : p.getBarrio(),
+                p.getClienteNombre(), p.getClienteCelular(), p.getDireccion(), !p.getBarrio().isBlank() ? p.getBarrio() : p.getZona(),
                 p.getReferencia(), p.getNotas(), p.getEntregaLat(), p.getEntregaLng(), p.getTotal(),
                 p.getMetodoPago() == MetodoPago.EFECTIVO && p.getEstadoPago() != EstadoPago.RECIBIDO ? p.getTotal() : 0,
                 p.getItems().stream().map(i -> i.getCantidad() + " × " + i.getNombre()).collect(Collectors.joining(", "))))

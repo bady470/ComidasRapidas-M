@@ -32,7 +32,10 @@ public class EstadisticasService {
     private final ConfigService configService;
     private final ZoneId zona;
 
-    public EstadisticasService(PedidoRepositorio pedidos, ConfigService configService, LeineiProperties props) {
+    private final SedeService sedes;
+
+    public EstadisticasService(PedidoRepositorio pedidos, ConfigService configService, LeineiProperties props, SedeService sedes) {
+        this.sedes = sedes;
         this.pedidos = pedidos;
         this.configService = configService;
         this.zona = ZoneId.of(props.zonaHoraria());
@@ -48,7 +51,9 @@ public class EstadisticasService {
         LocalDate antesHasta = desde.minusDays(1);
         LocalDate antesDesde = antesHasta.minusDays(dias - 1);
 
-        List<Pedido> todos = pedidos.findByPublicadoTrueAndFechaEntregaBetween(antesDesde, hasta);
+        Long sede = sedes.filtro(); // con varias sedes, la escogida en la barra (null = todas)
+        List<Pedido> todos = pedidos.findByPublicadoTrueAndFechaEntregaBetween(antesDesde, hasta).stream()
+                .filter(p -> sede == null || sede.equals(p.getSedeId())).toList();
         List<Pedido> actuales = todos.stream().filter(p -> !p.getFechaEntrega().isBefore(desde)).toList();
         List<Pedido> anteriores = todos.stream().filter(p -> p.getFechaEntrega().isBefore(desde)).toList();
         int costoOperativo = configService.tienda().getCostoOperativoUnidad();

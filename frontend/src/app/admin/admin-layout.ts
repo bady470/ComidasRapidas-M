@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, effec
 import { Router, RouterOutlet } from '@angular/router';
 import { Icono } from '../compartido/icono';
 import { ModoLleno } from './modo-lleno';
+import { FiltroSede } from './filtro-sede';
 import { GrupoMenu, Shell } from '../compartido/shell';
 import { AdminApi } from '../core/api';
 import { AvisosPortal } from '../core/avisos-portal';
@@ -14,12 +15,13 @@ import { SesionAdmin } from '../core/sesion';
 
 @Component({
   selector: 'app-admin-layout',
-  imports: [RouterOutlet, Shell, Icono, HoraPipe, ModoLleno],
+  imports: [RouterOutlet, Shell, Icono, HoraPipe, ModoLleno, FiltroSede],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-shell [marca]="tienda()?.nombre ?? ''" subtitulo="Portal de pedidos" [logoUrl]="tienda()?.logoUrl" [grupos]="menu()"
                [usuario]="sesion.actual()?.nombre ?? ''" rol="Administrador" [inicio]="emp.url('/admin')" (salir)="salir()">
       <div acciones class="mt-botones">
+        <app-filtro-sede />
         <app-modo-lleno />
         <span class="en-vivo" [class.off]="!avisos.enVivo()" [title]="avisos.enVivo() ? 'Conectado: los cambios llegan al instante' : 'Reconectando…'">
           {{ avisos.enVivo() ? 'En vivo' : 'Reconectando' }}</span>
@@ -91,6 +93,7 @@ export class AdminLayout implements OnInit {
     ] },
     { titulo: 'Configuración', items: [
       { ruta: 'tienda', texto: 'Mi tienda', icono: 'tienda' },
+      ...(this.estado.tieneModulo(MODULOS.sedes) ? [{ ruta: 'sedes', texto: 'Sedes', icono: 'sedes' }] : []),
       ...(this.estado.tieneModulo(MODULOS.mapas) ? [{ ruta: 'mapa', texto: 'Domicilios y mapa', icono: 'mapa' }] : []),
       ...(this.estado.tieneModulo(MODULOS.pagosEnLinea) ? [{ ruta: 'pagos-en-linea', texto: 'Pagos en línea', icono: 'pagos' }] : []),
     ] },

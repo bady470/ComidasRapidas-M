@@ -45,6 +45,7 @@ export const MODULOS = {
   cocina: 'cocina',
   clientes: 'clientes',
   mapas: 'mapas',
+  sedes: 'sedes',
 } as const;
 
 export const DIAS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -72,7 +73,21 @@ export interface Tienda {
   saturacion: Saturacion;
   /** Cómo se cobra el domicilio: valor fijo, por zona o por distancia en el mapa. */
   entrega: EntregaPublica;
+  /** Varias sedes: las que puede escoger el cliente (vacío si la empresa tiene una sola) y la de esta consulta. */
+  sedes: SedePublica[];
+  sedeId: number | null;
 }
+
+// ---------- Varias sedes ----------
+export interface SedePublica { id: number; nombre: string; direccion: string; ciudad: string; lat: number | null; lng: number | null; abierta: boolean; }
+export type MenuSedes = 'COMPARTIDO' | 'POR_SEDE';
+export interface SedeAdmin {
+  id: number; nombre: string; direccion: string; ciudad: string; whatsapp: string; localLat: number | null; localLng: number | null;
+  tramos: Tramo[]; abierta: boolean; tiempoMin: number; tiempoMax: number; activa: boolean; principal: boolean; horarios: HorarioDia[];
+}
+export type SedeForm = Omit<SedeAdmin, 'id' | 'principal'>;
+export interface PanelSedes { menu: MenuSedes; sedes: SedeAdmin[]; }
+export interface ProductoEnSede { sedeId: number; sede: string; disponible: boolean; ofrecido: boolean; precio: number | null; }
 
 // ---------- Mapas ----------
 export interface Tramo { hastaKm: number; valor: number; }
@@ -119,6 +134,8 @@ export interface Caja {
   domiciliarios: { id: number; nombre: string; pedidos: number; entregados: number; efectivoACobrar: number; efectivoCobrado: number; domicilios: number }[];
   pendientes: { id: number; codigo: string; cliente: string; total: number; medio: string; estadoPago: EstadoPago; estado: EstadoPedido }[];
   cierre: CierreCaja | null; fechas: string[];
+  /** Sede de la caja (null = todas sumadas) y si se puede cerrar (solo por sede). */
+  sedeId: number | null; sede: string; puedeCerrar: boolean;
 }
 // ---------- Cocina y clientes ----------
 export type ModoImpresion = 'APAGADA' | 'MANUAL' | 'AUTOMATICA';
@@ -284,10 +301,12 @@ export interface PedidoAdmin {
   tieneComprobante: boolean; pagoReportado: string | null;
   domiciliarioId: number | null; domiciliarioNombre: string; domiciliarioCelular: string;
   entregaLat: number | null; entregaLng: number | null; distanciaKm: number | null;
+  /** Sede del pedido (el nombre solo con varias sedes). */
+  sedeId: number | null; sede: string;
 }
 
 /** token: el de su link de reparto (/reparto/{token}). */
-export interface Domiciliario { id: number; nombre: string; celular: string; activo: boolean; token: string | null; }
+export interface Domiciliario { id: number; nombre: string; celular: string; activo: boolean; token: string | null; sedeId: number | null; }
 
 export interface Notificacion {
   id: number; tipo: 'PEDIDO_NUEVO' | 'PAGO_REPORTADO' | 'PAGO_RECIBIDO' | 'PAGO_REVERSADO'; pedidoId: number | null; codigo: string;

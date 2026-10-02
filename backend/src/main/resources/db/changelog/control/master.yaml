@@ -14,3 +14,4 @@ databaseChangeLog:
   - include: { file: 010-modulos-cocina-clientes.yaml, relativeToChangelogFile: true }
   - include: { file: 011-modulo-mapas.yaml, relativeToChangelogFile: true }
   - include: { file: 012-fotos-biblioteca.yaml, relativeToChangelogFile: true }
+  - include: { file: 013-modulo-sedes.yaml, relativeToChangelogFile: true }

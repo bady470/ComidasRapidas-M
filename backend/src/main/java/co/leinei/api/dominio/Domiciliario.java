@@ -21,6 +21,9 @@ public class Domiciliario {
     private int orden;
     @Column(name = "creado_en", updatable = false)
     private Instant creado = Instant.now();
+    /** Sede para la que trabaja (null = todas). */
+    @Column(name = "sede_id")
+    private Long sedeId;
     /** Link personal de reparto (/reparto/{token}). */
     private String token;
     @Column(name = "ubicacion_lat")
@@ -32,6 +35,8 @@ public class Domiciliario {
     @Column(name = "ubicacion_en")
     private Instant ubicacionEn;
 
+    public Long getSedeId() { return sedeId; }
+    public void setSedeId(Long v) { sedeId = v; }
     public String getToken() { return token; }
     public void setToken(String v) { token = v; }
     public Double getUbicacionLat() { return ubicacionLat; }

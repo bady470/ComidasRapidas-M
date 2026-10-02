@@ -102,4 +102,13 @@ public class PersistenciaConfig {
         r.addUrlPatterns("/api/t/*");
         return r;
     }
+
+    /** Sede escogida en la petición (encabezado X-Sede), para las empresas con varias sedes. */
+    @Bean
+    public FilterRegistrationBean<co.leinei.api.empresa.SedeContexto.Filtro> filtroSede() {
+        FilterRegistrationBean<co.leinei.api.empresa.SedeContexto.Filtro> r = new FilterRegistrationBean<>(new co.leinei.api.empresa.SedeContexto.Filtro());
+        r.setOrder(-190);
+        r.addUrlPatterns("/api/t/*");
+        return r;
+    }
 }

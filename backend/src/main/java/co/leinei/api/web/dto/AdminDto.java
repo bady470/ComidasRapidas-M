@@ -43,17 +43,22 @@ public final class AdminDto {
                          EstadoPedido estado, OrigenPedido origen, List<Evento> eventos,
                          boolean tieneComprobante, Instant pagoReportado,
                          Long domiciliarioId, String domiciliarioNombre, String domiciliarioCelular,
-                         Double entregaLat, Double entregaLng, Double distanciaKm) {}
+                         Double entregaLat, Double entregaLng, Double distanciaKm,
+                         /** Sede del pedido (el nombre solo con varias sedes). */
+                         Long sedeId, String sede) {}
 
     public record AsignarDomiciliarioRequest(Long domiciliarioId) {}
 
     /** token: el de su link de reparto (/reparto/{token}). */
-    public record Domiciliario(Long id, String nombre, String celular, boolean activo, String token) {}
+    public record Domiciliario(Long id, String nombre, String celular, boolean activo, String token,
+                               /** Sede para la que trabaja (null = todas). */
+                               Long sedeId) {}
 
     public record DomiciliarioRequest(
             @NotBlank(message = "Escribe el nombre del domiciliario") @Size(max = 80) String nombre,
             @Pattern(regexp = "|3\\d{9}", message = "El celular debe tener 10 dígitos y empezar por 3") String celular,
-            boolean activo) {}
+            boolean activo,
+            Long sedeId) {}
 
     public record Notificacion(Long id, String tipo, Long pedidoId, String codigo, String titulo, String mensaje,
                                boolean leida, Instant creado) {}

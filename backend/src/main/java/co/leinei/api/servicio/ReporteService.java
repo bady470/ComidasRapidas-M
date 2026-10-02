@@ -17,7 +17,10 @@ public class ReporteService {
     private final PedidoRepositorio pedidoRepo;
     private final ConfigService configService;
 
-    public ReporteService(PedidoRepositorio pedidoRepo, ConfigService configService) {
+    private final SedeService sedes;
+
+    public ReporteService(PedidoRepositorio pedidoRepo, ConfigService configService, SedeService sedes) {
+        this.sedes = sedes;
         this.pedidoRepo = pedidoRepo;
         this.configService = configService;
     }
@@ -30,8 +33,10 @@ public class ReporteService {
     @Transactional(readOnly = true)
     public AdminDto.Produccion produccion(LocalDate fecha) {
         int costoOperativoUnidad = configService.tienda().getCostoOperativoUnidad();
+        Long sede = sedes.filtro(); // con varias sedes, la escogida en la barra (null = todas)
         List<Pedido> pedidos = pedidoRepo.findByPublicadoTrueAndFechaEntregaOrderByCreadoDesc(fecha).stream()
-                .filter(p -> p.getEstado() != EstadoPedido.CANCELADO).toList();
+                .filter(p -> p.getEstado() != EstadoPedido.CANCELADO)
+                .filter(p -> sede == null || sede.equals(p.getSedeId())).toList();
 
         Map<String, int[]> porProducto = new LinkedHashMap<>(); // unidades, ventas, costo
         Map<String, Integer> porDetalle = new LinkedHashMap<>();  // "producto|detalle" → unidades

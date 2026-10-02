@@ -20,6 +20,8 @@ public class Horario {
     private boolean activo = true;
     private LocalTime abre;
     private LocalTime cierra;
+    @Column(name = "sede_id")
+    private Long sedeId;
 
     public Horario() {}
 
@@ -35,6 +37,8 @@ public class Horario {
         return !cierra.isAfter(abre);
     }
 
+    public Long getSedeId() { return sedeId; }
+    public void setSedeId(Long v) { sedeId = v; }
     public Long getId() { return id; }
     public UUID getUuid() { return uuid; }
     public int getDia() { return dia; }

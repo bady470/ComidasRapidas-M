@@ -13,7 +13,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(schema = "cliente", name = "tbl_configuraciones")
-public class ConfigTienda {
+public class ConfigTienda implements Saturable {
 
     @Id
     private Short id = 1;
@@ -83,6 +83,9 @@ public class ConfigTienda {
     private String domicilioTramos = "";
     @Column(name = "tiene_seguimiento_vivo")
     private boolean seguimientoVivo = true;
+    /** Con varias sedes: COMPARTIDO (el mismo menú) o POR_SEDE (cada sede con sus productos y precios). */
+    @Column(name = "sedes_menu")
+    private String sedesMenu = "COMPARTIDO";
     // Comandas impresas (ver OperacionDto.ConfigCocina)
     @Column(name = "impresion_modo")
     private String impresionModo = "APAGADA";
@@ -182,6 +185,8 @@ public class ConfigTienda {
     public void setDomicilioModo(String v) { domicilioModo = v; }
     public String getDomicilioTramos() { return domicilioTramos; }
     public void setDomicilioTramos(String v) { domicilioTramos = v == null ? "" : v; }
+    public String getSedesMenu() { return sedesMenu; }
+    public void setSedesMenu(String v) { sedesMenu = v; }
     public boolean isSeguimientoVivo() { return seguimientoVivo; }
     public void setSeguimientoVivo(boolean v) { seguimientoVivo = v; }
     public boolean tieneUbicacion() { return localLat != null && localLng != null; }

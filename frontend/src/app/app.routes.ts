@@ -30,6 +30,7 @@ function rutasEmpresa(): Routes {
         { path: 'promociones', title: 'Promociones', loadComponent: () => import('./admin/promociones').then((m) => m.PromocionesPage) },
         { path: 'domiciliarios', title: 'Domiciliarios', loadComponent: () => import('./admin/domiciliarios').then((m) => m.DomiciliariosPage) },
         { path: 'tienda', title: 'Mi tienda', loadComponent: () => import('./admin/config').then((m) => m.ConfigPage) },
+        { path: 'sedes', title: 'Sedes', loadComponent: () => import('./admin/sedes').then((m) => m.SedesPage) },
         { path: 'mapa', title: 'Domicilios y mapa', loadComponent: () => import('./admin/mapa-config').then((m) => m.MapaConfigPage) },
         { path: 'pagos-en-linea', title: 'Pagos en línea', loadComponent: () => import('./admin/pagos-en-linea').then((m) => m.PagosEnLineaPage) },
       ],

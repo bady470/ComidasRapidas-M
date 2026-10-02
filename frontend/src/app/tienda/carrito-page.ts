@@ -6,6 +6,7 @@ import { TiendaApi, mensajeError } from '../core/api';
 import { Carrito, claveLinea } from '../core/carrito';
 import { claveLocal, EmpresaActual } from '../core/empresa';
 import { EstadoTienda } from '../core/estado-tienda';
+import { SedeElegida } from '../core/sede';
 import { CelularPipe, DiaLargoPipe, DineroPipe, cuando, diaLargo, dinero, linkWhatsapp, soloHora } from '../core/formato';
 import { Cotizacion, EstadoPago, EstadoPagoEnLinea, MetodoPago, PedidoCreado, Seguimiento, TipoEntrega } from '../core/modelos';
 import { guardarPedidoReciente } from './recientes';
@@ -216,6 +217,7 @@ const CLAVE_CLIENTE = () => claveLocal('cliente');
 export class CarritoPage {
   private api = inject(TiendaApi);
   private estado = inject(EstadoTienda);
+  private sedeElegida = inject(SedeElegida);
   protected carrito = inject(Carrito);
   protected emp = inject(EmpresaActual);
 
@@ -248,6 +250,7 @@ export class CarritoPage {
     // Recalcula el total en el servidor cuando cambia el carrito, la forma de entrega o la zona.
     effect(() => {
       const items = this.carrito.items();
+      this.sedeElegida.version(); // al cambiar de sede, precios y domicilio cambian
       const tipo = this.tipo();
       const zona = this.zonaId();
       const punto = this.porDistancia() && tipo === 'DOMICILIO' ? this.ubicacion() : null;

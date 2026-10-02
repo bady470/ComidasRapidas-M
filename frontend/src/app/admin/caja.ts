@@ -46,7 +46,10 @@ import { Caja, CierreCajaForm, NOMBRE_ESTADO, NOMBRE_PAGO } from '../core/modelo
 
       <div class="grid-g">
         <form class="panel" (ngSubmit)="guardar()">
-          <h3>Cuadre del efectivo</h3>
+          <h3>Cuadre del efectivo{{ c.sede ? ' · ' + c.sede : '' }}</h3>
+          @if (!c.puedeCerrar) {
+            <div class="alerta aviso">Estás viendo todas las sedes sumadas. Para cerrar la caja, escoge una sede en la barra de arriba.</div>
+          }
           <div class="row2">
             <div class="field"><label for="cBase">Base con que abrió la caja</label>
               <input id="cBase" name="cBase" type="number" min="0" step="1000" [(ngModel)]="f.baseInicial" (ngModelChange)="recalcular()"></div>
@@ -71,7 +74,7 @@ import { Caja, CierreCajaForm, NOMBRE_ESTADO, NOMBRE_PAGO } from '../core/modelo
           </div>
           <div class="field"><label for="cNota">Nota del cierre <span class="hint">(opcional)</span></label>
             <textarea id="cNota" name="cNota" [(ngModel)]="f.nota" placeholder="Ej: quedó un billete de $50.000 roto"></textarea></div>
-          <div><button class="btn main" type="submit" [disabled]="guardando()">{{ guardando() ? 'Guardando…' : c.cierre ? 'Actualizar cierre' : 'Cerrar caja' }}</button></div>
+          <div><button class="btn main" type="submit" [disabled]="guardando() || !c.puedeCerrar">{{ guardando() ? 'Guardando…' : c.cierre ? 'Actualizar cierre' : 'Cerrar caja' }}</button></div>
         </form>
 
         <div class="stack" style="gap:16px">

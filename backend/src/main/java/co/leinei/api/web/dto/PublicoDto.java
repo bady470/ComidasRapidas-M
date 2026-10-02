@@ -40,7 +40,9 @@ public final class PublicoDto {
             // Modo «estamos llenos» vigente (los tiempos y el domicilio de arriba ya lo tienen en cuenta).
             Saturacion saturacion,
             // Cómo se cobra el domicilio (valor fijo, por zona o por distancia en el mapa).
-            MapaDto.EntregaPublica entrega) {}
+            MapaDto.EntregaPublica entrega,
+            // Varias sedes: las que puede escoger el cliente y la sede de esta consulta (vacío y null sin el módulo).
+            List<SedesDto.SedePublica> sedes, Long sedeId) {}
 
     /**
      * minutosExtra: cuánto se sumó al tiempo de entrega (0 = normal), hasta demoraHasta.

@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: control-013-modulo-sedes
+      author: leinei
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO plataforma.tbl_modulos (codigo, nombre, descripcion, es_base, orden) VALUES
+                ('sedes', 'Varias sedes', 'Varios locales con su horario, domicilio y caja; el menú igual en todas o personalizado por sede.', FALSE, 12);
+              UPDATE plataforma.tbl_planes SET modulos = modulos || ',sedes', actualizado_en = now()
+                  WHERE codigo = 'empresarial' AND modulos NOT LIKE '%sedes%';
+      rollback:
+        - sql:
+            sql: |
+              UPDATE plataforma.tbl_planes SET modulos = replace(modulos, ',sedes', '');
+              DELETE FROM plataforma.tbl_modulos WHERE codigo = 'sedes';

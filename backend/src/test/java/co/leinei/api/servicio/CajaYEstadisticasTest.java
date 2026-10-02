@@ -37,6 +37,7 @@ class CajaYEstadisticasTest {
         p.setEstadoPago(pago);
         p.setEstado(estado);
         p.setDomiciliario(d);
+        p.setSedeId(1L);
         PedidoItem i = new PedidoItem();
         i.setNombre("Hamburguesa");
         i.setDetalle("");
@@ -44,6 +45,17 @@ class CajaYEstadisticasTest {
         i.setPrecioUnitario(total);
         p.agregarItem(i);
         return p;
+    }
+
+    /** Empresa sin el módulo de sedes: una sola sede, la principal (id 1). */
+    private static SedeService sinSedes() {
+        SedeService sedes = mock(SedeService.class);
+        Sede principal = new Sede();
+        ReflectionTestUtils.setField(principal, "id", 1L);
+        when(sedes.activas()).thenReturn(false);
+        when(sedes.filtro()).thenReturn(null);
+        when(sedes.principal()).thenReturn(principal);
+        return sedes;
     }
 
     private static Domiciliario domiciliario(long id, String nombre) {
@@ -66,10 +78,10 @@ class CajaYEstadisticasTest {
         PedidoRepositorio pedidos = mock(PedidoRepositorio.class);
         CierreCajaRepositorio cierres = mock(CierreCajaRepositorio.class);
         when(pedidos.findByPublicadoTrueAndFechaEntregaOrderByCreadoDesc(HOY)).thenReturn(dia);
-        when(cierres.findByFecha(HOY)).thenReturn(Optional.empty());
+        when(cierres.findByFechaAndSedeId(HOY, 1L)).thenReturn(Optional.empty());
         when(cierres.save(any())).thenAnswer(a -> a.getArgument(0));
 
-        CajaService caja = new CajaService(pedidos, cierres);
+        CajaService caja = new CajaService(pedidos, cierres, sinSedes());
         OperacionDto.Caja c = caja.ver(HOY);
 
         assertThat(c.pedidos()).isEqualTo(5);
@@ -106,7 +118,7 @@ class CajaYEstadisticasTest {
         when(config.tienda()).thenReturn(new ConfigTienda());
         LeineiProperties props = new LeineiProperties("America/Bogota", "", 12, null, null);
 
-        OperacionDto.Estadisticas e = new EstadisticasService(pedidos, config, props).calcular(HOY.minusDays(2), HOY);
+        OperacionDto.Estadisticas e = new EstadisticasService(pedidos, config, props, sinSedes()).calcular(HOY.minusDays(2), HOY);
 
         assertThat(e.dias()).hasSize(3);
         assertThat(e.dias()).extracting(OperacionDto.Dia::ventas).containsExactly(0L, 0L, 40_000L);

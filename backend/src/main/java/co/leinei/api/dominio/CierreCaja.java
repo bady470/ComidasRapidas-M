@@ -16,6 +16,8 @@ public class CierreCaja {
     @Column(updatable = false)
     private java.util.UUID uuid = java.util.UUID.randomUUID();
     private LocalDate fecha;
+    @Column(name = "sede_id")
+    private Long sedeId;
     @Column(name = "base_inicial")
     private int baseInicial;
     private int gastos;
@@ -47,6 +49,8 @@ public class CierreCaja {
     void alActualizar() { actualizado = Instant.now(); }
 
     public Long getId() { return id; }
+    public Long getSedeId() { return sedeId; }
+    public void setSedeId(Long v) { sedeId = v; }
     public LocalDate getFecha() { return fecha; }
     public void setFecha(LocalDate v) { fecha = v; }
     public int getBaseInicial() { return baseInicial; }

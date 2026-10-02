@@ -47,6 +47,7 @@ public class DomiciliarioService {
         d.setNombre(r.nombre().trim());
         d.setCelular(r.celular() == null ? "" : r.celular().replaceAll("\\D", ""));
         d.setActivo(id == null || r.activo());
+        d.setSedeId(r.sedeId());
         if (d.getToken() == null) d.setToken(nuevoToken());
         repo.save(d);
         tiempoReal.publicar("domiciliarios", Map.of(), TiempoReal.admin(co.leinei.api.empresa.EmpresaContexto.requerida().id()));
@@ -80,6 +81,6 @@ public class DomiciliarioService {
     }
 
     static AdminDto.Domiciliario aDto(Domiciliario d) {
-        return new AdminDto.Domiciliario(d.getId(), d.getNombre(), d.getCelular(), d.isActivo(), d.getToken());
+        return new AdminDto.Domiciliario(d.getId(), d.getNombre(), d.getCelular(), d.isActivo(), d.getToken(), d.getSedeId());
     }
 }

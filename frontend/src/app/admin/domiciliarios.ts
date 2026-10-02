@@ -54,6 +54,13 @@ import { Mapa, Marcador } from '../compartido/mapa';
                           <div class="field"><label [for]="'en' + d.id">Nombre</label><input [id]="'en' + d.id" name="en" [(ngModel)]="edicion.nombre"></div>
                           <div class="field"><label [for]="'ec' + d.id">Celular</label><input [id]="'ec' + d.id" name="ec" inputmode="tel" [(ngModel)]="edicion.celular"></div>
                         </div>
+                        @if (sedes().length > 1) {
+                          <div class="field"><label [for]="'es' + d.id">Sede</label>
+                            <select [id]="'es' + d.id" name="es" [(ngModel)]="edicion.sedeId">
+                              <option [ngValue]="null">Todas las sedes</option>
+                              @for (s of sedes(); track s.id) { <option [ngValue]="s.id">{{ s.nombre }}</option> }
+                            </select></div>
+                        }
                         <label class="check"><input type="checkbox" name="ea" [(ngModel)]="edicion.activo"> Activo</label>
                         <div class="row"><button class="btn main" type="submit">Guardar</button><button class="btn" type="button" (click)="editando.set(null)">Cancelar</button>
                           @if (conMapas()) { <button class="linkbtn" type="button" (click)="renovar(d.id)" title="El link anterior deja de servir">Cambiar su link de reparto</button> }</div>
@@ -62,7 +69,7 @@ import { Mapa, Marcador } from '../compartido/mapa';
                   </tr>
                 } @else {
                   <tr [class.apagada]="!d.activo">
-                    <td><b>{{ d.nombre }}</b></td>
+                    <td><b>{{ d.nombre }}</b>@if (sedes().length > 1) { <div class="muted">Sede {{ nombreSede(d.sedeId) }}</div> }</td>
                     <td class="num">{{ d.celular | celular }}</td>
                     <td><span class="st" [class.pay-RECIBIDO]="d.activo" [class.pay-PENDIENTE]="!d.activo">{{ d.activo ? 'Activo' : 'Inactivo' }}</span></td>
                     <td class="r">
@@ -87,6 +94,13 @@ import { Mapa, Marcador } from '../compartido/mapa';
         <div class="field"><label for="dNombre">Nombre</label><input id="dNombre" name="dNombre" [(ngModel)]="nuevo.nombre"></div>
         <div class="field"><label for="dCel">Celular <span class="hint">(para enviarle los pedidos por WhatsApp)</span></label>
           <input id="dCel" name="dCel" inputmode="tel" [(ngModel)]="nuevo.celular" placeholder="3001234567"></div>
+        @if (sedes().length > 1) {
+          <div class="field"><label for="dSede">Sede</label>
+            <select id="dSede" name="dSede" [(ngModel)]="nuevo.sedeId">
+              <option [ngValue]="null">Todas las sedes</option>
+              @for (s of sedes(); track s.id) { <option [ngValue]="s.id">{{ s.nombre }}</option> }
+            </select></div>
+        }
         @if (error()) { <p class="err">{{ error() }}</p> }
         <div><button class="btn main" type="submit">Agregar</button></div>
       </form>
@@ -113,8 +127,11 @@ export class DomiciliariosPage {
   protected lista = signal<Domiciliario[]>([]);
   protected editando = signal<number | null>(null);
   protected error = signal('');
-  protected nuevo = { nombre: '', celular: '' };
-  protected edicion = { nombre: '', celular: '', activo: true };
+  protected nuevo = { nombre: '', celular: '', sedeId: null as number | null };
+  protected edicion = { nombre: '', celular: '', activo: true, sedeId: null as number | null };
+  /** Sedes para asignarle una a cada domiciliario (solo con varias sedes). */
+  protected sedes = computed(() => this.estado.tieneModulo(MODULOS.sedes) ? this.estado.catalogo()?.tienda.sedes ?? [] : []);
+  protected nombreSede(id: number | null): string { return id == null ? 'Todas' : this.sedes().find((s) => s.id === id)?.nombre ?? ''; }
 
   constructor() {
     this.api.domiciliarios().subscribe({ next: (l) => this.lista.set(l), error: (e) => this.error.set(mensajeError(e)) });
@@ -165,13 +182,13 @@ export class DomiciliariosPage {
   }
 
   protected editar(d: Domiciliario): void {
-    this.edicion = { nombre: d.nombre, celular: d.celular, activo: d.activo };
+    this.edicion = { nombre: d.nombre, celular: d.celular, activo: d.activo, sedeId: d.sedeId };
     this.editando.set(d.id);
   }
 
   protected guardar(id: number): void {
     const e = this.edicion;
-    this.api.guardarDomiciliario(id, { nombre: e.nombre.trim(), celular: e.celular.replace(/\D/g, ''), activo: e.activo }).subscribe({
+    this.api.guardarDomiciliario(id, { nombre: e.nombre.trim(), celular: e.celular.replace(/\D/g, ''), activo: e.activo, sedeId: e.sedeId }).subscribe({
       next: (l) => { this.lista.set(l); this.editando.set(null); this.avisos.mostrar('Domiciliario actualizado'); },
       error: (err) => this.avisos.mostrar(mensajeError(err)),
     });
@@ -182,11 +199,11 @@ export class DomiciliariosPage {
     const cel = n.celular.replace(/\D/g, '');
     if (!n.nombre.trim()) { this.error.set('Escribe el nombre.'); return; }
     if (cel && !/^3\d{9}$/.test(cel)) { this.error.set('El celular debe tener 10 dígitos y empezar por 3.'); return; }
-    this.api.guardarDomiciliario(null, { nombre: n.nombre.trim(), celular: cel, activo: true }).subscribe({
+    this.api.guardarDomiciliario(null, { nombre: n.nombre.trim(), celular: cel, activo: true, sedeId: n.sedeId }).subscribe({
       next: (l) => {
         this.lista.set(l);
         form.resetForm();
-        this.nuevo = { nombre: '', celular: '' };
+        this.nuevo = { nombre: '', celular: '', sedeId: null };
         this.error.set('');
         this.avisos.mostrar('Domiciliario agregado');
       },

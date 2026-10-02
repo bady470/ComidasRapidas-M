@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormsModule } from '@angular/forms';
 import { Foto } from '../compartido/foto';
 import { SubirImagen } from './subir-imagen';
+import { ProductoSedes } from './producto-sedes';
 import { AdminApi, mensajeError } from '../core/api';
 import { Avisos } from '../core/avisos';
 import { EstadoTienda } from '../core/estado-tienda';
@@ -25,7 +26,7 @@ const PLANTILLAS: { nombre: string; grupo: () => GrupoAdmin }[] = [
 
 @Component({
   selector: 'app-productos',
-  imports: [FormsModule, Foto, DineroPipe, SubirImagen],
+  imports: [FormsModule, Foto, DineroPipe, SubirImagen, ProductoSedes],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="toolbar">
@@ -127,6 +128,7 @@ const PLANTILLAS: { nombre: string; grupo: () => GrupoAdmin }[] = [
                 <div class="acciones-fila">
                   <button class="btn" (click)="editar(p)">Editar</button>
                   <button class="btn" (click)="disponible(p)">{{ p.disponible ? 'Agotar' : 'Activar' }}</button>
+                  @if (estado.tieneModulo(M.sedes)) { <button class="btn" (click)="porSede.set(p)">Por sede</button> }
                   <button class="btn" (click)="duplicar(p)">Duplicar</button>
                   @if (confirmar() === p.id) {
                     <button class="btn sure" (click)="eliminar(p)">Confirmar</button>
@@ -143,12 +145,16 @@ const PLANTILLAS: { nombre: string; grupo: () => GrupoAdmin }[] = [
         </tbody>
       </table>
     </div>
+
+    @if (porSede(); as p) { <app-producto-sedes [producto]="p" (cerrar)="porSede.set(null)" /> }
   `,
 })
 export class ProductosPage {
   private api = inject(AdminApi);
   private avisos = inject(Avisos);
   protected estado = inject(EstadoTienda);
+  /** Producto abierto en el editor «Por sede». */
+  protected porSede = signal<ProductoAdmin | null>(null);
   protected readonly M = MODULOS;
 
   protected plantillas = PLANTILLAS;

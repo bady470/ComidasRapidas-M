@@ -26,4 +26,6 @@ public final class Modulos {
     public static final String CLIENTES = "clientes";
     /** Domicilio según la distancia y domiciliario en vivo en el mapa. */
     public static final String MAPAS = "mapas";
+    /** Varios locales (sedes) con su horario, domicilio, caja y menú. */
+    public static final String SEDES = "sedes";
 }

@@ -25,10 +25,12 @@ public class CatalogoService {
     private final ConfigService configService;
     private final PrecioService precios;
     private final BannerService banners;
+    private final SedeService sedes;
 
     public CatalogoService(ProductoRepositorio productoRepo, CategoriaRepositorio categoriaRepo,
                            PromocionRepositorio promocionRepo, ArchivoRepositorio archivoRepo,
-                           ConfigService configService, PrecioService precios, BannerService banners) {
+                           ConfigService configService, PrecioService precios, BannerService banners, SedeService sedes) {
+        this.sedes = sedes;
         this.productoRepo = productoRepo;
         this.categoriaRepo = categoriaRepo;
         this.promocionRepo = promocionRepo;
@@ -49,12 +51,16 @@ public class CatalogoService {
         List<Categoria> categorias = categoriaRepo.findAllByOrderByOrdenAscIdAsc().stream().filter(Categoria::isActiva).toList();
         Set<Long> activas = categorias.stream().map(Categoria::getId).collect(Collectors.toSet());
 
-        List<PublicoDto.Producto> productos = productoRepo.findAllByOrderByOrdenAscIdAsc().stream()
+        // Con varias sedes: lo de la sede escogida (agotado, si lo ofrece y su precio).
+        List<Producto> todos = productoRepo.findAllByOrderByOrdenAscIdAsc();
+        sedes.aplicar(todos, sedes.actual());
+        List<PublicoDto.Producto> productos = todos.stream()
                 // Un producto de una categoría oculta no se muestra; uno sin categoría sí.
                 .filter(p -> p.getCategoria() == null || activas.contains(p.getCategoria().getId()))
+                .filter(Producto::ofrecidoEnSede)
                 .map(p -> new PublicoDto.Producto(p.getId(), p.getCategoria() == null ? null : p.getCategoria().getId(),
-                        p.getNombre(), p.getDescripcion(), p.getPrecio(), precios.precioUnitario(p, vigentes),
-                        p.getImagenId(), p.getEtiqueta(), p.isDisponible(), gruposPublicos(p)))
+                        p.getNombre(), p.getDescripcion(), p.precioVenta(), precios.precioUnitario(p, vigentes),
+                        p.getImagenId(), p.getEtiqueta(), p.disponibleVenta(), gruposPublicos(p)))
                 .toList();
 
         Set<Long> conProductos = productos.stream().map(PublicoDto.Producto::categoriaId)
@@ -95,6 +101,8 @@ public class CatalogoService {
             p.getGrupos().forEach(g -> g.getOpciones().size()); // cargar opciones dentro de la transacción
             mapa.put(p.getId(), p);
         });
+        // Precio, agotado y si se ofrece en la sede del pedido (con varias sedes).
+        sedes.aplicar(mapa.values(), sedes.actual());
         return mapa;
     }
 

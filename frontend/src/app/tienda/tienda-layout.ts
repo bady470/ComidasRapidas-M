@@ -5,6 +5,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { CarritoFlotante } from '../compartido/carrito-flotante';
+import { SelectorSede } from '../compartido/selector-sede';
+import { AvisoCerrado } from '../compartido/aviso-cerrado';
 import { Logo } from '../compartido/logo';
 import { Carrito } from '../core/carrito';
 import { EmpresaActual } from '../core/empresa';
@@ -13,7 +15,7 @@ import { CelularPipe, soloHora } from '../core/formato';
 
 @Component({
   selector: 'app-tienda-layout',
-  imports: [Icono, BotonModo, RouterOutlet, RouterLink, RouterLinkActive, CelularPipe, Logo, CarritoFlotante],
+  imports: [Icono, BotonModo, RouterOutlet, RouterLink, RouterLinkActive, CelularPipe, Logo, CarritoFlotante, SelectorSede, AvisoCerrado],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="top">
@@ -26,6 +28,7 @@ import { CelularPipe, soloHora } from '../core/formato';
           <a [routerLink]="emp.url()" routerLinkActive="activo" [routerLinkActiveOptions]="{ exact: true }">Menú</a>
           <a [routerLink]="emp.url('/seguimiento')" routerLinkActive="activo">Mi pedido</a>
         </nav>
+        <app-selector-sede />
         <app-modo />
       </div>
     </header>
@@ -45,6 +48,9 @@ import { CelularPipe, soloHora } from '../core/formato';
     <router-outlet />
 
     <!-- Carrito flotante: siempre en el menú; en las demás páginas, solo si hay algo. Nunca en la página del carrito. -->
+    <!-- Fuera del horario: modal con cuándo abren y el horario (solo en el menú y el carrito). -->
+    <app-aviso-cerrado [activo]="enMenu() || enCarrito()" />
+
     <app-carrito-flotante [visible]="!enCarrito() && (enMenu() || carrito.totalUnidades() > 0)" />
 
     @if (tienda(); as t) {

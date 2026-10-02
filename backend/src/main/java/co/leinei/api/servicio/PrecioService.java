@@ -50,10 +50,10 @@ public class PrecioService {
             int unitario = base + extras;
             String detalle = l.opciones().stream().map(Opcion::getNombre).collect(Collectors.joining(" · "));
             List<Long> ids = l.opciones().stream().map(Opcion::getId).filter(Objects::nonNull).sorted().toList();
-            cotizadas.add(new LineaCotizada(p.getId(), ids, p.getNombre(), detalle, p.getPrecio(), base, extras,
+            cotizadas.add(new LineaCotizada(p.getId(), ids, p.getNombre(), detalle, p.precioVenta(), base, extras,
                     unitario, p.getCosto(), l.cantidad(), unitario * l.cantidad()));
             cantidad += l.cantidad();
-            subtotalLista += (p.getPrecio() + extras) * l.cantidad();
+            subtotalLista += (p.precioVenta() + extras) * l.cantidad();
             subtotal += unitario * l.cantidad();
             costo += p.getCosto() * l.cantidad();
         }
@@ -83,7 +83,7 @@ public class PrecioService {
 
     /** Precio base que ve el cliente hoy, con precio especial si lo hay. */
     public int precioUnitario(Producto p, List<Promocion> vigentes) {
-        int precio = p.getPrecio();
+        int precio = p.precioVenta();
         for (Promocion promo : vigentes) {
             if (promo.getTipo() == TipoPromocion.PRECIO_ESPECIAL && promo.getProducto() != null
                     && promo.getProducto().getId().equals(p.getId())

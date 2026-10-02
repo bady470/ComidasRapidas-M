@@ -72,6 +72,9 @@ public class Pedido {
     private Double entregaLng;
     @Column(name = "distancia_km")
     private Double distanciaKm;
+    /** Sede que atiende el pedido. */
+    @Column(name = "sede_id")
+    private Long sedeId;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "domiciliario_id")
     private Domiciliario domiciliario;
@@ -160,6 +163,8 @@ public class Pedido {
     public void setEntregaLat(Double v) { entregaLat = v; }
     public Double getEntregaLng() { return entregaLng; }
     public void setEntregaLng(Double v) { entregaLng = v; }
+    public Long getSedeId() { return sedeId; }
+    public void setSedeId(Long v) { sedeId = v; }
     public Double getDistanciaKm() { return distanciaKm; }
     public void setDistanciaKm(Double v) { distanciaKm = v; }
     public Domiciliario getDomiciliario() { return domiciliario; }

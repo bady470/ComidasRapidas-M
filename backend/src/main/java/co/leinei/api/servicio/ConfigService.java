@@ -11,6 +11,7 @@ import co.leinei.api.repositorio.*;
 import co.leinei.api.web.dto.AdminDto;
 import co.leinei.api.web.dto.MapaDto;
 import co.leinei.api.web.dto.PublicoDto;
+import co.leinei.api.web.dto.SedesDto;
 import co.leinei.api.tiemporeal.TiempoReal;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,10 +36,13 @@ public class ConfigService {
     private final DisponibilidadService disponibilidad;
     private final ConfigPagosService pagosEnLinea;
     private final TiempoReal tiempoReal;
+    private final SedeService sedes;
 
     public ConfigService(ConfigTiendaRepositorio configRepo, HorarioRepositorio horarioRepo, ZonaEnvioRepositorio zonaRepo,
                          CuentaPagoRepositorio cuentaRepo, MarcaService marca,
-                         DisponibilidadService disponibilidad, ConfigPagosService pagosEnLinea, TiempoReal tiempoReal) {
+                         DisponibilidadService disponibilidad, ConfigPagosService pagosEnLinea, TiempoReal tiempoReal,
+                         SedeService sedes) {
+        this.sedes = sedes;
         this.pagosEnLinea = pagosEnLinea;
         this.tiempoReal = tiempoReal;
         this.configRepo = configRepo;
@@ -57,14 +61,30 @@ public class ConfigService {
                 .orElseThrow(() -> new IllegalStateException("Falta la configuración de la tienda (migración V2)"));
     }
 
+    /**
+     * La configuración vista desde la sede de la petición (con varias sedes): dirección, tiempos, abierto, ubicación,
+     * tramos y «estamos llenos» de esa sede. Es una copia de solo lectura; para guardar se usa tienda() o la sede.
+     */
+    @Transactional(readOnly = true)
+    public ConfigTienda actual() {
+        return sedes.vista(tienda(), sedes.actual());
+    }
+
+    /** La configuración vista desde una sede dada (la de un pedido). */
+    @Transactional(readOnly = true)
+    public ConfigTienda deSede(Long sedeId) {
+        return sedes.activas() ? sedes.vista(tienda(), sedes.porId(sedeId)) : tienda();
+    }
+
+    /** Horario de la sede de la petición (sin varias sedes, el de la tienda). */
     @Transactional(readOnly = true)
     public List<Horario> horarios() {
-        return horarioRepo.findAllByOrderByDiaAsc();
+        return sedes.horarios(sedes.actual());
     }
 
     @Transactional(readOnly = true)
     public DisponibilidadService.Disponibilidad disponibilidad() {
-        return disponibilidad.calcular(tienda(), horarios());
+        return disponibilidad.calcular(actual(), horarios());
     }
 
     /** Zonas con valor propio; sin el módulo de zonas se cobra el valor único de domicilio. */
@@ -82,7 +102,7 @@ public class ConfigService {
     /** Lo que el cliente necesita saber de la tienda: marca, si recibe pedidos, cómo entrega y cómo se paga. */
     @Transactional(readOnly = true)
     public PublicoDto.Tienda tiendaPublica() {
-        ConfigTienda c = tienda();
+        ConfigTienda c = actual();
         List<Horario> horarios = horarios();
         DisponibilidadService.Disponibilidad d = disponibilidad.calcular(c, horarios);
         // Modo «estamos llenos»: pausas y minutos extra vigentes en este momento.
@@ -108,7 +128,17 @@ public class ConfigService {
                 c.isEfectivo(), cuentas, e.modulos().stream().sorted().toList(),
                 pagosEnLinea.activa(e).map(a -> new PagosDto.PagoPublico(a.proveedor().name(), a.proveedor().nombre(),
                         a.proveedor().medios())).orElse(null),
-                saturacion(c, ahora), entrega);
+                saturacion(c, ahora), entrega, sedesPublicas(), sedes.activas() ? sedes.actual().getId() : null);
+    }
+
+    /** Las sedes para que el cliente escoja (vacío si la empresa no tiene varias sedes). */
+    private List<SedesDto.SedePublica> sedesPublicas() {
+        if (!sedes.activas()) return List.of();
+        ConfigTienda empresa = tienda();
+        // «Abierta» = recibe pedidos ahora: el negocio y la sede abiertos y dentro de su horario.
+        return sedes.activasLista().stream().map(s -> new SedesDto.SedePublica(s.getId(), s.getNombre(), s.getDireccion(),
+                s.getCiudad(), s.getLocalLat(), s.getLocalLng(),
+                disponibilidad.calcular(sedes.vista(empresa, s), sedes.horarios(s)).recibePedidos())).toList();
     }
 
     /** Cómo se cobra el domicilio: por distancia (si está lista), por zonas o un valor fijo. */
@@ -128,7 +158,8 @@ public class ConfigService {
 
     @Transactional(readOnly = true)
     public MapaDto.ConfigMapa mapa() {
-        ConfigTienda c = tienda();
+        // Con varias sedes, la ubicación y los tramos son los de la sede escogida en el portal.
+        ConfigTienda c = actual();
         return new MapaDto.ConfigMapa(c.getLocalLat(), c.getLocalLng(), c.getDomicilioModo(),
                 Distancia.tramos(c.getDomicilioTramos()).stream().map(t -> new MapaDto.Tramo(t.hastaKm(), t.valor())).toList(),
                 c.isSeguimientoVivo());
@@ -148,11 +179,19 @@ public class ConfigService {
             if (orden.get(i).hastaKm() == orden.get(i - 1).hastaKm()) throw ReglaNegocioException.invalido("Hay dos tramos con los mismos km.");
         }
         ConfigTienda c = tienda();
-        c.setLocalLat(r.localLat());
-        c.setLocalLng(r.localLng());
         c.setDomicilioModo(r.modo());
-        c.setDomicilioTramos(Distancia.texto(orden));
         c.setSeguimientoVivo(r.seguimientoVivo());
+        Sede sede = sedes.actual();
+        if (sede != null) {
+            sede.setLocalLat(r.localLat());
+            sede.setLocalLng(r.localLng());
+            sede.setDomicilioTramos(Distancia.texto(orden));
+        } else {
+            c.setLocalLat(r.localLat());
+            c.setLocalLng(r.localLng());
+            c.setDomicilioTramos(Distancia.texto(orden));
+            sedes.sincronizarPrincipal(c);
+        }
         long empresa = EmpresaContexto.requerida().id();
         tiempoReal.publicar("catalogo", Map.of(), TiempoReal.tienda(empresa), TiempoReal.admin(empresa));
         return mapa();
@@ -200,35 +239,45 @@ public class ConfigService {
         Instant hasta = ahora.plus(java.time.Duration.ofMinutes(r.duracion()));
         boolean conDuracion = r.accion().equals("DEMORA") || r.accion().startsWith("PAUSAR");
         if (conDuracion && r.duracion() < 5) throw ReglaNegocioException.invalido("Escoge por cuánto tiempo (mínimo 5 minutos).");
-        switch (r.accion()) {
-            case "DEMORA" -> {
-                if (r.minutosExtra() < 5) throw ReglaNegocioException.invalido("Escoge cuántos minutos más se demoran los pedidos.");
-                c.setMinutosExtra(r.minutosExtra());
-                c.setDemoraHasta(hasta);
-            }
-            case "PAUSAR_DOMICILIOS" -> {
-                if (!c.isDomicilioActivo()) throw ReglaNegocioException.conflicto("Tu tienda no tiene domicilios activos.");
-                c.setDomiciliosPausadosHasta(hasta);
-            }
-            case "PAUSAR_PEDIDOS" -> c.setPedidosPausadosHasta(hasta);
-            case "QUITAR_DEMORA" -> { c.setMinutosExtra(0); c.setDemoraHasta(null); }
-            case "REANUDAR_DOMICILIOS" -> c.setDomiciliosPausadosHasta(null);
-            case "REANUDAR_PEDIDOS" -> c.setPedidosPausadosHasta(null);
-            default -> {
-                c.setMinutosExtra(0);
-                c.setDemoraHasta(null);
-                c.setDomiciliosPausadosHasta(null);
-                c.setPedidosPausadosHasta(null);
+        if (r.accion().equals("DEMORA") && r.minutosExtra() < 5) {
+            throw ReglaNegocioException.invalido("Escoge cuántos minutos más se demoran los pedidos.");
+        }
+        if (r.accion().equals("PAUSAR_DOMICILIOS") && !c.isDomicilioActivo()) {
+            throw ReglaNegocioException.conflicto("Tu tienda no tiene domicilios activos.");
+        }
+        // Con varias sedes aplica a la sede escogida en el portal, o a todas si se están viendo todas.
+        List<Saturable> destinos = new ArrayList<>();
+        if (sedes.activas()) {
+            Long filtro = sedes.filtro();
+            sedes.activasLista().stream().filter(s -> filtro == null || s.getId().equals(filtro)).forEach(destinos::add);
+        } else {
+            destinos.add(c);
+        }
+        for (Saturable d : destinos) {
+            switch (r.accion()) {
+                case "DEMORA" -> { d.setMinutosExtra(r.minutosExtra()); d.setDemoraHasta(hasta); }
+                case "PAUSAR_DOMICILIOS" -> d.setDomiciliosPausadosHasta(hasta);
+                case "PAUSAR_PEDIDOS" -> d.setPedidosPausadosHasta(hasta);
+                case "QUITAR_DEMORA" -> { d.setMinutosExtra(0); d.setDemoraHasta(null); }
+                case "REANUDAR_DOMICILIOS" -> d.setDomiciliosPausadosHasta(null);
+                case "REANUDAR_PEDIDOS" -> d.setPedidosPausadosHasta(null);
+                default -> {
+                    d.setMinutosExtra(0);
+                    d.setDemoraHasta(null);
+                    d.setDomiciliosPausadosHasta(null);
+                    d.setPedidosPausadosHasta(null);
+                }
             }
         }
         long empresa = EmpresaContexto.requerida().id();
         tiempoReal.publicar("catalogo", Map.of(), TiempoReal.tienda(empresa), TiempoReal.admin(empresa));
-        return saturacion(c, ahora);
+        return saturacion(actual(), ahora);
     }
 
     @Transactional(readOnly = true)
     public AdminDto.Config verAdmin() {
-        ConfigTienda c = tienda();
+        // Con varias sedes, dirección, WhatsApp, abierto, tiempos y horario son los de la sede escogida en el portal.
+        ConfigTienda c = actual();
         List<AdminDto.Horario> horarios = horarios().stream()
                 .map(h -> new AdminDto.Horario(h.getDia(), h.isActivo(), h.getAbre().format(HH_MM), h.getCierra().format(HH_MM)))
                 .toList();
@@ -296,9 +345,24 @@ public class ConfigService {
         c.setEfectivo(r.efectivo());
         c.setCostoOperativoUnidad(r.costoOperativoUnidad());
 
+        // Con varias sedes, lo que es de cada local se guarda en la sede escogida; sin ellas, la principal copia la tienda.
+        Sede sede = sedes.actual();
+        if (sede != null) {
+            sede.setDireccion(c.getDireccion());
+            sede.setCiudad(c.getCiudad());
+            sede.setWhatsapp(c.getWhatsapp());
+            sede.setAbierta(r.abierto());
+            sede.setTiempoMin(r.tiempoMin());
+            sede.setTiempoMax(r.tiempoMax());
+            c.setAbierto(true); // con sedes se cierra cada sede; la empresa queda abierta
+        } else {
+            sedes.sincronizarPrincipal(c);
+        }
+        Long sedeHorario = sede != null ? sede.getId() : sedes.principal().getId();
         for (AdminDto.Horario h : r.horarios()) {
-            Horario e = horarioRepo.findByDia((short) h.dia())
+            Horario e = horarioRepo.findBySedeIdAndDia(sedeHorario, (short) h.dia())
                     .orElseGet(() -> new Horario(h.dia(), true, LocalTime.of(10, 0), LocalTime.of(22, 0)));
+            e.setSedeId(sedeHorario);
             e.setActivo(h.activo());
             e.setAbre(hora(h.abre()));
             e.setCierra(hora(h.cierra()));
