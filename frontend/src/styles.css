@@ -1844,3 +1844,114 @@ body:has(.pl-elegante) { background: #111110; }
 /* La portada fija necesita su propio fondo debajo para que el recorte (marco que se encoge) se vea limpio */
 .lp { will-change: clip-path; }
 @media (prefers-reduced-motion: reduce) { .fav-card, .fav-card:hover, .fav-mas { transition: none; transform: none; } }
+
+/* =====================================================================
+   Superadmin: panel, lista de empresas y detalle en pestañas
+   (reusa las piezas in-* del Inicio del portal para que todo se sienta de la misma familia)
+   ===================================================================== */
+.sa-hero { background: linear-gradient(125deg, var(--brand) 0%, color-mix(in srgb, var(--brand) 55%, #0E1016) 100%); }
+.sa-logo { width: 38px; height: 38px; border-radius: 11px; overflow: hidden; }
+.sa-logo.grande { width: 46px; height: 46px; border-radius: 13px; }
+.sa-logo.enorme { width: 68px; height: 68px; border-radius: 18px; box-shadow: 0 0 0 3px rgba(255,255,255,.35), 0 10px 24px rgba(0,0,0,.25); }
+.sa-logo .ini { font-size: 15px; }
+.sa-logo.enorme .ini { font-size: 26px; }
+.in-pedidos a > app-icono:last-child { color: var(--ink-3); }
+
+/* Empresas por plan */
+.sa-planes { display: grid; gap: 14px; }
+.sa-plan { display: grid; gap: 6px; }
+.sa-plan-t { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+.sa-barra { height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--brand) 12%, var(--surface-2)); overflow: hidden; }
+.sa-barra i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--brand), color-mix(in srgb, var(--brand) 60%, #fff)); transition: width .8s cubic-bezier(.2, .7, .3, 1); }
+.sa-barra.animada i { width: 35%; animation: sa-carga 1.4s ease-in-out infinite; }
+@keyframes sa-carga { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+
+/* Lista de empresas: filas tipo tarjeta que se apilan en el celular */
+/* Los bloques de la página pueden encogerse: la barra de filtros se desplaza de lado en vez de ensanchar todo */
+.sa-filtros, .sa-lista, .sa-empresa, .sa-tabs, .sa-resumen { min-width: 0; }
+.sa-filtros .seg { width: fit-content; max-width: 100%; scrollbar-width: none; }
+.sa-filtros .seg::-webkit-scrollbar { display: none; }
+/* La acción principal de la barra de arriba («Nueva empresa») se queda también en el celular */
+@media (max-width: 900px) { .mt-botones .btn.main { display: inline-flex; } }
+@media (max-width: 480px) { .mt-botones .btn.main { padding-inline: 10px; font-size: 0; gap: 0; } .mt-botones .btn.main app-icono { font-size: 14px; } }
+.sa-filtros .seg button span.num { margin-left: 6px; }
+.sa-cuenta { margin: -6px 0 -8px; }
+.sa-lista { display: grid; gap: 10px; }
+.sa-empresa {
+  display: grid; grid-template-columns: minmax(220px, 1.6fr) 110px minmax(130px, 1fr) minmax(120px, 1fr) minmax(100px, .8fr) auto;
+  gap: 14px; align-items: center; padding: 14px 18px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm); position: relative; transition: transform var(--t), box-shadow var(--t), border-color var(--t);
+}
+.sa-empresa::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 0 4px 4px 0; background: var(--line); }
+.sa-empresa.e-activa::before { background: var(--ok); }
+.sa-empresa.e-suspendida::before { background: var(--warn); }
+.sa-empresa.e-error_aprovisionamiento::before { background: var(--bad); }
+.sa-empresa.e-aprovisionando::before, .sa-empresa.e-pendiente_aprovisionamiento::before { background: var(--info); }
+.sa-empresa:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: color-mix(in srgb, var(--brand) 25%, var(--line)); }
+.sa-empresa-id { display: flex; align-items: center; gap: 12px; min-width: 0; text-decoration: none; color: inherit; }
+.sa-empresa-nombre { display: grid; min-width: 0; line-height: 1.3; }
+.sa-empresa-nombre b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sa-empresa-nombre small { color: var(--ink-3); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sa-empresa > .st { justify-self: start; }
+.sa-dato { display: grid; line-height: 1.3; font-size: 13.5px; min-width: 0; }
+.sa-dato small { font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+.sa-dato b, .sa-dato span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sa-dato .muted { font-size: 12.5px; }
+.sa-acciones { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+@media (max-width: 1150px) {
+  .sa-empresa { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "id st acc" "dir plan fecha"; row-gap: 10px; }
+  .sa-empresa-id { grid-area: id; } .sa-empresa > .st { grid-area: st; } .sa-acciones { grid-area: acc; }
+  .sa-empresa > .d-dir { grid-area: dir; } .sa-empresa > .d-plan { grid-area: plan; } .sa-empresa > .d-fecha { grid-area: fecha; }
+}
+@media (max-width: 640px) {
+  .sa-empresa { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "id st" "dir plan" "acc acc"; padding: 14px; }
+  .sa-empresa > .d-fecha { display: none; }
+  .sa-acciones { justify-content: stretch; }
+  .sa-acciones .btn { flex: 1; }
+}
+
+/* Detalle de empresa */
+.sa-volver { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 13.5px; justify-self: start; }
+.sa-volver app-icono { transform: rotate(180deg); }
+.sa-cab {
+  --c1: var(--brand); --c2: #0E1016;
+  position: relative; overflow: hidden; isolation: isolate; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px;
+  padding: 24px 26px; border-radius: 22px; color: #fff;
+  background: linear-gradient(125deg, var(--c2) 0%, color-mix(in srgb, var(--c1) 70%, var(--c2)) 100%);
+  box-shadow: 0 18px 40px -18px color-mix(in srgb, var(--c1) 60%, transparent);
+}
+.sa-cab::after { content: ""; position: absolute; right: -80px; top: -120px; width: 320px; height: 320px; border-radius: 50%; z-index: -1;
+  background: radial-gradient(circle, color-mix(in srgb, var(--c1) 55%, transparent), transparent 65%); }
+.sa-cab-id { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.sa-cab-txt { display: grid; gap: 6px; min-width: 0; }
+.sa-cab h2 { font-size: clamp(22px, 3vw, 30px); font-weight: 800; letter-spacing: -.02em; color: #fff; }
+.sa-cab-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 13.5px; color: rgba(255,255,255,.82); }
+.sa-cab .st { background: rgba(255,255,255,.92); }
+.sa-cab-acc { display: flex; flex-wrap: wrap; gap: 8px; }
+.sa-cab-acc .btn { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.28); color: #fff; box-shadow: none; }
+.sa-cab-acc .btn:hover { background: rgba(255,255,255,.24); color: #fff; border-color: rgba(255,255,255,.4); }
+.sa-cab-acc .btn.main { background: #fff; color: #161A23; }
+.sa-cab-acc .btn.bad { background: rgba(255,90,90,.2); border-color: rgba(255,120,120,.5); }
+.sa-credenciales { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.sa-prep.mal { border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
+.sa-tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); margin-bottom: -4px; }
+.sa-tabs::-webkit-scrollbar { display: none; }
+.sa-tabs button { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 12px 14px; font-weight: 600; font-size: 14px;
+  color: var(--ink-3); white-space: nowrap; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color var(--t), border-color var(--t); }
+.sa-tabs button:hover { color: var(--ink); }
+.sa-tabs button[aria-pressed=true] { color: var(--accent-ink); border-bottom-color: var(--brand); }
+.sa-resumen { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 16px; align-items: start; }
+.sa-ficha h3 { display: flex; align-items: center; gap: 8px; }
+.sa-ficha h3 app-icono { color: var(--accent-ink); margin: 0; }
+.sa-ficha .linkbtn { text-decoration: none; font-size: 13.5px; }
+.sa-precio { display: flex; align-items: baseline; gap: 4px; }
+.sa-precio b { font-size: 28px; font-weight: 800; letter-spacing: -.02em; }
+.sa-accion { background: linear-gradient(180deg, color-mix(in srgb, var(--brand) 6%, var(--surface)), var(--surface) 60%); }
+.sa-notas { white-space: pre-wrap; color: var(--ink-2); font-size: 14px; }
+.sa-angosto { max-width: 620px; }
+.sa-muestra { --c1: var(--brand); --c2: #111; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); display: grid; }
+.sa-muestra-barra { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.sa-muestra-barra .sa-logo { width: 30px; height: 30px; border-radius: 9px; }
+.sa-muestra-btn { margin: 16px auto; padding: 10px 22px; border-radius: 999px; font-weight: 700; font-size: 14px; color: #fff;
+  background: var(--c1); box-shadow: 0 8px 18px -6px var(--c1); }
+@media (max-width: 640px) { .sa-cab { padding: 20px; } .sa-cab-acc { width: 100%; } .sa-cab-acc .btn { flex: 1; justify-content: center; } }

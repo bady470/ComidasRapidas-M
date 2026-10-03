@@ -1,0 +1,37 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "leinei-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "start",
+        "--",
+        "--port",
+        "4300"
+      ],
+      "port": 4300
+    },
+    {
+      "name": "leinei-web-datos",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "start",
+        "--",
+        "--port",
+        "4301",
+        "--configuration",
+        "production",
+        "--proxy-config",
+        "C:/Users/HPVICT~1/AppData/Local/Temp/claude/C--Users-HP-VICTUS-Music-Nueva-carpeta-Nueva-carpeta-Nueva-carpeta-leinei-marca-blanca/0501627f-252b-4fd0-ad02-79eef0cf33c9/scratchpad/proxy.json"
+      ],
+      "port": 4301
+    }
+  ]
+}

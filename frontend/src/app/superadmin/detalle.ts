@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input
 import { FormsModule, NgForm } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
+import { Icono } from '../compartido/icono';
 import { Logo } from '../compartido/logo';
 import { SelectorModulos } from '../compartido/selector-modulos';
 import { SelectorPlan } from '../compartido/selector-plan';
@@ -14,152 +15,229 @@ import { ActualizarEmpresa, EmpresaDetalle, EstadoEmpresa, ModuloPlataforma, NOM
 
 const EN_PREPARACION: EstadoEmpresa[] = ['pendiente_aprovisionamiento', 'aprovisionando'];
 
-/** Detalle de una empresa: estado del aprovisionamiento, datos, marca, módulos y acciones. */
+type Pestana = 'resumen' | 'datos' | 'plan' | 'pagos' | 'acceso' | 'tecnico';
+
+/**
+ * Detalle de una empresa, ordenado en pestañas: un resumen para ubicarse, y aparte lo que se edita (datos y marca,
+ * plan y módulos), los pagos, el acceso del administrador y lo técnico (base de datos y migraciones).
+ */
 @Component({
   selector: 'app-detalle-empresa',
-  imports: [FormsModule, RouterLink, Logo, HoraPipe, DineroPipe, SelectorPlan, SelectorModulos, PagosEmpresa],
+  imports: [FormsModule, RouterLink, Icono, Logo, HoraPipe, DineroPipe, SelectorPlan, SelectorModulos, PagosEmpresa],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <p style="margin-bottom:10px"><a class="linkbtn" routerLink="/superadmin/empresas">← Empresas</a></p>
+    <a class="linkbtn sa-volver" routerLink="/superadmin/empresas"><app-icono nombre="flecha" [tam]="14" /> Todas las empresas</a>
     @if (error() && !empresa()) { <div class="alerta mala">{{ error() }}</div> }
 
     @if (empresa(); as e) {
-      <div class="admin-h" style="padding-top:4px">
-        <div class="empresa-fila">
-          <app-logo [logoUrl]="e.logoUrl" [nombre]="e.nombreComercial" [style.background]="e.colorSecundario" style="width:52px;height:52px;border-radius:14px" />
-          <div class="stack" style="gap:2px">
-            <h1>{{ e.nombreComercial }}</h1>
-            <div class="row" style="gap:8px"><span [class]="'st st-' + e.estado">{{ nombreEstado(e.estado) }}</span>
-              <span class="muted num">/{{ e.identificador }}</span>
-              <span class="muted">· Plan {{ nombrePlan(e.plan) }} · {{ e.precioPlan | dinero }}/{{ e.cicloFacturacion === 'ANUAL' ? 'año' : 'mes' }}</span></div>
+      <!-- Cabecera con los colores de la marca: quién es, en qué estado está y lo que se hace con un clic -->
+      <section class="sa-cab" [style.--c1]="e.colorPrimario" [style.--c2]="e.colorSecundario">
+        <div class="sa-cab-id">
+          <app-logo class="sa-logo enorme" [logoUrl]="e.logoUrl" [nombre]="e.nombreComercial" [style.background]="e.colorSecundario" />
+          <div class="sa-cab-txt">
+            <h2>{{ e.nombreComercial }}</h2>
+            <div class="sa-cab-meta">
+              <span [class]="'st st-' + e.estado">{{ nombreEstado(e.estado) }}</span>
+              <span class="num">/{{ e.identificador }}</span>
+              <span>Plan {{ nombrePlan(e.plan) }} · {{ e.precioPlan | dinero }}/{{ e.cicloFacturacion === 'ANUAL' ? 'año' : 'mes' }}</span>
+            </div>
           </div>
         </div>
-        <div class="row" style="flex-wrap:wrap;gap:6px">
+        <div class="sa-cab-acc">
           @if (e.estado === 'activa') {
-            <a class="btn" [href]="'/' + e.identificador" target="_blank" rel="noopener">Ver tienda</a>
-            <a class="btn" [href]="'/' + e.identificador + '/admin'" target="_blank" rel="noopener">Portal de pedidos</a>
-            <button class="btn bad" type="button" (click)="suspender()">Suspender</button>
+            <a class="btn" [href]="'/' + e.identificador" target="_blank" rel="noopener"><app-icono nombre="tienda" /> Tienda</a>
+            <a class="btn" [href]="'/' + e.identificador + '/admin'" target="_blank" rel="noopener"><app-icono nombre="externo" /> Portal</a>
+            <button class="btn bad" type="button" (click)="suspender()"><app-icono nombre="pausa" /> {{ confirmar() ? '¿Seguro? Toca otra vez' : 'Suspender' }}</button>
           }
-          @if (e.estado === 'suspendida') { <button class="btn okb" type="button" (click)="accion(api.activar(e.uuid), 'Empresa reactivada')">Reactivar</button> }
+          @if (e.estado === 'suspendida') { <button class="btn main" type="button" (click)="accion(api.activar(e.uuid), 'Empresa reactivada')"><app-icono nombre="ok" /> Reactivar</button> }
           @if (e.estado === 'error_aprovisionamiento') { <button class="btn main" type="button" (click)="accion(api.reintentar(e.uuid), 'Se volvió a poner en cola')">Reintentar</button> }
         </div>
-      </div>
+      </section>
 
       @if (credenciales(); as k) {
-        <div class="alerta buena" style="margin-bottom:16px">
-          Acceso del administrador: usuario <b class="num">{{ k.usuario }}</b> · clave <b class="num">{{ k.clave }}</b>.
-          Cópialo ahora; no se vuelve a mostrar.
-          <button class="btn" type="button" style="margin-left:8px" (click)="credenciales.set(null)">Listo</button>
+        <div class="alerta buena sa-credenciales">
+          <span>Acceso del administrador: usuario <b class="num">{{ k.usuario }}</b> · clave <b class="num">{{ k.clave }}</b>. Cópialo ahora; no se vuelve a mostrar.</span>
+          <button class="btn" type="button" (click)="credenciales.set(null)">Listo</button>
         </div>
       }
-      @if (e.estado === 'suspendida') { <div class="alerta aviso" style="margin-bottom:16px">La tienda y el portal de esta empresa no están disponibles mientras esté suspendida.</div> }
+      @if (e.estado === 'suspendida') { <div class="alerta aviso">La tienda y el portal de esta empresa no están disponibles mientras esté suspendida.</div> }
 
       @if (e.aprovisionamiento; as a) {
         @if (enPreparacion() || e.estado === 'error_aprovisionamiento') {
-          <div class="panel" style="margin-bottom:16px">
+          <div class="panel sa-prep" [class.mal]="e.estado === 'error_aprovisionamiento'">
             <h3>{{ enPreparacion() ? 'Preparando la empresa…' : 'La preparación falló' }}</h3>
-            <p class="muted" style="font-size:14px">
+            <p class="muted">
               Paso: <b>{{ a.pasoActual || 'en cola' }}</b> · intentos {{ a.intentos }} · {{ a.actualizadoEn | hora }}
               @if (enPreparacion()) { · <span class="en-vivo" [class.off]="!vivo.enVivo()">{{ vivo.enVivo() ? 'En vivo' : 'Reconectando' }}</span> }
             </p>
+            @if (enPreparacion()) { <div class="sa-barra animada"><i></i></div> }
             @if (a.registro) { <pre class="registro">{{ a.registro }}</pre> }
           </div>
         }
       }
 
-      <div class="two">
-        <form class="panel" (ngSubmit)="guardar()">
-          <h3>Datos y marca</h3>
-          <div class="field"><label for="dNombre">Nombre comercial</label><input id="dNombre" name="dNombre" [(ngModel)]="f.nombreComercial"></div>
-          <div class="field"><label for="dRazon">Razón social</label><input id="dRazon" name="dRazon" [(ngModel)]="f.razonSocial"></div>
-          <div class="row2">
-            <div class="field"><label for="dNit">NIT</label><input id="dNit" name="dNit" [(ngModel)]="f.nit"></div>
-          </div>
-          <div class="field"><span class="flabel">Plan y facturación</span>
-            <app-selector-plan [planes]="planesVisibles()" [(plan)]="f.plan" [(ciclo)]="f.cicloFacturacion" (elegido)="elegidos.set(modulosDe($event))" />
-            <span class="hint">Al cambiar de plan, los módulos de abajo se ajustan a los que incluye; revísalos y pulsa «Guardar módulos» para aplicarlos.</span></div>
-          <div class="field"><label for="dResp">Responsable</label><input id="dResp" name="dResp" [(ngModel)]="f.responsableNombre"></div>
-          <div class="row2">
-            <div class="field"><label for="dCorreo">Correo</label><input id="dCorreo" name="dCorreo" type="email" [(ngModel)]="f.responsableCorreo"></div>
-            <div class="field"><label for="dCel">Celular</label><input id="dCel" name="dCel" [(ngModel)]="f.responsableCelular"></div>
-          </div>
-          <div class="row2">
-            <div class="field"><label for="dC1">Color principal</label>
-              <div class="row"><input id="dC1" name="dC1" type="color" [(ngModel)]="f.colorPrimario" style="width:52px;height:40px;padding:2px">
-                <input name="dC1t" [(ngModel)]="f.colorPrimario" aria-label="Código del color principal" style="flex:1;min-width:0"></div></div>
-            <div class="field"><label for="dC2">Color secundario</label>
-              <div class="row"><input id="dC2" name="dC2" type="color" [(ngModel)]="f.colorSecundario" style="width:52px;height:40px;padding:2px">
-                <input name="dC2t" [(ngModel)]="f.colorSecundario" aria-label="Código del color secundario" style="flex:1;min-width:0"></div></div>
-          </div>
-          <div class="field"><label for="dDom">Dominio propio</label><input id="dDom" name="dDom" [(ngModel)]="f.dominioPropio" placeholder="pedidos.minegocio.com"></div>
-          <div class="field"><label for="dNotas">Notas internas</label><textarea id="dNotas" name="dNotas" [(ngModel)]="f.notas"></textarea></div>
-          @if (errorDatos()) { <p class="err">{{ errorDatos() }}</p> }
-          <div><button class="btn main" type="submit" [disabled]="ocupado()">Guardar datos</button></div>
-        </form>
+      <nav class="sa-tabs" aria-label="Secciones de la empresa">
+        @for (t of pestanas(); track t.k) {
+          <button type="button" [attr.aria-pressed]="pestana() === t.k" (click)="pestana.set(t.k)">
+            <app-icono [nombre]="t.icono" [tam]="16" /> {{ t.t }}
+          </button>
+        }
+      </nav>
 
-        <div class="stack" style="gap:16px">
-          <div class="panel">
-            <h3>Logo</h3>
-            <div class="subir">
-              <app-logo [logoUrl]="e.logoUrl" [nombre]="e.nombreComercial" [style.background]="e.colorSecundario" style="width:64px;height:64px;border-radius:14px" />
-              <label class="btn" style="cursor:pointer">{{ e.logoUrl ? 'Cambiar logo' : 'Subir logo' }}
-                <input type="file" accept="image/png,image/jpeg,image/webp" hidden (change)="subirLogo($event)"></label>
-              @if (e.logoUrl) { <button class="linkbtn" type="button" (click)="accion(api.quitarLogo(e.uuid), 'Logo quitado')">Quitar</button> }
+      @switch (pestana()) {
+        @case ('resumen') {
+          <div class="sa-resumen">
+            <div class="panel sa-ficha">
+              <h3><app-icono nombre="cuenta" /> Responsable</h3>
+              <dl class="datos">
+                <dt>Nombre</dt><dd>{{ e.responsableNombre || '—' }}</dd>
+                <dt>Correo</dt><dd>@if (e.responsableCorreo) { <a [href]="'mailto:' + e.responsableCorreo">{{ e.responsableCorreo }}</a> } @else { — }</dd>
+                <dt>Celular</dt><dd class="num">{{ e.responsableCelular || '—' }}</dd>
+                <dt>Razón social</dt><dd>{{ e.razonSocial }}{{ e.nit ? ' · NIT ' + e.nit : '' }}</dd>
+              </dl>
+              <div><button class="linkbtn" type="button" (click)="pestana.set('datos')">Editar datos</button></div>
             </div>
-          </div>
-
-          <div class="panel">
-            <h3>Módulos</h3>
-            <app-selector-modulos [modulos]="modulos()" [(elegidos)]="elegidos" [plan]="planActual()" />
-            <div><button class="btn main" type="button" [disabled]="ocupado() || !modulosCambiados()" (click)="guardarModulos()">Guardar módulos</button></div>
-          </div>
-
-          @if (e.estado === 'activa') {
-            <div class="panel">
-              <h3>Productos precargados</h3>
-              <p class="muted">Salchipapas, hamburguesas, perros, pizzas, bebidas y más, con fotos y precios listos para asignarle a esta empresa.</p>
-              <div><a class="btn main" [routerLink]="['/superadmin/biblioteca']" [queryParams]="{ empresa: e.uuid }">Elegir productos</a></div>
+            <div class="panel sa-ficha">
+              <h3><app-icono nombre="planes" /> Plan</h3>
+              <div class="sa-precio"><b class="num">{{ e.precioPlan | dinero }}</b><span class="muted">/{{ e.cicloFacturacion === 'ANUAL' ? 'año' : 'mes' }}</span></div>
+              <p class="muted">{{ nombrePlan(e.plan) }} · {{ modulosActivos() }} módulo{{ modulosActivos() === 1 ? '' : 's' }} activo{{ modulosActivos() === 1 ? '' : 's' }}</p>
+              <div><button class="linkbtn" type="button" (click)="pestana.set('plan')">Cambiar plan o módulos</button></div>
             </div>
-            <form class="panel" (ngSubmit)="restablecer(fk)" #fk="ngForm">
-              <h3>Clave de un administrador</h3>
-              <p class="muted" style="font-size:14px">Si la empresa olvidó su clave, asígnale una nueva y compártela.</p>
-              <div class="row2">
-                <div class="field"><label for="kUsuario">Usuario</label><input id="kUsuario" name="kUsuario" autocomplete="off" [(ngModel)]="clave.usuario"></div>
-                <div class="field"><label for="kNueva">Clave nueva</label><input id="kNueva" name="kNueva" autocomplete="off" [(ngModel)]="clave.nueva"></div>
+            <div class="panel sa-ficha">
+              <h3><app-icono nombre="enlace" /> Direcciones</h3>
+              <dl class="datos">
+                <dt>Tienda</dt><dd class="num"><a [href]="'/' + e.identificador" target="_blank" rel="noopener">/{{ e.identificador }}</a></dd>
+                <dt>Portal</dt><dd class="num"><a [href]="'/' + e.identificador + '/admin'" target="_blank" rel="noopener">/{{ e.identificador }}/admin</a></dd>
+                <dt>Dominio</dt><dd>{{ e.dominioPropio || 'Sin dominio propio' }}</dd>
+                <dt>Creada</dt><dd>{{ e.creadoEn | hora }}</dd>
+              </dl>
+            </div>
+            @if (e.estado === 'activa') {
+              <div class="panel sa-ficha sa-accion">
+                <h3><app-icono nombre="biblioteca" /> Productos precargados</h3>
+                <p class="muted">Salchipapas, hamburguesas, perros, pizzas, bebidas y más, con fotos y precios listos para asignarle a esta empresa.</p>
+                <div><a class="btn main" [routerLink]="['/superadmin/biblioteca']" [queryParams]="{ empresa: e.uuid }">Elegir productos</a></div>
               </div>
-              @if (errorClave()) { <p class="err">{{ errorClave() }}</p> }
-              <div><button class="btn main" type="submit">Asignar clave</button></div>
+            }
+            @if (e.notas) {
+              <div class="panel sa-ficha">
+                <h3><app-icono nombre="nota" /> Notas internas</h3>
+                <p class="sa-notas">{{ e.notas }}</p>
+              </div>
+            }
+          </div>
+        }
+
+        @case ('datos') {
+          <div class="two">
+            <form class="panel" (ngSubmit)="guardar()">
+              <h3>Datos de la empresa</h3>
+              <div class="field"><label for="dNombre">Nombre comercial</label><input id="dNombre" name="dNombre" [(ngModel)]="f.nombreComercial"></div>
+              <div class="row2">
+                <div class="field"><label for="dRazon">Razón social</label><input id="dRazon" name="dRazon" [(ngModel)]="f.razonSocial"></div>
+                <div class="field"><label for="dNit">NIT</label><input id="dNit" name="dNit" [(ngModel)]="f.nit"></div>
+              </div>
+              <div class="field"><label for="dResp">Responsable</label><input id="dResp" name="dResp" [(ngModel)]="f.responsableNombre"></div>
+              <div class="row2">
+                <div class="field"><label for="dCorreo">Correo</label><input id="dCorreo" name="dCorreo" type="email" [(ngModel)]="f.responsableCorreo"></div>
+                <div class="field"><label for="dCel">Celular</label><input id="dCel" name="dCel" [(ngModel)]="f.responsableCelular"></div>
+              </div>
+              <div class="field"><label for="dDom">Dominio propio <span class="hint">(opcional)</span></label><input id="dDom" name="dDom" [(ngModel)]="f.dominioPropio" placeholder="pedidos.minegocio.com"></div>
+              <div class="field"><label for="dNotas">Notas internas <span class="hint">(solo las ve el superadmin)</span></label><textarea id="dNotas" name="dNotas" [(ngModel)]="f.notas"></textarea></div>
+              @if (errorDatos()) { <p class="err">{{ errorDatos() }}</p> }
+              <div><button class="btn main" type="submit" [disabled]="ocupado()">Guardar datos</button></div>
             </form>
-          }
-        </div>
-      </div>
 
-      @if (e.estado === 'activa' || e.estado === 'suspendida') {
-        <div style="margin-top:16px"><app-pagos-empresa [uuid]="e.uuid" /></div>
+            <div class="stack" style="gap:16px">
+              <form class="panel" (ngSubmit)="guardar()">
+                <h3>Marca</h3>
+                <!-- Vista previa: así se ven la barra y el botón de la tienda con estos colores -->
+                <div class="sa-muestra" [style.--c1]="f.colorPrimario" [style.--c2]="f.colorSecundario" aria-hidden="true">
+                  <span class="sa-muestra-barra"><app-logo class="sa-logo" [logoUrl]="e.logoUrl" [nombre]="f.nombreComercial || e.nombreComercial" [style.background]="f.colorSecundario" /> <b>{{ f.nombreComercial || e.nombreComercial }}</b></span>
+                  <span class="sa-muestra-btn">Hacer pedido</span>
+                </div>
+                <div class="row2">
+                  <div class="field"><label for="dC1">Color principal</label>
+                    <div class="row"><input id="dC1" name="dC1" type="color" [(ngModel)]="f.colorPrimario" style="width:52px;height:40px;padding:2px">
+                      <input name="dC1t" [(ngModel)]="f.colorPrimario" aria-label="Código del color principal" style="flex:1;min-width:0"></div></div>
+                  <div class="field"><label for="dC2">Color secundario</label>
+                    <div class="row"><input id="dC2" name="dC2" type="color" [(ngModel)]="f.colorSecundario" style="width:52px;height:40px;padding:2px">
+                      <input name="dC2t" [(ngModel)]="f.colorSecundario" aria-label="Código del color secundario" style="flex:1;min-width:0"></div></div>
+                </div>
+                <div><button class="btn main" type="submit" [disabled]="ocupado()">Guardar colores</button></div>
+              </form>
+              <div class="panel">
+                <h3>Logo</h3>
+                <div class="subir">
+                  <app-logo [logoUrl]="e.logoUrl" [nombre]="e.nombreComercial" [style.background]="e.colorSecundario" style="width:64px;height:64px;border-radius:14px" />
+                  <label class="btn" style="cursor:pointer">{{ e.logoUrl ? 'Cambiar logo' : 'Subir logo' }}
+                    <input type="file" accept="image/png,image/jpeg,image/webp" hidden (change)="subirLogo($event)"></label>
+                  @if (e.logoUrl) { <button class="linkbtn" type="button" (click)="accion(api.quitarLogo(e.uuid), 'Logo quitado')">Quitar</button> }
+                </div>
+                <span class="hint">PNG, JPG o WebP de máximo 2 MB.</span>
+              </div>
+            </div>
+          </div>
+        }
+
+        @case ('plan') {
+          <div class="two">
+            <form class="panel" (ngSubmit)="guardar()">
+              <h3>Plan y facturación</h3>
+              <app-selector-plan [planes]="planesVisibles()" [(plan)]="f.plan" [(ciclo)]="f.cicloFacturacion" (elegido)="elegidos.set(modulosDe($event))" />
+              <span class="hint">Al cambiar de plan, los módulos de al lado se ajustan a los que incluye: revísalos y pulsa «Guardar módulos».</span>
+              <div><button class="btn main" type="submit" [disabled]="ocupado()">Guardar plan</button></div>
+            </form>
+            <div class="panel">
+              <h3>Módulos</h3>
+              <app-selector-modulos [modulos]="modulos()" [(elegidos)]="elegidos" [plan]="planActual()" />
+              <div><button class="btn main" type="button" [disabled]="ocupado() || !modulosCambiados()" (click)="guardarModulos()">Guardar módulos</button></div>
+            </div>
+          </div>
+        }
+
+        @case ('pagos') {
+          <app-pagos-empresa [uuid]="e.uuid" />
+        }
+
+        @case ('acceso') {
+          <form class="panel sa-angosto" (ngSubmit)="restablecer(fk)" #fk="ngForm">
+            <h3>Clave de un administrador</h3>
+            <p class="muted">Si la empresa olvidó su clave, asígnale una nueva y compártela por un medio seguro.</p>
+            <div class="row2">
+              <div class="field"><label for="kUsuario">Usuario</label><input id="kUsuario" name="kUsuario" autocomplete="off" [(ngModel)]="clave.usuario"></div>
+              <div class="field"><label for="kNueva">Clave nueva <span class="hint">(mínimo 8)</span></label><input id="kNueva" name="kNueva" autocomplete="off" [(ngModel)]="clave.nueva"></div>
+            </div>
+            @if (errorClave()) { <p class="err">{{ errorClave() }}</p> }
+            <div><button class="btn main" type="submit">Asignar clave</button></div>
+          </form>
+        }
+
+        @case ('tecnico') {
+          <div class="two">
+            <div class="panel">
+              <h3>Base de datos</h3>
+              @if (e.conexion; as c) {
+                <dl class="datos">
+                  <dt>Servidor</dt><dd class="num">{{ c.host }}:{{ c.puerto }}</dd>
+                  <dt>Base</dt><dd class="num">{{ c.nombreBase }}</dd>
+                  <dt>Dueño</dt><dd class="num">{{ c.usuarioOwner }}</dd>
+                  <dt>Aplicación</dt><dd class="num">{{ c.usuarioApp }}</dd>
+                  <dt>Lectura</dt><dd class="num">{{ c.usuarioLectura }}</dd>
+                </dl>
+                <span class="hint">Las claves están cifradas en la base de control y no se muestran.</span>
+              } @else { <p class="muted">Todavía no se ha creado.</p> }
+            </div>
+            <div class="panel">
+              <h3>Versión del esquema</h3>
+              @for (v of e.versiones; track $index) {
+                <div class="row" style="justify-content:space-between"><span class="num">{{ v.ultimaMigracionAplicada }}</span><span class="muted">{{ v.aplicadaEn | hora }}</span></div>
+              } @empty { <p class="muted">Sin migraciones aplicadas.</p> }
+              <dl class="datos" style="margin-top:8px"><dt>Creada</dt><dd>{{ e.creadoEn | hora }}</dd></dl>
+            </div>
+          </div>
+        }
       }
-
-      <div class="two" style="margin-block:16px 40px">
-        <div class="panel">
-          <h3>Base de datos</h3>
-          @if (e.conexion; as c) {
-            <dl class="datos">
-              <dt>Servidor</dt><dd class="num">{{ c.host }}:{{ c.puerto }}</dd>
-              <dt>Base</dt><dd class="num">{{ c.nombreBase }}</dd>
-              <dt>Dueño</dt><dd class="num">{{ c.usuarioOwner }}</dd>
-              <dt>Aplicación</dt><dd class="num">{{ c.usuarioApp }}</dd>
-              <dt>Lectura</dt><dd class="num">{{ c.usuarioLectura }}</dd>
-            </dl>
-            <span class="hint">Las claves están cifradas en la base de control y no se muestran.</span>
-          } @else { <p class="muted">Todavía no se ha creado.</p> }
-        </div>
-        <div class="panel">
-          <h3>Versión del esquema</h3>
-          @for (v of e.versiones; track $index) {
-            <div class="row" style="justify-content:space-between"><span class="num">{{ v.ultimaMigracionAplicada }}</span><span class="muted">{{ v.aplicadaEn | hora }}</span></div>
-          } @empty { <p class="muted">Sin migraciones aplicadas.</p> }
-          <dl class="datos" style="margin-top:8px"><dt>Creada</dt><dd>{{ e.creadoEn | hora }}</dd></dl>
-        </div>
-      </div>
     }
   `,
 })
@@ -180,6 +258,24 @@ export class DetalleEmpresaPage {
   protected f: ActualizarEmpresa = vacio();
   protected clave = { usuario: '', nueva: '' };
   protected vivo: { enVivo: () => boolean };
+
+  protected pestana = signal<Pestana>('resumen');
+  /** Pagos y acceso solo tienen sentido cuando la empresa ya existe del todo (activa o suspendida). */
+  protected pestanas = computed(() => {
+    const estado = this.empresa()?.estado;
+    const lista = estado === 'activa' || estado === 'suspendida';
+    return [
+      { k: 'resumen' as Pestana, t: 'Resumen', icono: 'casa' },
+      { k: 'datos' as Pestana, t: 'Datos y marca', icono: 'tienda' },
+      { k: 'plan' as Pestana, t: 'Plan y módulos', icono: 'planes' },
+      ...(lista ? [{ k: 'pagos' as Pestana, t: 'Pagos', icono: 'pagos' }, { k: 'acceso' as Pestana, t: 'Acceso', icono: 'candado' }] : []),
+      { k: 'tecnico' as Pestana, t: 'Técnico', icono: 'biblioteca' },
+    ];
+  });
+  protected modulosActivos = computed(() => {
+    const e = this.empresa();
+    return e ? this.modulos().filter((m) => !m.esBase && e.modulos.includes(m.codigo)).length : 0;
+  });
 
   protected enPreparacion = computed(() => EN_PREPARACION.includes(this.empresa()?.estado as EstadoEmpresa));
   protected modulosCambiados = computed(() => {
@@ -290,17 +386,16 @@ export class DetalleEmpresaPage {
   protected suspender(): void {
     const e = this.empresa();
     if (!e) return;
-    // Sin diálogos del navegador: se pide confirmar con un segundo clic.
-    if (!this.confirmando) {
-      this.confirmando = true;
-      this.avisos.mostrar('Vuelve a tocar «Suspender» para confirmar.');
-      setTimeout(() => (this.confirmando = false), 4000);
+    // Sin diálogos del navegador: el mismo botón pide confirmar con un segundo clic.
+    if (!this.confirmar()) {
+      this.confirmar.set(true);
+      setTimeout(() => this.confirmar.set(false), 4000);
       return;
     }
-    this.confirmando = false;
+    this.confirmar.set(false);
     this.accion(this.api.suspender(e.uuid), 'Empresa suspendida');
   }
-  private confirmando = false;
+  protected confirmar = signal(false);
 
   protected restablecer(form: NgForm): void {
     const e = this.empresa();

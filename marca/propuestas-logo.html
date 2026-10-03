@@ -1,0 +1,238 @@
+<title>Logo Leinei</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* Presentación de marca: cabecera sobria y una ficha por propuesta (escena oscura + usos reales debajo). */
+  :root {
+    --tinta: #0B0D17; --marfil: #F5F0E6; --oro: #D9B66A;
+    --pagina: #F2F1EE; --tarjeta: #FFFFFF; --linea: #ECEAE5; --texto: #0B0D17; --texto-2: #5B6072; --texto-3: #8C8F9C;
+    --etiqueta: #9A7B3C; --sombra: rgba(11,13,23,.25);
+    --display: Sora, "Segoe UI", system-ui, sans-serif; --cuerpo: Inter, system-ui, -apple-system, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --pagina: #0C0E16; --tarjeta: #151826; --linea: #262A3B; --texto: #EDEAE3; --texto-2: #A3A7B7; --texto-3: #7E8296;
+    --etiqueta: #D9B66A; --sombra: rgba(0,0,0,.6); color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --pagina: #0C0E16; --tarjeta: #151826; --linea: #262A3B; --texto: #EDEAE3; --texto-2: #A3A7B7; --texto-3: #7E8296;
+    --etiqueta: #D9B66A; --sombra: rgba(0,0,0,.6); color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--cuerpo); background: var(--pagina); color: var(--texto); -webkit-font-smoothing: antialiased; }
+  header { padding: 48px 24px 8px; max-width: 1180px; margin: 0 auto; }
+  header small { letter-spacing: .18em; text-transform: uppercase; font-size: 12px; font-weight: 600; color: var(--etiqueta); }
+  header h1 { font-family: var(--display); font-size: clamp(28px, 4vw, 44px); letter-spacing: -.03em; margin: 8px 0 6px; text-wrap: balance; }
+  header p { color: var(--texto-2); max-width: 66ch; margin: 0; line-height: 1.6; }
+  main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 64px; display: grid; gap: 32px; }
+  .concepto { background: var(--tarjeta); border-radius: 28px; overflow: hidden; box-shadow: 0 30px 60px -30px var(--sombra); }
+  .escena { position: relative; display: grid; grid-template-columns: 1.15fr 1fr; align-items: center; gap: 24px; padding: 60px 56px 52px; color: var(--marfil);
+    background: radial-gradient(700px 360px at 18% 20%, rgba(217,182,106,.22), transparent 60%), radial-gradient(600px 400px at 90% 110%, rgba(90,110,255,.16), transparent 60%), linear-gradient(160deg, #161A2B, #07080F); }
+  .escena .num { position: absolute; top: 22px; left: 28px; font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--oro); font-weight: 600; }
+  .heroe { display: flex; align-items: center; gap: 28px; }
+  .heroe svg.icono { width: 168px; height: 168px; flex: none; filter: drop-shadow(0 30px 40px rgba(0,0,0,.55)); }
+  .marca-texto b { display: block; font-family: Sora, sans-serif; font-weight: 600; font-size: 64px; letter-spacing: -.035em; line-height: 1; }
+  .marca-texto span { display: block; margin-top: 12px; font-size: 13px; letter-spacing: .26em; text-transform: uppercase; color: rgba(245,240,230,.62); }
+  .idea h2 { font-family: Sora, sans-serif; font-size: 26px; letter-spacing: -.02em; margin: 0 0 10px; }
+  .idea p { margin: 0; line-height: 1.65; color: rgba(245,240,230,.74); font-size: 15px; }
+  .usos { display: grid; grid-template-columns: 1.2fr 1fr 1fr; border-top: 1px solid var(--linea); }
+  .uso { padding: 26px 28px; display: grid; gap: 14px; align-content: start; min-width: 0; }
+  .uso + .uso { border-left: 1px solid var(--linea); }
+  .uso h3 { margin: 0; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--texto-3); font-weight: 600; }
+  .bloque-claro { display: flex; align-items: center; gap: 14px; padding: 22px; border-radius: 18px; background: var(--marfil); }
+  .bloque-claro svg { width: 56px; height: 56px; }
+  .bloque-claro b { font-family: Sora, sans-serif; font-size: 30px; letter-spacing: -.03em; color: var(--tinta); }
+  .tamanos { display: flex; align-items: end; gap: 18px; }
+  .tamanos svg { display: block; }
+  .tamanos div { display: grid; gap: 6px; justify-items: center; font-size: 11px; color: var(--texto-3); }
+  .celular { display: grid; grid-template-columns: repeat(4, 52px); gap: 14px; padding: 18px; border-radius: 22px; background: linear-gradient(160deg, #2B3150, #12142A); width: fit-content; }
+  .celular div { display: grid; gap: 5px; justify-items: center; font-size: 9.5px; color: rgba(255,255,255,.8); }
+  .celular svg { width: 52px; height: 52px; }
+  .celular i { width: 52px; height: 52px; border-radius: 14px; background: rgba(255,255,255,.14); display: block; }
+  @media (max-width: 900px) {
+    .escena { grid-template-columns: 1fr; padding: 56px 24px 32px; }
+    .heroe svg.icono { width: 110px; height: 110px; }
+    .marca-texto b { font-size: 44px; }
+    .usos { grid-template-columns: 1fr; }
+    .uso + .uso { border-left: 0; border-top: 1px solid var(--linea); }
+  }
+  @media (max-width: 480px) {
+    .heroe { flex-direction: column; align-items: flex-start; gap: 18px; }
+    .celular { grid-template-columns: repeat(4, 44px); gap: 10px; padding: 14px; }
+    .celular svg, .celular i { width: 44px; height: 44px; }
+  }
+</style>
+
+<!-- Símbolos y degradados compartidos (no se ven; los usan todos los íconos de la página) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="fondo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1E2236"/><stop offset="1" stop-color="#07080F"/></linearGradient>
+    <linearGradient id="brillo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="oro" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F6E3A8"/><stop offset=".5" stop-color="#D9B66A"/><stop offset="1" stop-color="#A97E33"/></linearGradient>
+    <linearGradient id="marfil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#E4DCCB"/></linearGradient>
+    <symbol id="baldosa" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="24" fill="url(#fondo)"/>
+      <rect width="100" height="100" rx="24" fill="url(#brillo)"/>
+      <rect x="0.5" y="0.5" width="99" height="99" rx="23.5" fill="none" stroke="#fff" stroke-opacity=".08"/>
+    </symbol>
+
+    <!-- A · Bolsa: la bolsa de compras con LN y un aviso dorado de «nuevo pedido» -->
+    <symbol id="marcaA" viewBox="0 0 100 100">
+      <use href="#baldosa"/>
+      <path d="M39 35 C39 21 61 21 61 35" fill="none" stroke="url(#oro)" stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M28 35 H72 L69 75 Q68.4 82 61.5 82 H38.5 Q31.6 82 31 75 Z" fill="url(#marfil)"/>
+      <path d="M28 35 H72 L71.6 40 H28.4 Z" fill="#0B0D17" opacity=".07"/>
+      <path d="M40 49 V68 H48.5" fill="none" stroke="#11131F" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M53.5 68 V49 L63 68 V49" fill="none" stroke="#11131F" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="74" cy="31" r="9" fill="url(#oro)" stroke="#10121D" stroke-width="2.5"/>
+      <text x="74" y="35" text-anchor="middle" font-family="Sora, sans-serif" font-weight="700" font-size="11" fill="#10121D">1</text>
+    </symbol>
+
+    <!-- B · Comanda: el tiquete del pedido con LN, sus líneas y el chulo dorado de confirmado -->
+    <symbol id="marcaB" viewBox="0 0 100 100">
+      <use href="#baldosa"/>
+      <path d="M31 17 H69 Q74 17 74 22 V77 L68 82 L62 77 L56 82 L50 77 L44 82 L38 77 L32 82 L26 77 V22 Q26 17 31 17 Z" fill="url(#marfil)"/>
+      <path d="M34 27 V43 H41.5" fill="none" stroke="#11131F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M46 43 V27 L55 43 V27" fill="none" stroke="#11131F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="34" y="52" width="24" height="3.2" rx="1.6" fill="#11131F" opacity=".22"/>
+      <rect x="34" y="59" width="17" height="3.2" rx="1.6" fill="#11131F" opacity=".22"/>
+      <rect x="34" y="66" width="20" height="3.2" rx="1.6" fill="#11131F" opacity=".22"/>
+      <circle cx="66" cy="62" r="10" fill="url(#oro)" stroke="#10121D" stroke-width="2.5"/>
+      <path d="M61.5 62 L64.8 65.3 L70.8 58.8" fill="none" stroke="#10121D" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    <!-- C · Domicilio: el pin de ubicación dorado con LN y líneas de velocidad -->
+    <symbol id="marcaC" viewBox="0 0 100 100">
+      <use href="#baldosa"/>
+      <path d="M12 40 H22 M9 48 H21 M14 56 H22" stroke="url(#oro)" stroke-width="3" stroke-linecap="round" opacity=".75"/>
+      <path d="M55 86 C47 76 31 62 31 44 A24 24 0 0 1 79 44 C79 62 63 76 55 86 Z" fill="url(#oro)"/>
+      <circle cx="55" cy="44" r="16.5" fill="#10121D"/>
+      <path d="M46 36 V52 H52.5" fill="none" stroke="url(#marfil)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M56.5 52 V36 L64.5 52 V36" fill="none" stroke="url(#oro)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    <!-- D · Mensaje: el globo del pedido por chat con LN y el chulo dorado de «recibido» -->
+    <symbol id="marcaD" viewBox="0 0 100 100">
+      <use href="#baldosa"/>
+      <path d="M24 22 H76 Q83 22 83 29 V62 Q83 69 76 69 H45 L31 81 L33 69 H24 Q17 69 17 62 V29 Q17 22 24 22 Z" fill="url(#marfil)"/>
+      <path d="M28 35 V56 H37" fill="none" stroke="#11131F" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M42 56 V35 L52 56 V35" fill="none" stroke="#11131F" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="68" cy="45.5" r="10.5" fill="url(#oro)"/>
+      <path d="M63 45.5 L66.5 49 L73 42" fill="none" stroke="#10121D" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header>
+  <small>Leinei · identidad</small>
+  <h1>Cuatro propuestas para la marca</h1>
+  <p>Leinei es la plataforma de pedidos que vende sus módulos a los negocios. Las cuatro llevan el monograma LN dentro de un símbolo que todo el mundo asocia con pedir: la bolsa, la comanda, el domicilio y el mensaje.</p>
+</header>
+
+<main>
+  <section class="concepto">
+    <div class="escena">
+      <span class="num">Propuesta A · Bolsa</span>
+      <div class="heroe">
+        <svg class="icono" viewBox="0 0 100 100"><use href="#marcaA"/></svg>
+        <div class="marca-texto"><b>Leinei</b><span>Pedidos en línea</span></div>
+      </div>
+      <div class="idea">
+        <h2>Llegó un pedido</h2>
+        <p>La bolsa de compras con LN y un aviso dorado de «nuevo pedido», como el de una notificación. Se entiende al instante, en cualquier país y edad: aquí se pide y se vende.</p>
+      </div>
+    </div>
+    <div class="usos">
+      <div class="uso"><h3>Sobre fondo claro</h3>
+        <div class="bloque-claro"><svg viewBox="0 0 100 100"><use href="#marcaA"/></svg><b>Leinei</b></div></div>
+      <div class="uso"><h3>Tamaños</h3>
+        <div class="tamanos">
+          <div><svg width="64" height="64" viewBox="0 0 100 100"><use href="#marcaA"/></svg>64</div>
+          <div><svg width="40" height="40" viewBox="0 0 100 100"><use href="#marcaA"/></svg>40</div>
+          <div><svg width="24" height="24" viewBox="0 0 100 100"><use href="#marcaA"/></svg>24</div>
+          <div><svg width="16" height="16" viewBox="0 0 100 100"><use href="#marcaA"/></svg>16</div>
+        </div></div>
+      <div class="uso"><h3>En el celular</h3>
+        <div class="celular"><div><i></i>Fotos</div><div><svg viewBox="0 0 100 100"><use href="#marcaA"/></svg>Leinei</div><div><i></i>Mapas</div><div><i></i>Correo</div></div></div>
+    </div>
+  </section>
+
+  <section class="concepto">
+    <div class="escena">
+      <span class="num">Propuesta B · Comanda</span>
+      <div class="heroe">
+        <svg class="icono" viewBox="0 0 100 100"><use href="#marcaB"/></svg>
+        <div class="marca-texto"><b>Leinei</b><span>Cada pedido, en orden</span></div>
+      </div>
+      <div class="idea">
+        <h2>El pedido confirmado</h2>
+        <p>El tiquete del pedido, con el borde cortado de papel, LN como encabezado, las líneas de productos y un chulo dorado de confirmado. Habla de la operación del negocio: recibir, ordenar y despachar.</p>
+      </div>
+    </div>
+    <div class="usos">
+      <div class="uso"><h3>Sobre fondo claro</h3>
+        <div class="bloque-claro"><svg viewBox="0 0 100 100"><use href="#marcaB"/></svg><b>Leinei</b></div></div>
+      <div class="uso"><h3>Tamaños</h3>
+        <div class="tamanos">
+          <div><svg width="64" height="64" viewBox="0 0 100 100"><use href="#marcaB"/></svg>64</div>
+          <div><svg width="40" height="40" viewBox="0 0 100 100"><use href="#marcaB"/></svg>40</div>
+          <div><svg width="24" height="24" viewBox="0 0 100 100"><use href="#marcaB"/></svg>24</div>
+          <div><svg width="16" height="16" viewBox="0 0 100 100"><use href="#marcaB"/></svg>16</div>
+        </div></div>
+      <div class="uso"><h3>En el celular</h3>
+        <div class="celular"><div><i></i>Fotos</div><div><svg viewBox="0 0 100 100"><use href="#marcaB"/></svg>Leinei</div><div><i></i>Mapas</div><div><i></i>Correo</div></div></div>
+    </div>
+  </section>
+
+  <section class="concepto">
+    <div class="escena">
+      <span class="num">Propuesta C · Domicilio</span>
+      <div class="heroe">
+        <svg class="icono" viewBox="0 0 100 100"><use href="#marcaC"/></svg>
+        <div class="marca-texto"><b>Leinei</b><span>De tu tienda a su puerta</span></div>
+      </div>
+      <div class="idea">
+        <h2>En camino</h2>
+        <p>Un pin de ubicación en oro con LN adentro y líneas de velocidad: el pedido va rápido hacia el cliente. La más dinámica, ideal si quieres destacar los domicilios y el seguimiento en vivo.</p>
+      </div>
+    </div>
+    <div class="usos">
+      <div class="uso"><h3>Sobre fondo claro</h3>
+        <div class="bloque-claro"><svg viewBox="0 0 100 100"><use href="#marcaC"/></svg><b>Leinei</b></div></div>
+      <div class="uso"><h3>Tamaños</h3>
+        <div class="tamanos">
+          <div><svg width="64" height="64" viewBox="0 0 100 100"><use href="#marcaC"/></svg>64</div>
+          <div><svg width="40" height="40" viewBox="0 0 100 100"><use href="#marcaC"/></svg>40</div>
+          <div><svg width="24" height="24" viewBox="0 0 100 100"><use href="#marcaC"/></svg>24</div>
+          <div><svg width="16" height="16" viewBox="0 0 100 100"><use href="#marcaC"/></svg>16</div>
+        </div></div>
+      <div class="uso"><h3>En el celular</h3>
+        <div class="celular"><div><i></i>Fotos</div><div><svg viewBox="0 0 100 100"><use href="#marcaC"/></svg>Leinei</div><div><i></i>Mapas</div><div><i></i>Correo</div></div></div>
+    </div>
+  </section>
+
+  <section class="concepto">
+    <div class="escena">
+      <span class="num">Propuesta D · Mensaje</span>
+      <div class="heroe">
+        <svg class="icono" viewBox="0 0 100 100"><use href="#marcaD"/></svg>
+        <div class="marca-texto"><b>Leinei</b><span>Pides y te confirman</span></div>
+      </div>
+      <div class="idea">
+        <h2>Pedido recibido</h2>
+        <p>El globo de chat con LN y un chulo dorado de «recibido». Conecta con la forma en que la gente ya pide en Colombia: por mensaje, y con la tranquilidad de que el negocio lo confirmó.</p>
+      </div>
+    </div>
+    <div class="usos">
+      <div class="uso"><h3>Sobre fondo claro</h3>
+        <div class="bloque-claro"><svg viewBox="0 0 100 100"><use href="#marcaD"/></svg><b>Leinei</b></div></div>
+      <div class="uso"><h3>Tamaños</h3>
+        <div class="tamanos">
+          <div><svg width="64" height="64" viewBox="0 0 100 100"><use href="#marcaD"/></svg>64</div>
+          <div><svg width="40" height="40" viewBox="0 0 100 100"><use href="#marcaD"/></svg>40</div>
+          <div><svg width="24" height="24" viewBox="0 0 100 100"><use href="#marcaD"/></svg>24</div>
+          <div><svg width="16" height="16" viewBox="0 0 100 100"><use href="#marcaD"/></svg>16</div>
+        </div></div>
+      <div class="uso"><h3>En el celular</h3>
+        <div class="celular"><div><i></i>Fotos</div><div><svg viewBox="0 0 100 100"><use href="#marcaD"/></svg>Leinei</div><div><i></i>Mapas</div><div><i></i>Correo</div></div></div>
+    </div>
+  </section>
+</main>

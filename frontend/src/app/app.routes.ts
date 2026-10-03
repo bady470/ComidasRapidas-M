@@ -59,7 +59,8 @@ export const routes: Routes = [
     canActivate: [soloSuperadmin],
     loadComponent: () => import('./superadmin/layout').then((m) => m.SuperLayout),
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'empresas' },
+      { path: '', pathMatch: 'full', redirectTo: 'panel' },
+      { path: 'panel', title: 'Panel', loadComponent: () => import('./superadmin/panel').then((m) => m.PanelPlataformaPage) },
       { path: 'empresas', title: 'Empresas', loadComponent: () => import('./superadmin/empresas').then((m) => m.EmpresasPage) },
       { path: 'empresas/nueva', title: 'Nueva empresa', loadComponent: () => import('./superadmin/nueva').then((m) => m.NuevaEmpresaPage) },
       { path: 'empresas/:uuid', title: 'Empresa', loadComponent: () => import('./superadmin/detalle').then((m) => m.DetalleEmpresaPage) },
